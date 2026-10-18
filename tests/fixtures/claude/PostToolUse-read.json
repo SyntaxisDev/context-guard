@@ -1,0 +1,27 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "permission_mode": "auto",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "tool_input": {
+      "file_path": "{HOME}/.context-guard/handoffs/file.md",
+      "limit": 3
+    },
+    "tool_name": "Read",
+    "tool_response": {
+      "file": {
+        "content": "<scrubbed>",
+        "filePath": "<scrubbed>",
+        "numLines": 3,
+        "startLine": 1,
+        "totalLines": 31
+      },
+      "type": "text"
+    },
+    "tool_use_id": "toolu_d0a0656b432449bfa0658b10",
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

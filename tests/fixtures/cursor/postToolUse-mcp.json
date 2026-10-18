@@ -1,0 +1,24 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "conversation_id": "b7b59d4f-decd-6917-9e08-33f008623adc",
+    "cursor_version": "3.25.6",
+    "duration": 2161.362,
+    "generation_id": "97c1c065-da7c-70b8-eb81-b354cb47f9b1",
+    "hook_event_name": "postToolUse",
+    "model": "claude-opus-5-5",
+    "session_id": "b7b59d4f-decd-6917-9e08-33f008623adc",
+    "tool_input": {
+      "query": "<scrubbed>"
+    },
+    "tool_name": "MCP:execute_sql_read_only",
+    "tool_output": "<scrubbed>",
+    "tool_use_id": "a9d5fc93-5d31-a6e5-5319-2366074ca256",
+    "transcript_path": "{HOME}/.cursor/projects/dir/agent-transcripts/b7b59d4f-decd-6917-9e08-33f008623adc/b7b59d4f-decd-6917-9e08-33f008623adc.jsonl",
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Cursor hook log stdin dump (cursor.hooks.*.log), scrubbed"
+}

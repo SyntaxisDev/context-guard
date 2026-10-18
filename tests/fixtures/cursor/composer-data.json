@@ -1,0 +1,15 @@
+{
+  "record": {
+    "_v": 18,
+    "contextTokenLimit": 300000,
+    "contextTokensUsed": 185463,
+    "contextUsagePercent": 61.821000000000005,
+    "createdAt": 1792309582332,
+    "isAgentic": true,
+    "lastUpdatedAt": 1792313862591,
+    "name": "<scrubbed>",
+    "status": "completed",
+    "unifiedMode": "agent"
+  },
+  "source": "Cursor state.vscdb cursorDiskKV composerData:<id>, scrubbed"
+}

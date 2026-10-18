@@ -1,0 +1,12 @@
+{
+  "event": "SessionStart",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "SessionStart",
+    "model": "claude-opus-5-5",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "source": "startup",
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

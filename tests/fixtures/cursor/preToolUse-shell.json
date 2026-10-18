@@ -1,0 +1,25 @@
+{
+  "event": "preToolUse",
+  "payload": {
+    "conversation_id": "247709dd-81db-f108-072d-c2629977ba89",
+    "cursor_version": "3.25.6",
+    "cwd": "",
+    "generation_id": "e07f6547-08ec-bf9d-d18f-f8c41277efca",
+    "hook_event_name": "preToolUse",
+    "model": "claude-opus-5-5",
+    "session_id": "247709dd-81db-f108-072d-c2629977ba89",
+    "tool_input": {
+      "command": "<scrubbed>",
+      "cwd": "",
+      "timeout": 30000
+    },
+    "tool_name": "Shell",
+    "tool_use_id": "51847f53-9ed5-9304-950e-9c5f25342aae",
+    "transcript_path": "{HOME}/.cursor/projects/dir/agent-transcripts/247709dd-81db-f108-072d-c2629977ba89/247709dd-81db-f108-072d-c2629977ba89.jsonl",
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Cursor hook log stdin dump (cursor.hooks.*.log), scrubbed"
+}

@@ -1,0 +1,41 @@
+{
+  "capabilities": ["shell", "write", "network", "mcp", "git_push"],
+  "tiers": ["cheap", "standard", "deep"],
+  "roles": {
+    "scout": {
+      "description": "Fast read-only codebase search. Use to find files, symbols, usages and patterns. Returns paths and short snippets only.",
+      "capabilities": {"shell": false, "write": false, "network": false, "mcp": false, "git_push": false},
+      "default_tier": "cheap",
+      "allowed_tiers": ["cheap"],
+      "budget_tokens": 60000
+    },
+    "investigator": {
+      "description": "Read-heavy research. Use when answering a question needs more than ~5 files, long logs, CI output, PR threads, or data queries. Returns a short evidence pack, not raw output.",
+      "capabilities": {"shell": true, "write": false, "network": true, "mcp": true, "git_push": false},
+      "default_tier": "standard",
+      "allowed_tiers": ["cheap", "standard", "deep"],
+      "budget_tokens": 120000
+    },
+    "reviewer": {
+      "description": "Reviews a diff, branch or PR for correctness and risk. Use for one focused review pass; pass the scope (PR number, base branch, or files) and what to focus on.",
+      "capabilities": {"shell": true, "write": false, "network": true, "mcp": false, "git_push": false},
+      "default_tier": "deep",
+      "allowed_tiers": ["standard", "deep"],
+      "budget_tokens": 120000
+    },
+    "implementer": {
+      "description": "Executes an agreed plan or handoff file. Use after the design is decided; pass the plan/handoff path and the scope. Not for design decisions.",
+      "capabilities": {"shell": true, "write": true, "network": false, "mcp": true, "git_push": false},
+      "default_tier": "standard",
+      "allowed_tiers": ["standard", "deep"]
+    },
+    "runner": {
+      "description": "Mechanical execution. Use for tests, lint, builds, long-running commands, status checks, and git chores the user explicitly asked for (commit, push, rebase, PR).",
+      "capabilities": {"shell": true, "write": true, "network": true, "mcp": true, "git_push": true},
+      "default_tier": "cheap",
+      "allowed_tiers": ["cheap", "standard"],
+      "budget_tokens": 60000
+    }
+  },
+  "variants": []
+}

@@ -1,0 +1,19 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "default",
+    "session_id": "c30fff5d-9be8-5c49-b3f5-5ecf51c9b324",
+    "tool_input": {
+      "command": "*** Begin Patch\n*** Update File: {PROJECT}/file.py\n@@\n-old\n+new\n*** End Patch\n"
+    },
+    "tool_name": "apply_patch",
+    "tool_response": "<scrubbed>",
+    "tool_use_id": "call_eacd1240d9cc9bcef6c1ea7c",
+    "transcript_path": "{HOME}/.codex/sessions/2026/10/16/rollout-2026-10-16T16-09-01-c30fff5d-9be8-5c49-b3f5-5ecf51c9b324.jsonl",
+    "turn_id": "0c7f695a-5df2-8588-f7fa-45d7b5716a02"
+  },
+  "source": "Codex rollout values (session_meta, turn_context, spawn_agent call) shaped by the codex binary schema"
+}

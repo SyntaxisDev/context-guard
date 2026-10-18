@@ -1,0 +1,21 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "agent_id": "a1c88201-7e91-d532-3a4c-e6db82f16842",
+    "agent_type": "implementer",
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "default",
+    "session_id": "c30fff5d-9be8-5c49-b3f5-5ecf51c9b324",
+    "tool_input": {
+      "command": "<scrubbed>"
+    },
+    "tool_name": "Bash",
+    "tool_response": "<scrubbed>",
+    "tool_use_id": "call_eacd1240d9cc9bcef6c1ea7c",
+    "transcript_path": "{HOME}/.codex/sessions/2026/10/16/rollout-2026-10-16T16-09-01-c30fff5d-9be8-5c49-b3f5-5ecf51c9b324.jsonl",
+    "turn_id": "4c257f56-e708-ed32-aea5-f276758d6f5b"
+  },
+  "source": "Codex rollout values (session_meta, turn_context, spawn_agent call) shaped by the codex binary schema"
+}

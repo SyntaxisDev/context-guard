@@ -1,0 +1,86 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "permission_mode": "auto",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "tool_input": {
+      "description": "<scrubbed>",
+      "prompt": "recorded prompt (scrubbed)",
+      "run_in_background": false,
+      "subagent_type": "investigator"
+    },
+    "tool_name": "Agent",
+    "tool_response": {
+      "agentId": "a0257b112ec53fe9d",
+      "agentType": "<scrubbed>",
+      "canContinueAgent": true,
+      "content": [
+        {
+          "text": "<scrubbed>",
+          "type": "text"
+        }
+      ],
+      "handback": "<scrubbed>",
+      "handbackReport": {
+        "text": "<scrubbed>"
+      },
+      "harnessNoteCount": 1,
+      "harnessSectionHash": "<scrubbed>",
+      "harnessTailCount": 0,
+      "prompt": "recorded prompt (scrubbed)",
+      "resolvedModel": "claude-sonnet-5-5",
+      "status": "completed",
+      "toolStats": {
+        "bashCount": 15,
+        "editFileCount": 0,
+        "linesAdded": 0,
+        "linesRemoved": 0,
+        "otherToolCount": 1,
+        "readCount": 0,
+        "searchCount": 0
+      },
+      "totalDurationMs": 78733,
+      "totalTokens": 96537,
+      "totalToolUseCount": 16,
+      "usage": {
+        "cache_creation": {
+          "ephemeral_1h_input_tokens": 0,
+          "ephemeral_5m_input_tokens": 2183
+        },
+        "cache_creation_input_tokens": 2183,
+        "cache_read_input_tokens": 93025,
+        "fallback_credit": null,
+        "inference_geo": "<scrubbed>",
+        "input_tokens": 2,
+        "iterations": [
+          {
+            "cache_creation": {
+              "ephemeral_1h_input_tokens": 0,
+              "ephemeral_5m_input_tokens": 2183
+            },
+            "cache_creation_input_tokens": 2183,
+            "cache_read_input_tokens": 93025,
+            "input_tokens": 2,
+            "output_tokens": 1327,
+            "type": "message"
+          }
+        ],
+        "output_tokens": 1327,
+        "output_tokens_details": {
+          "thinking_tokens": 0
+        },
+        "server_tool_use": {
+          "web_fetch_requests": 0,
+          "web_search_requests": 0
+        },
+        "service_tier": "<scrubbed>",
+        "speed": "<scrubbed>"
+      }
+    },
+    "tool_use_id": "toolu_b514825c776c2ae2458ef23c",
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

@@ -1,0 +1,16 @@
+{
+  "event": "SubagentStop",
+  "payload": {
+    "agent_id": "a5c0d72bf372adaaa",
+    "agent_transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980/subagents/agent-a5c0d72bf372adaaa.jsonl",
+    "agent_type": "investigator",
+    "cwd": "{PROJECT}",
+    "hook_event_name": "SubagentStop",
+    "last_assistant_message": "<scrubbed>",
+    "permission_mode": "auto",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "stop_hook_active": false,
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

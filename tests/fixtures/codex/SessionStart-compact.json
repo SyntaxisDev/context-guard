@@ -1,0 +1,13 @@
+{
+  "event": "SessionStart",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "SessionStart",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "default",
+    "session_id": "c30fff5d-9be8-5c49-b3f5-5ecf51c9b324",
+    "source": "compact",
+    "transcript_path": "{HOME}/.codex/sessions/2026/10/16/rollout-2026-10-16T16-09-01-c30fff5d-9be8-5c49-b3f5-5ecf51c9b324.jsonl"
+  },
+  "source": "Codex rollout values (session_meta, turn_context, spawn_agent call) shaped by the codex binary schema"
+}

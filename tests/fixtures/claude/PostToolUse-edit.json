@@ -1,0 +1,47 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "permission_mode": "auto",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "tool_input": {
+      "file_path": "{HOME}/.context-guard/handoffs/file.md",
+      "new_string": "<scrubbed>",
+      "old_string": "<scrubbed>",
+      "replace_all": false
+    },
+    "tool_name": "Edit",
+    "tool_response": {
+      "filePath": "<scrubbed>",
+      "newString": "<scrubbed>",
+      "oldString": "<scrubbed>",
+      "originalFile": "<scrubbed>",
+      "replaceAll": false,
+      "structuredPatch": [
+        {
+          "lines": [
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>",
+            "<scrubbed>"
+          ],
+          "newLines": 8,
+          "newStart": 24,
+          "oldLines": 8,
+          "oldStart": 24
+        }
+      ],
+      "userModified": false
+    },
+    "tool_use_id": "toolu_da6996a3e4ba4b78d41b199c",
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

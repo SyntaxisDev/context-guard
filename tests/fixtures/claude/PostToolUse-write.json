@@ -1,0 +1,25 @@
+{
+  "event": "PostToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "PostToolUse",
+    "permission_mode": "auto",
+    "session_id": "c0092fd1-e9e0-036e-ef0c-cfa895348980",
+    "tool_input": {
+      "content": "<scrubbed>",
+      "file_path": "{HOME}/.context-guard/handoffs/file.md"
+    },
+    "tool_name": "Write",
+    "tool_response": {
+      "content": "<scrubbed>",
+      "filePath": "<scrubbed>",
+      "originalFile": null,
+      "structuredPatch": [],
+      "type": "create",
+      "userModified": false
+    },
+    "tool_use_id": "toolu_bf42a82d3284900824a54c71",
+    "transcript_path": "{HOME}/.claude/projects/dir/c0092fd1-e9e0-036e-ef0c-cfa895348980.jsonl"
+  },
+  "source": "Claude Code transcript values (session, model, tool_use input and toolUseResult) with documented fields"
+}

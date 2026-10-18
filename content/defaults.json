@@ -1,0 +1,125 @@
+{
+  "thresholds": {
+    "note_fraction": 0.55,
+    "note_cap": 150000,
+    "firm_fraction": 0.75,
+    "firm_cap": 200000,
+    "block_fraction": 0.92,
+    "block_cap": 260000
+  },
+  "subagent_budget": {
+    "enabled": true,
+    "tokens": 80000
+  },
+  "handoff_list": {
+    "enabled": true,
+    "limit": 5
+  },
+  "kit_check": {
+    "enabled": true,
+    "auto_update": false
+  },
+  "handoff_refresh": {
+    "enabled": true,
+    "refresh_tokens": 60000,
+    "min_seconds": 300
+  },
+  "paths": {
+    "handoff_dir": "~/.context-guard/handoffs",
+    "state_dir": "~/.context-guard/state",
+    "prune_days": 30
+  },
+  "events": {
+    "enabled": true,
+    "max_lines": 5000
+  },
+  "classifier": {
+    "max_chars": 200,
+    "max_question_words": 4,
+    "polite_words": [
+      "can you",
+      "could you",
+      "can we",
+      "mind",
+      "shall we",
+      "please"
+    ],
+    "keywords": [
+      "commit",
+      "push",
+      "pushed",
+      "rebase",
+      "merge",
+      "merged",
+      "cherry",
+      "conflicts?",
+      "pr",
+      "prs",
+      "pull request",
+      "re-?run",
+      "retry",
+      "lint",
+      "ruff",
+      "format",
+      "status",
+      "parse",
+      "reparse",
+      "compile",
+      "ci",
+      "pipeline",
+      "stage",
+      "staged",
+      "amend",
+      "squash",
+      "checkout",
+      "clean",
+      "deps",
+      "stash",
+      "pull",
+      "worktree",
+      "full-refresh",
+      "deploy",
+      "trigger",
+      "cancel",
+      "run (?:the )?tests?",
+      "go ahead",
+      "do it"
+    ],
+    "short_keywords": [
+      "run",
+      "running",
+      "test",
+      "tests",
+      "again",
+      "check",
+      "done",
+      "green"
+    ],
+    "short_max_words": 8,
+    "enabled": false,
+    "timeout_seconds": 20,
+    "cache_entries": 5000,
+    "model": ""
+  },
+  "calibration": {
+    "enabled": false,
+    "mode": "propose",
+    "first_run_prompts": 1000,
+    "interval_days": 30,
+    "window": 10000,
+    "sample_rejected": 2000,
+    "batch_size": 50,
+    "max_fp_per_tp": 3,
+    "min_mechanical": 20,
+    "model": ""
+  },
+  "runner": {
+    "enabled": false,
+    "model": "",
+    "commands": [],
+    "max_commands": 8,
+    "timeout_seconds": 300,
+    "plan_timeout_seconds": 60,
+    "cooldown_seconds": 60
+  }
+}

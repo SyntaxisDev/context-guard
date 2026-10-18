@@ -1,0 +1,28 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "conversation_id": "07214565-c4d0-4156-a26c-fa997370e042",
+    "cursor_version": "3.25.6",
+    "cwd": "{PROJECT}",
+    "duration": 1102.78,
+    "generation_id": "d5cde799-6f2e-9747-7d36-6618e323343c",
+    "hook_event_name": "postToolUse",
+    "model": "claude-opus-5-5-high",
+    "parent_tool_call_id": "toolu_e7c50089848141f13f3adf59",
+    "session_id": "07214565-c4d0-4156-a26c-fa997370e042",
+    "tool_input": {
+      "command": "<scrubbed>",
+      "cwd": "{PROJECT}",
+      "timeout": 30000
+    },
+    "tool_name": "Shell",
+    "tool_output": "<scrubbed>",
+    "tool_use_id": "289bd9c3-b5fb-3746-07c7-6f1aa3843752",
+    "transcript_path": null,
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Cursor hook log stdin dump (cursor.hooks.*.log), scrubbed"
+}

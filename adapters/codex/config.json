@@ -1,0 +1,9 @@
+{
+  "tiers": {
+    "cheap": {"model": "gpt-6-luna", "effort": "low"},
+    "standard": {"model": "gpt-6.1-sol", "effort": "medium"},
+    "deep": {"model": "gpt-6.1-sol", "effort": "high"}
+  },
+  "rollout_tail_bytes": 2097152,
+  "additional_context_limit": 6000
+}

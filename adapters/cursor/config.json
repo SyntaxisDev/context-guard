@@ -1,0 +1,30 @@
+{
+  "tiers": {
+    "cheap": {"agent_model": "claude-haiku-5-5[effort=low]", "call": "claude-haiku-5-5-thinking-high"},
+    "standard": {"agent_model": "claude-sonnet-5-5[effort=medium]", "call": "claude-sonnet-5-5-medium"},
+    "deep": {"agent_model": "claude-opus-5-5[effort=high,context=300k]", "call": "claude-opus-5-5-high"}
+  },
+  "telemetry": {
+    "state_db": "",
+    "platform_state_db": {
+      "darwin": "~/Library/Application Support/Cursor/User/globalStorage/state.vscdb",
+      "linux": "~/.config/Cursor/User/globalStorage/state.vscdb"
+    },
+    "cli_chats": "~/.cursor/chats",
+    "window_fallback": 0,
+    "timeout_seconds": 1
+  },
+  "hook_events": {
+    "sessionStart": {"event": "session", "hook": {"timeout": 5}},
+    "beforeSubmitPrompt": {"event": "prompt", "hook": {"timeout": 5}},
+    "preToolUse": {"event": "tool", "spawn_only": true, "hook": {"timeout": 5, "matcher": "Task"}},
+    "postToolUse": {"event": "tool", "hook": {"timeout": 5}},
+    "stop": {"event": "stop", "hook": {"timeout": 5, "loop_limit": 1}}
+  },
+  "tools": {
+    "read": ["Read"],
+    "write": ["Write", "StrReplace", "Edit", "MultiEdit"],
+    "shell": ["Shell"],
+    "spawn": ["Task"]
+  }
+}

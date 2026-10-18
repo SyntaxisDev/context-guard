@@ -1,0 +1,82 @@
+#!/usr/bin/expect -f
+# Drives one interactive cursor-agent session: beforeSubmitPrompt and stop fire only from the
+# terminal UI, never with `cursor-agent -p`. The session output goes to stdout.
+#
+# Usage: cursor_interactive.exp <prompt> [<prompt> ...] -- <cursor-agent command> [<arg> ...]
+# Exit codes: 0 every prompt answered, 2 usage, 3 timeout, 4 cursor-agent exited early.
+#
+# The UI enables the kitty keyboard protocol, so "\r" only inserts a newline and "\033[13u" submits.
+# Keys sent before it switches the tty to raw mode are echoed and lost, so typing waits for a quiet screen.
+set separator [lsearch -exact $argv --]
+if {$separator < 1 || $separator == [llength $argv] - 1} {
+    puts stderr "usage: cursor_interactive.exp <prompt>... -- <command> \[<arg>...\]"
+    exit 2
+}
+set prompts [lrange $argv 0 [expr {$separator - 1}]]
+set command [lrange $argv [expr {$separator + 1}] end]
+set submit "\033\[13u"
+set stty_init "rows 45 cols 160"
+set send_slow {1 0.03}
+set start_seconds 60
+set settle_seconds 5
+set turn_seconds 90
+set quiet_seconds 6
+
+proc quit {} { send "\003"; sleep 1; send "\003" }
+proc fail {code message} { puts stderr $message; quit; exit $code }
+proc ended {what} { puts stderr "cursor-agent exited during $what"; exit 4 }
+
+proc wait_ready {limit settle} {
+    set timeout $limit
+    expect {
+        -re {[Tt]rust this (workspace|folder)} { send "\r"; exp_continue }
+        "Plan, search, build anything" {}
+        timeout { fail 3 "timeout waiting for startup" }
+        eof { ended startup }
+    }
+    set timeout $settle
+    set deadline [expr {[clock seconds] + $limit}]
+    expect {
+        -re {.+} { if {[clock seconds] < $deadline} { exp_continue } }
+        timeout {}
+        eof { ended startup }
+    }
+}
+
+# Busy: the footer shows "ctrl+c to stop" and a "Composing"/"Thinking" spinner redraws constantly.
+# Done: the screen stays quiet for `quiet` seconds and the last redraw shows no busy marker.
+proc wait_turn {what limit quiet} {
+    set timeout 45
+    expect {
+        "ctrl+c to stop" {}
+        timeout { fail 3 "$what never started" }
+        eof { ended $what }
+    }
+    set deadline [expr {[clock seconds] + $limit}]
+    set last ""
+    while {[clock seconds] < $deadline} {
+        set timeout $quiet
+        expect {
+            -re {.+} { set last $expect_out(0,string) }
+            timeout { if {![regexp {Composing|Thinking|ctrl\+c to stop} $last]} { return } }
+            eof { ended $what }
+        }
+    }
+    fail 3 "timeout waiting for $what"
+}
+
+spawn {*}$command
+wait_ready $start_seconds $settle_seconds
+set turn 0
+foreach prompt $prompts {
+    incr turn
+    send -s -- $prompt
+    sleep 1
+    send -- $submit
+    wait_turn "turn $turn" $turn_seconds $quiet_seconds
+    sleep 2
+}
+quit
+set timeout 15
+expect eof {}
+exit 0

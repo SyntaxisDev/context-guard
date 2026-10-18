@@ -1,0 +1,16 @@
+{
+  "tiers": {
+    "cheap": {"model": "claude-haiku-5-5", "effort": "low", "call": "haiku"},
+    "standard": {"model": "sonnet", "effort": "medium", "call": "sonnet"},
+    "deep": {"model": "opus", "effort": "high", "call": "opus"}
+  },
+  "transcript": {
+    "tail_bytes": 2097152,
+    "min_learned_window": 50000
+  },
+  "context_windows": [["[1m]", 1000000], ["claude-", 200000]],
+  "hook_output": {
+    "context_chars": 10000,
+    "tool_note_chars": 2000
+  }
+}

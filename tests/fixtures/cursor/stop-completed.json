@@ -1,0 +1,34 @@
+{
+  "event": "stop",
+  "payload": {
+    "conversation_id": "247709dd-81db-f108-072d-c2629977ba89",
+    "cursor_version": "3.25.6",
+    "generation_id": "9995f0a7-c6af-01db-f803-d6a4982fe876",
+    "hook_event_name": "stop",
+    "loop_count": 0,
+    "model": "claude-opus-5-5-high",
+    "model_id": "claude-opus-5-5",
+    "model_params": [
+      {
+        "id": "context",
+        "value": "300k"
+      },
+      {
+        "id": "effort",
+        "value": "high"
+      },
+      {
+        "id": "fast",
+        "value": "false"
+      }
+    ],
+    "session_id": "247709dd-81db-f108-072d-c2629977ba89",
+    "status": "completed",
+    "transcript_path": "{HOME}/.cursor/projects/dir/agent-transcripts/247709dd-81db-f108-072d-c2629977ba89/247709dd-81db-f108-072d-c2629977ba89.jsonl",
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Cursor hook log stdin dump (cursor.hooks.*.log), scrubbed"
+}

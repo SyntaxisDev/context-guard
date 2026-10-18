@@ -1,0 +1,12 @@
+{
+  "record": {
+    "compactMetadata": {
+      "preTokens": 167288,
+      "trigger": "auto"
+    },
+    "subtype": "compact_boundary",
+    "timestamp": "2026-10-10T07:31:55.924Z",
+    "type": "system"
+  },
+  "source": "Claude transcript compact_boundary record"
+}

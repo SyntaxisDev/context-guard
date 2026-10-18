@@ -1,0 +1,29 @@
+{
+  "record": {
+    "payload": {
+      "info": {
+        "last_token_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 76672,
+          "input_tokens": 77304,
+          "output_tokens": 137,
+          "reasoning_output_tokens": 0,
+          "total_tokens": 77441
+        },
+        "model_context_window": 475000,
+        "total_token_usage": {
+          "cache_write_input_tokens": 0,
+          "cached_input_tokens": 3370880,
+          "input_tokens": 3449790,
+          "output_tokens": 5222,
+          "reasoning_output_tokens": 450,
+          "total_tokens": 3455012
+        }
+      },
+      "type": "token_count"
+    },
+    "timestamp": "2026-10-16T14:04:42.346Z",
+    "type": "event_msg"
+  },
+  "source": "Codex rollout event_msg token_count, numbers kept"
+}
