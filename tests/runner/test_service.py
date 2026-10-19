@@ -1,4 +1,5 @@
 """Optional runner contracts: off by default, classifier gating and deadline, plan -> validate -> execute."""
+
 import json
 import shutil
 import subprocess
@@ -19,16 +20,28 @@ WINDOW = 200_000
 
 
 def fake_cli(directory: Path, body: str) -> Path:
-    """An executable standing in for a runtime CLI; it records each call next to itself."""
+    """Write an executable standing in for a runtime CLI; it records each call next to itself.
+
+    Args:
+        directory: Where the executable and its `calls` record are written.
+        body: Python source the executable runs after recording the call.
+
+    Returns:
+        The path of the executable.
+    """
     path = directory / "fake-cli"
-    path.write_text(f"#!{sys.executable}\nimport pathlib, sys, time\n"
-                    f"pathlib.Path({str(directory / 'calls')!r}).open('a').write('call\\n')\n{body}\n")
+    path.write_text(
+        f"#!{sys.executable}\nimport pathlib, sys, time\n"
+        f"pathlib.Path({str(directory / 'calls')!r}).open('a').write('call\\n')\n{body}\n"
+    )
     path.chmod(0o755)
     return path
 
 
 class ServiceCase(unittest.TestCase):
-    def setUp(self):
+    """A temporary home and workspace with a fake runtime CLI behind the runner services."""
+
+    def setUp(self) -> None:
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name).resolve()
@@ -37,13 +50,16 @@ class ServiceCase(unittest.TestCase):
         self.workspace.mkdir()
         self.loader = config.ConfigLoader(config.sources_for("test", self.home, None), {})
 
-    def enable(self, **sections):
+    def enable(self, **sections: dict) -> None:
         self.loader.update_user_config({name: {"enabled": True, **values} for name, values in sections.items()})
 
     def services(self, answer: str = "", body: str | None = None) -> service.Services:
         cli = fake_cli(self.root, body if body is not None else f"print({answer!r})")
-        provider = Provider(str(cli), lambda program, model, prompt, scratch, schema: Invocation([program, model], prompt),
-                            lambda stdout, scratch: stdout)
+        provider = Provider(
+            str(cli),
+            lambda program, model, prompt, _scratch, _schema: Invocation([program, model], prompt),
+            lambda stdout, _scratch: stdout,
+        )
         return service.Services(self.loader, self.home, "test", provider, "cheap-model", [sys.executable, "worker"])
 
     def calls(self) -> int:
@@ -59,7 +75,9 @@ class ServiceCase(unittest.TestCase):
 
 
 class GatingTests(ServiceCase):
-    def test_disabled_by_default_builds_nothing_and_starts_no_process(self):
+    """When the classifier, calibration and runner act, and how routing combines with the policy decision."""
+
+    def test_disabled_by_default_builds_nothing_and_starts_no_process(self) -> None:
         build = mock.Mock()
         with mock.patch.object(subprocess, "Popen") as popen:
             routing = service.route(self.prompt("commit and push", 190_000), self.loader.load(), build)
@@ -67,7 +85,7 @@ class GatingTests(ServiceCase):
         build.assert_not_called()
         popen.assert_not_called()
 
-    def test_subagents_and_other_events_never_route(self):
+    def test_subagents_and_other_events_never_route(self) -> None:
         self.enable(classifier={}, runner={})
         build = mock.Mock()
         leaf = Observation("test", "a1", "prompt", tokens=190_000, is_subagent=True, prompt="commit")
@@ -76,8 +94,8 @@ class GatingTests(ServiceCase):
             self.assertEqual(service.route(obs, self.loader.load(), build), service.Routing())
         build.assert_not_called()
 
-    def test_classifier_is_skipped_below_the_note_threshold(self):
-        self.enable(classifier={})
+    def test_classifier_is_skipped_below_the_note_threshold(self) -> None:
+        self.enable(classifier={}, calibration={})
         services = self.services("MECHANICAL")
         self.assertEqual(services.prompt(self.prompt("commit and push", 100_000)).message, "")
         self.assertEqual(self.calls(), 0)
@@ -85,23 +103,53 @@ class GatingTests(ServiceCase):
         self.assertEqual((self.calls(), routing.message), (1, service.MECHANICAL_NOTE))
         self.assertEqual([row["asked"] for row in self.decisions()], [False, True])
 
-    def test_classifier_timeout_fails_open_inside_the_hook_deadline(self):
-        self.enable(classifier={"timeout_seconds": 20})
+    def test_classifier_timeout_fails_open_inside_the_hook_deadline(self) -> None:
+        self.enable(classifier={"timeout_seconds": 20}, calibration={})
         services = self.services(body="time.sleep(30)")
         started = time.monotonic()
-        routing = deadline.run_within(lambda: services.prompt(self.prompt("commit and push", 190_000)),
-                                      "deadline expired", seconds=2)
+        routing = deadline.run_within(
+            lambda: services.prompt(self.prompt("commit and push", 190_000)), "deadline expired", seconds=2
+        )
         self.assertLess(time.monotonic() - started, 2)
         self.assertEqual(routing, service.Routing())
         self.assertEqual(self.calls(), 1)
         self.assertEqual([(row["asked"], row["label"]) for row in self.decisions()], [(True, None)])
 
-    def test_mechanical_label_schedules_the_runner_and_blocks_the_prompt(self):
-        self.enable(classifier={}, runner={})
+    def test_decisions_are_logged_only_with_calibration_and_truncated(self) -> None:
+        self.enable(classifier={})
+        services = self.services("CONTINUE")
+        services.prompt(self.prompt("commit and push", 190_000))
+        self.assertFalse(services.calibration.log_path().exists())
+        self.enable(calibration={})
+        long = "x" * 5000
+        self.services("CONTINUE").prompt(self.prompt(long, 190_000))
+        limit = self.loader.load()["classifier"]["max_chars"] + 1
+        self.assertEqual([(row["prompt"], row["chars"]) for row in self.decisions()], [(long[:limit], 5000)])
+
+    def test_calibration_alone_logs_prompts_without_asking_the_classifier(self) -> None:
+        self.enable(calibration={})
+        build = mock.Mock(side_effect=lambda: self.services("MECHANICAL"))
+        routing = service.route(self.prompt("commit and push", 190_000), self.loader.load(), build)
+        self.assertEqual((routing, self.calls()), (service.Routing(), 0))
+        self.assertEqual([(row["prefilter"], row["asked"]) for row in self.decisions()], [(True, False)])
+
+    def test_calibration_replies_pass_through_unless_a_proposal_awaits_them(self) -> None:
+        self.enable(classifier={})
+        services = self.services("CONTINUE")
+        self.assertFalse(services.prompt(self.prompt("calibration keep", 190_000)).blocked)
+        write_json(services.calibration.proposal_path(), {"status": "pending", "changes": {}, "summary": "s"})
+        self.assertFalse(services.prompt(self.prompt("calibration keep", 190_000)).blocked)
+        self.enable(calibration={})
+        routing = self.services("CONTINUE").prompt(self.prompt("calibration keep", 190_000))
+        self.assertTrue(routing.blocked)
+        self.assertIn("Discarded the calibration proposal", routing.message)
+
+    def test_mechanical_label_schedules_the_runner_and_blocks_the_prompt(self) -> None:
+        self.enable(runner={})
         self.addCleanup(mechanical.STAGED_JOBS.clear)
         launch, workers = subprocess.Popen, []
 
-        def popen(argv, **kwargs):
+        def popen(argv: list[str], **kwargs: object) -> subprocess.Popen | mock.Mock:
             if argv[:2] != [sys.executable, "worker"]:
                 return launch(argv, **kwargs)
             workers.append(argv)
@@ -114,17 +162,20 @@ class GatingTests(ServiceCase):
         self.assertEqual([argv[2] for argv in workers], [service.WORKER])
         self.assertEqual(service.combine(Decision("note", "tier note"), routing).kind, "block")
 
-    def test_runner_is_not_staged_when_the_deadline_is_nearly_spent(self):
+    def test_runner_is_not_staged_when_the_deadline_is_nearly_spent(self) -> None:
         self.enable(runner={})
         services = self.services()
         obs = self.prompt("commit and push", 190_000)
         with mock.patch.object(subprocess, "Popen") as popen:
-            routing = deadline.run_within(lambda: services.route("MECHANICAL", "commit and push", obs), None,
-                                          seconds=service.SCHEDULE_RESERVE_SECONDS / 2)
+            routing = deadline.run_within(
+                lambda: services.route("MECHANICAL", "commit and push", obs),
+                None,
+                seconds=service.SCHEDULE_RESERVE_SECONDS / 2,
+            )
         self.assertEqual(routing, service.Routing(message=service.MECHANICAL_NOTE))
         popen.assert_not_called()
 
-    def test_staged_jobs_are_released_only_after_a_blocking_response(self):
+    def test_staged_jobs_are_released_only_after_a_blocking_response(self) -> None:
         self.enable(runner={})
         self.addCleanup(mechanical.STAGED_JOBS.clear)
         services = self.services()
@@ -138,7 +189,7 @@ class GatingTests(ServiceCase):
         service.confirm_staged({"decision": "block"}, {})
         self.assertEqual(read_json(job)["status"], "scheduled")
 
-    def test_combine_appends_routing_to_the_policy_decision(self):
+    def test_combine_appends_routing_to_the_policy_decision(self) -> None:
         note = service.Routing(message="routed")
         self.assertEqual(service.combine(Decision(), note), Decision("note", "routed"))
         self.assertEqual(service.combine(Decision("block", "full"), note).message, "full\n\nrouted")
@@ -147,14 +198,17 @@ class GatingTests(ServiceCase):
 
 @unittest.skipUnless(shutil.which("git"), "git is required for the worker contract")
 class WorkerTests(ServiceCase):
+    """The worker executes only validated, authorised plans and publishes a report."""
+
     def job(self, prompt: str, key: str) -> Path:
         directory = config.state_dir(self.loader.load(), self.home, "test") / "runner"
         path = directory / (key * 32 + ".json")
-        write_json(path, {"status": "scheduled", "prompt": prompt, "workspace": str(self.workspace),
-                          "created_at": time.time()})
+        write_json(
+            path, {"status": "scheduled", "prompt": prompt, "workspace": str(self.workspace), "created_at": time.time()}
+        )
         return path
 
-    def test_worker_executes_a_validated_plan_and_publishes_a_report(self):
+    def test_worker_executes_a_validated_plan_and_publishes_a_report(self) -> None:
         subprocess.run(["git", "init", "-q", str(self.workspace)], check=True)
         self.enable(runner={})
         plan = json.dumps({"commands": [["git", "status", "--short"]]})
@@ -164,7 +218,7 @@ class WorkerTests(ServiceCase):
         pending = config.handoff_dir(self.loader.load(), self.home) / "pending" / f"native-{job.stem}.json"
         self.assertTrue(pending.exists())
 
-    def test_mutating_git_without_an_affirmative_request_fails_closed(self):
+    def test_mutating_git_without_an_affirmative_request_fails_closed(self) -> None:
         self.enable(runner={})
         plan = json.dumps({"commands": [["git", "status"], ["git", "push"]]})
         job = self.job("explain why push failed", "b")

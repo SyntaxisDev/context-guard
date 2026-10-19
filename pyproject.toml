@@ -7,3 +7,56 @@ dependencies = []
 
 [tool.uv]
 package = false
+
+[tool.ruff]
+target-version = "py314"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "ALL",
+    "DOC102",
+    "DOC201",
+    "DOC202",
+    "DOC402",
+    "DOC403",
+    "DOC501",
+    "DOC502",
+]
+ignore = [
+    "COM812",  # conflicts with the formatter
+    "CPY001",
+    "D105",    # Google style documents constructors and dunders in the class docstring
+    "D107",
+    "INP001",  # hooks and scripts run as files, not as packages
+    "PT",      # the suites use unittest
+    "T20",     # hooks and the CLI answer on stdout
+    "TC",      # Python 3.14 evaluates annotations lazily
+    "PLR0911", # function size is bounded by tests/test_architecture.py
+    "PLR0913",
+    "PLR0917",
+]
+preview = true
+explicit-preview-rules = true
+allowed-confusables = ["–"]
+
+[tool.ruff.lint.per-file-ignores]
+"adapters/*/hooks.py" = ["E402"]
+"scripts/record_payloads.py" = ["E402"]
+"**/test_*.py" = [
+    "D100",
+    "D102",
+    "D103",
+    "PLR2004",
+    "S101",
+    "S108",
+    "S603",
+    "S607",
+]
+"**/tests/**/__init__.py" = ["D104"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.isort]
+combine-as-imports = true

@@ -1,86 +1,79 @@
-import io
 import json
-import os
 import sqlite3
-import subprocess
-import sys
-import time
 import unittest
-import unittest.mock
-from contextlib import redirect_stderr, redirect_stdout
-from functools import partial
-from pathlib import Path
-from unittest.mock import patch
 
 from adapters.cursor import hooks
-from core import deadline, policy
+from core import policy
 from tests import harness
 
-HOOKS_FILE = Path(hooks.__file__).resolve()
-RECORDED = {"sessionStart": "sessionStart-root", "beforeSubmitPrompt": "beforeSubmitPrompt-root",
-            "preToolUse": "preToolUse-task", "postToolUse": "postToolUse-shell", "stop": "stop-completed"}
+RECORDED = {
+    "sessionStart": "sessionStart-root",
+    "beforeSubmitPrompt": "beforeSubmitPrompt-root",
+    "preToolUse": "preToolUse-task",
+    "postToolUse": "postToolUse-shell",
+    "stop": "stop-completed",
+}
 
 
 class CursorHookCase(harness.RuntimeHookCase):
+    """A Cursor home with its chat state database and helpers that record usage and run hooks on recorded payloads."""
+
     runtime = "cursor"
 
-    def setUp(self):
+    def setUp(self) -> None:
         super().setUp()
         self.config = hooks.load(self.home, {})
         self.database = hooks.state_db_path(self.config, self.home)
         if self.database is None:
             self.skipTest("no Cursor state database location for this platform")
 
-    def chat(self, conversation, value):
+    def chat(self, conversation: str, value: str | dict | list) -> None:
         self.database.parent.mkdir(parents=True, exist_ok=True)
         with sqlite3.connect(self.database) as database:
             database.execute("create table if not exists cursorDiskKV (key text primary key, value text)")
-            database.execute("insert or replace into cursorDiskKV values (?, ?)",
-                             ("composerData:" + conversation, value if isinstance(value, str) else json.dumps(value)))
+            database.execute(
+                "insert or replace into cursorDiskKV values (?, ?)",
+                ("composerData:" + conversation, value if isinstance(value, str) else json.dumps(value)),
+            )
         database.close()
 
-    def tokens(self, conversation, used, limit=200000):
+    def tokens(self, conversation: str, used: int, limit: int = 200000) -> None:
         harness.write_cursor_chat(self.home, conversation, used, limit)
 
-    def hook(self, native, **fields):
+    def hook(self, native: str, **fields: object) -> dict:
         recorded = harness.payload("cursor", RECORDED.get(native, "postToolUse-shell"), self.home, self.project)
-        payload = {**recorded, "conversation_id": "c1", "session_id": "c1", "hook_event_name": native,
-                   "workspace_roots": [str(self.project)], **fields}
+        payload = {
+            **recorded,
+            "conversation_id": "c1",
+            "session_id": "c1",
+            "hook_event_name": native,
+            "workspace_roots": [str(self.project)],
+            **fields,
+        }
         return hooks.run(native, payload, self.home, {})
 
-    def names(self):
-        return [record["event"] for record in self.logged()]
+    def user_config(self, values: dict) -> None:
+        (self.home / ".context-guard").mkdir(exist_ok=True)
+        (self.home / ".context-guard" / "config.json").write_text(json.dumps(values))
 
+    def prompted(self, conversation: str = "c1") -> tuple[int | None, int | None]:
+        """Submit a prompt and read back what the hook logged for the chat.
 
-class ObserveTests(CursorHookCase):
-    def test_observation_reads_chat_telemetry(self):
-        now = time.time()
-        self.chat("c1", {"contextTokensUsed": 120000, "contextTokenLimit": 272000,
-                         "lastUpdatedAt": (now - 600) * 1000})
-        obs = hooks.observe("beforeSubmitPrompt", {"conversation_id": "c1", "prompt": "next",
-                                                   "workspace_roots": [str(self.project)], "model": "gpt"},
-                            self.config, self.home, now=now)
-        self.assertEqual((obs.event, obs.tokens, obs.window, obs.model, obs.prompt, obs.cwd),
-                         ("prompt", 120000, 272000, "gpt", "next", str(self.project)))
-        self.assertAlmostEqual(obs.idle_seconds, 600, delta=1)
-        self.assertFalse(obs.is_subagent)
+        Args:
+            conversation: The chat id to prompt.
 
-    def test_subagents_are_detected_from_tool_hooks(self):
-        tool = hooks.observe("postToolUse", {"conversation_id": "s1", "parent_tool_call_id": "toolu_1",
-                                             "tool_name": "Shell", "tool_input": {}}, self.config, self.home)
-        self.assertTrue(tool.is_subagent)
-        self.assertNotIn("subagentStart", self.config["hook_events"])
-        self.assertNotIn("subagentStop", self.config["hook_events"])
-
-    def test_window_fallback_applies_without_chat_limit(self):
-        self.chat("c1", {"contextTokensUsed": 5000})
-        config = dict(self.config, telemetry=dict(self.config["telemetry"], window_fallback=400000))
-        obs = hooks.observe("postToolUse", {"conversation_id": "c1", "tool_name": "Shell"}, config, self.home)
-        self.assertEqual((obs.tokens, obs.window, obs.idle_seconds), (5000, 400000, None))
+        Returns:
+            The tokens and window the logged prompt record read.
+        """
+        self.hook("beforeSubmitPrompt", conversation_id=conversation, prompt="next")
+        records = [r for r in self.logged() if r["event"] == "prompt" and r["session"] == conversation]
+        return records[-1]["tokens"], records[-1]["window"]
 
 
 class SessionTests(CursorHookCase):
-    def test_session_start_lists_handoffs_without_policy_text(self):
+    """sessionStart lists open handoffs and nothing else."""
+
+    def test_session_start_lists_handoffs_without_policy_text(self) -> None:
         self.store.mkdir(parents=True)
         handoff = self.store / "project-task-0123456789abcdef.md"
         handoff.write_text(f"# Project task\nStatus: open · Updated: now\nWorkspace: {self.project}\n")
@@ -89,12 +82,14 @@ class SessionTests(CursorHookCase):
         self.assertIn("(likely match)", response["additional_context"])
         self.assertNotIn("Orchestrator mode", response["additional_context"])
 
-    def test_session_start_without_handoffs_adds_nothing(self):
+    def test_session_start_without_handoffs_adds_nothing(self) -> None:
         self.assertEqual(self.hook("sessionStart"), {})
 
 
 class PromptTests(CursorHookCase):
-    def test_block_reports_chat_tokens_and_the_chat_limit(self):
+    """Prompt notes and blocks, and delivery of held notes on the next tool result or session."""
+
+    def test_block_reports_chat_tokens_and_the_chat_limit(self) -> None:
         self.tokens("c1", 190000)
         blocked = self.hook("beforeSubmitPrompt", prompt="continue the work")
         self.assertEqual(set(blocked), {"continue", "user_message"})
@@ -102,7 +97,7 @@ class PromptTests(CursorHookCase):
         self.assertIn("190k", blocked["user_message"])
         self.assertIn("200k", blocked["user_message"])
 
-    def test_prompt_note_reaches_the_model_on_the_next_tool_result_once(self):
+    def test_prompt_note_reaches_the_model_on_the_next_tool_result_once(self) -> None:
         self.tokens("c1", 120000)
         self.assertEqual(self.hook("beforeSubmitPrompt", prompt="go on"), {"continue": True})
         note = self.hook("postToolUse", tool_name="Shell", tool_input={"command": "ls"})
@@ -113,25 +108,46 @@ class PromptTests(CursorHookCase):
         self.assertEqual(self.names().count("note"), 1)
         self.assertEqual(self.names().count("note_delivered"), 1)
 
-    def test_prompt_note_survives_stop_and_reaches_the_next_tool_result(self):
+    def test_prompt_note_survives_a_stop_without_follow_up_and_reaches_the_next_tool_result(self) -> None:
         self.tokens("c1", 120000)
         self.hook("beforeSubmitPrompt", prompt="quick question")
-        self.hook("stop", status="completed", loop_count=0)
+        self.assertEqual(self.hook("stop", status="aborted", loop_count=0), {})
         self.assertNotIn("note_delivered", self.names())
         note = self.hook("postToolUse", tool_name="Shell", tool_input={})
         self.assertIn("120k", note["additional_context"])
-        self.assertEqual([(r["event"], r.get("tier")) for r in self.logged() if r["event"] == "note_delivered"],
-                         [("note_delivered", "note")])
+        self.assertEqual(
+            [(r["event"], r.get("tier")) for r in self.logged() if r["event"] == "note_delivered"],
+            [("note_delivered", "note")],
+        )
 
-    def test_prompt_note_is_delivered_at_the_next_session_start(self):
+    def test_held_note_is_dropped_once_the_handoff_is_written(self) -> None:
         self.tokens("c1", 120000)
         self.hook("beforeSubmitPrompt", prompt="quick question")
-        self.hook("stop", status="completed", loop_count=0)
+        self.store.mkdir(parents=True)
+        path = str(self.store / "task-0123456789abcdef.md")
+        self.assertEqual(self.hook("postToolUse", tool_name="Write", tool_input={"file_path": path}), {})
+        self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
+        self.assertNotIn("note_delivered", self.names())
+
+    def test_stop_follow_up_supersedes_the_held_note(self) -> None:
+        self.tokens("c1", 120000)
+        self.hook("beforeSubmitPrompt", prompt="quick question")
+        self.assertIn("followup_message", self.hook("stop", status="completed", loop_count=0))
+        self.store.mkdir(parents=True)
+        path = str(self.store / "task-0123456789abcdef.md")
+        self.assertEqual(self.hook("postToolUse", tool_name="Write", tool_input={"file_path": path}), {})
+        self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
+        self.assertEqual(self.names(), ["prompt", "note", "handoff_requested", "handoff_written"])
+
+    def test_prompt_note_is_delivered_at_the_next_session_start(self) -> None:
+        self.tokens("c1", 120000)
+        self.hook("beforeSubmitPrompt", prompt="quick question")
+        self.hook("stop", status="aborted", loop_count=0)
         started = self.hook("sessionStart")
         self.assertIn("120k", started["additional_context"])
         self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
 
-    def test_tool_notes_cap_at_firm_and_prompt_still_blocks(self):
+    def test_tool_notes_cap_at_firm_and_prompt_still_blocks(self) -> None:
         self.tokens("c1", 190000)
         firm = self.hook("postToolUse", tool_name="Shell", tool_input={})
         self.assertIn("190k", firm["additional_context"])
@@ -141,9 +157,18 @@ class PromptTests(CursorHookCase):
 
 
 class TelemetryTests(CursorHookCase):
-    def test_missing_or_changed_telemetry_passes(self):
-        cases = {"no row": None, "not json": "{", "text tokens": {"contextTokensUsed": "190000"},
-                 "negative": {"contextTokensUsed": -1}, "list": [190000]}
+    """Missing or changed chat telemetry and invalid payloads pass; the window falls back without a chat limit."""
+
+    def test_missing_or_changed_telemetry_passes(self) -> None:
+        self.assertEqual(self.hook("beforeSubmitPrompt", prompt="x"), {"continue": True})
+        self.assertEqual(self.hook("stop", status="completed"), {})
+        cases = {
+            "no row": None,
+            "not json": "{",
+            "text tokens": {"contextTokensUsed": "190000"},
+            "negative": {"contextTokensUsed": -1},
+            "list": [190000],
+        }
         for label, value in cases.items():
             with self.subTest(label):
                 conversation = "c-" + label.replace(" ", "-")
@@ -151,105 +176,109 @@ class TelemetryTests(CursorHookCase):
                     self.chat(conversation, value)
                 else:
                     self.chat("other", {"contextTokensUsed": 250000})
-                self.assertEqual(self.hook("beforeSubmitPrompt", conversation_id=conversation, prompt="x"),
-                                 {"continue": True})
+                self.assertEqual(
+                    self.hook("beforeSubmitPrompt", conversation_id=conversation, prompt="x"), {"continue": True}
+                )
                 self.assertEqual(self.hook("postToolUse", conversation_id=conversation, tool_name="Shell"), {})
         self.assertNotIn("block", self.names())
         self.assertNotIn("note", self.names())
 
-    def test_missing_database_passes(self):
-        self.assertEqual(self.hook("beforeSubmitPrompt", prompt="x"), {"continue": True})
-        self.assertEqual(self.hook("stop", status="completed"), {})
+    def test_window_fallback_applies_without_chat_limit(self) -> None:
+        self.chat("c1", {"contextTokensUsed": 5000})
+        self.assertEqual(self.prompted(), (5000, None))
+        self.user_config({"telemetry": {"window_fallback": 400000}})
+        self.assertEqual(self.prompted(), (5000, 400000))
 
-    def test_invalid_payloads_pass(self):
+    def test_invalid_payloads_pass(self) -> None:
         self.tokens("c1", 250000)
-        for payload in (None, [], {"conversation_id": 5}, {"conversation_id": "c1", "workspace_roots": "x"},
-                        {"conversation_id": "c1", "prompt": "a\x00b"}, {"conversation_id": "c1", "tool_input": "x"},
-                        {"conversation_id": "c1", "loop_count": -1}, {}):
+        for payload in (
+            None,
+            [],
+            {"conversation_id": 5},
+            {"conversation_id": "c1", "workspace_roots": "x"},
+            {"conversation_id": "c1", "prompt": "a\x00b"},
+            {"conversation_id": "c1", "tool_input": "x"},
+            {"conversation_id": "c1", "loop_count": -1},
+            {},
+        ):
             with self.subTest(payload=payload):
                 self.assertEqual(hooks.run("beforeSubmitPrompt", payload, self.home, {}), {"continue": True})
                 self.assertEqual(hooks.run("postToolUse", payload, self.home, {}), {})
         self.assertEqual(hooks.run("unknownEvent", {"conversation_id": "c1"}, self.home, {}), {})
         self.assertEqual(self.logged(), [])
 
-    def test_deadline_fails_open(self):
-        self.tokens("c1", 250000)
-        with patch.object(hooks.policy, "evaluate", side_effect=lambda *args, **kwargs: time.sleep(2)):
-            started = time.monotonic()
-            response = hooks.run("beforeSubmitPrompt", {"conversation_id": "c1", "prompt": "x"}, self.home, {},
-                                 seconds=0.1)
-        self.assertEqual(response, {"continue": True})
-        self.assertLess(time.monotonic() - started, 1.5)
-
 
 class CliTelemetryTests(CursorHookCase):
-    def observe(self, conversation="c1"):
-        return hooks.observe("postToolUse", {"conversation_id": conversation, "tool_name": "Shell"},
-                             self.config, self.home)
+    """The Cursor CLI chat store as a telemetry source behind the IDE record."""
 
-    def test_recorded_cli_store_gives_tokens_and_window(self):
+    def test_recorded_cli_store_gives_tokens_and_window(self) -> None:
         recorded = harness.read_fixture("cursor", "cli-store")["record"]
         harness.write_cli_chat(self.home, "c1")
-        obs = self.observe()
-        self.assertEqual((obs.tokens, obs.window), (recorded["tokens"], recorded["window"]))
-        self.assertLess(obs.idle_seconds, 60)
+        self.assertEqual(self.prompted(), (recorded["tokens"], recorded["window"]))
 
-    def test_cli_store_raises_the_note_without_a_gui_record(self):
+    def test_cli_store_raises_the_note_without_a_gui_record(self) -> None:
         harness.write_cli_chat(self.home, "c1", 160000, 200000)
         self.assertEqual(self.hook("beforeSubmitPrompt", prompt="next"), {"continue": True})
         note = self.hook("postToolUse", tool_name="Shell", tool_input={})
         self.assertIn("160k", note["additional_context"])
         self.assertEqual([r["tokens"] for r in self.logged() if r["event"] == "note"], [160000])
 
-    def test_gui_record_wins_over_the_cli_store(self):
+    def test_gui_record_wins_over_the_cli_store(self) -> None:
         self.tokens("c1", 20000, limit=272000)
         harness.write_cli_chat(self.home, "c1", 190000, 200000)
-        self.assertEqual((self.observe().tokens, self.observe().window), (20000, 272000))
+        self.assertEqual(self.prompted(), (20000, 272000))
 
-    def test_malformed_cli_store_fails_open(self):
+    def test_malformed_corrupt_or_missing_cli_store_fails_open(self) -> None:
         truncated = harness.cli_root(160000, 200000)
-        cases = {"bad hex": {"meta": "zz"}, "meta not an object": {"meta": b"[1]".hex()},
-                 "no root id": {"meta": b"{}".hex()}, "truncated protobuf": {"root": truncated[:-3]},
-                 "unknown wire type": {"root": truncated + bytes([0x0B])},
-                 "no usage field": {"root": harness.proto_field(1, bytes(32))}}
+        cases = {
+            "bad hex": {"meta": "zz"},
+            "meta not an object": {"meta": b"[1]".hex()},
+            "no root id": {"meta": b"{}".hex()},
+            "truncated protobuf": {"root": truncated[:-3]},
+            "unknown wire type": {"root": truncated + bytes([0x0B])},
+            "no usage field": {"root": harness.proto_field(1, bytes(32))},
+            "not a database": None,
+        }
         for label, override in cases.items():
             with self.subTest(label):
                 conversation = "c-" + label.replace(" ", "-")
-                harness.write_cli_chat(self.home, conversation, 160000, 200000, **override)
-                self.assertIsNone(self.observe(conversation).tokens)
-
-    def test_corrupt_or_missing_store_fails_open(self):
-        database = harness.write_cli_chat(self.home, "corrupt", 160000, 200000)
-        database.write_bytes(b"not a database")
-        self.assertIsNone(self.observe("corrupt").tokens)
-        self.assertIsNone(self.observe("missing").tokens)
-        self.assertIsNone(self.observe("../corrupt").tokens)
+                database = harness.write_cli_chat(self.home, conversation, 160000, 200000, **(override or {}))
+                if override is None:
+                    database.write_bytes(b"not a database")
+                self.assertEqual(self.prompted(conversation), (None, None))
+        self.assertEqual(self.prompted("missing"), (None, None))
+        self.assertEqual(self.prompted("../c-not-a-database"), (None, None))
 
 
 class LeafTests(CursorHookCase):
-    def test_subagent_gets_one_budget_message_and_no_tier_notes(self):
+    """Subagents get one budget message for the role recorded at spawn and no tier notes."""
+
+    def test_subagent_gets_one_budget_message_and_no_tier_notes(self) -> None:
         self.tokens("sub", 190000)
         first = self.hook("postToolUse", conversation_id="sub", parent_tool_call_id="toolu_1", tool_name="Shell")
         self.assertEqual(first["additional_context"], policy.BUDGET_MESSAGE.format(tokens=190, budget=80))
-        self.assertEqual(self.hook("postToolUse", conversation_id="sub", parent_tool_call_id="toolu_1",
-                                   tool_name="Shell"), {})
+        self.assertEqual(
+            self.hook("postToolUse", conversation_id="sub", parent_tool_call_id="toolu_1", tool_name="Shell"), {}
+        )
         self.assertEqual(self.names().count("subagent_budget"), 1)
         self.assertNotIn("note", self.names())
 
-    def test_subagent_budget_follows_the_role_recorded_at_spawn(self):
+    def test_subagent_budget_follows_the_role_recorded_at_spawn(self) -> None:
         self.hook("preToolUse", tool_name="Task", tool_use_id="toolu_r", tool_input={"subagent_type": "reviewer"})
         self.tokens("rev", 100000)
         self.tokens("other", 100000)
-        self.assertEqual(self.hook("postToolUse", conversation_id="rev", parent_tool_call_id="toolu_r",
-                                   tool_name="Shell"), {})
+        self.assertEqual(
+            self.hook("postToolUse", conversation_id="rev", parent_tool_call_id="toolu_r", tool_name="Shell"), {}
+        )
         self.hook("postToolUse", conversation_id="other", parent_tool_call_id="toolu_x", tool_name="Shell")
         self.tokens("rev", 125000)
         self.hook("postToolUse", conversation_id="rev", parent_tool_call_id="toolu_r", tool_name="Shell")
         budgets = [(r["session"], r["detail"]) for r in self.logged() if r["event"] == "subagent_budget"]
-        self.assertEqual(budgets, [("other", {"role": None, "budget": 80_000}),
-                                   ("rev", {"role": "reviewer", "budget": 120_000})])
+        self.assertEqual(
+            budgets, [("other", {"role": None, "budget": 80_000}), ("rev", {"role": "reviewer", "budget": 120_000})]
+        )
 
-    def test_unregistered_subagent_events_pass(self):
+    def test_unregistered_subagent_events_pass(self) -> None:
         self.store.mkdir(parents=True)
         (self.store / "task-0123456789abcdef.md").write_text(f"# Task\nWorkspace: {self.project}\n")
         self.assertEqual(self.hook("subagentStart", subagent_id="sub", subagent_type="scout"), {})
@@ -257,7 +286,9 @@ class LeafTests(CursorHookCase):
 
 
 class StopTests(CursorHookCase):
-    def test_refresh_follow_up_only_on_completed_first_stop(self):
+    """stop asks for a handoff refresh only on the first completed stop."""
+
+    def test_refresh_follow_up_only_on_completed_first_stop(self) -> None:
         self.tokens("c1", 170000, limit=1000000)
         follow = self.hook("stop", status="completed", loop_count=0)
         self.assertTrue(follow["followup_message"].startswith("[context-guard]"))
@@ -269,104 +300,98 @@ class StopTests(CursorHookCase):
 
 
 class ToolEventTests(CursorHookCase):
-    def spawns(self):
+    """Task spawns and handoff reads and writes are logged from tool events."""
+
+    def spawns(self) -> list[dict]:
         return [record["detail"] for record in self.logged() if record["event"] == "subagent_spawn"]
 
-    def test_task_spawn_is_logged_once_with_role_tier_model_and_effort(self):
-        task = {"description": "review", "prompt": "p", "subagent_type": "reviewer",
-                "model": "claude-sonnet-5-5-medium"}
+    def test_task_spawn_is_logged_once_with_role_tier_model_and_effort(self) -> None:
+        task = {
+            "description": "review",
+            "prompt": "p",
+            "subagent_type": "reviewer",
+            "model": "claude-sonnet-5-5-medium",
+        }
         self.assertEqual(self.hook("preToolUse", tool_name="Task", tool_input=task), {})
         self.assertEqual(self.hook("postToolUse", tool_name="Task", tool_input=task), {})
         self.assertEqual(self.hook("preToolUse", tool_name="Task", tool_input={"subagent_type": "scout"}), {})
-        self.assertEqual(self.spawns(), [
-            {"role": "reviewer", "tier": "standard", "model": "claude-sonnet-5-5-medium", "effort": "medium"},
-            {"role": "scout", "tier": "cheap", "model": None, "effort": None}])
+        self.assertEqual(
+            self.spawns(),
+            [
+                {"role": "reviewer", "tier": "standard", "model": "claude-sonnet-5-5-medium", "effort": "medium"},
+                {"role": "scout", "tier": "cheap", "model": "claude-haiku-5-5", "effort": "low"},
+            ],
+        )
 
-    def test_pre_tool_use_ignores_other_tools(self):
+    def test_pre_tool_use_ignores_other_tools(self) -> None:
         self.tokens("c1", 250000)
         self.assertEqual(self.hook("preToolUse", tool_name="Shell", tool_input={"command": "ls"}), {})
         self.assertEqual(self.logged(), [])
 
-    def test_handoff_reads_and_writes_in_the_store_are_logged(self):
+    def test_handoff_reads_and_writes_in_the_store_are_logged(self) -> None:
         self.store.mkdir(parents=True)
         handoff = str(self.store / "task-0123456789abcdef.md")
         self.hook("postToolUse", tool_name="Write", tool_input={"file_path": handoff, "content": "x"})
         self.hook("postToolUse", tool_name="Read", tool_input={"file_path": handoff})
         self.hook("postToolUse", tool_name="Read", tool_input={"file_path": str(self.project / "README.md")})
-        handoff_events = [(record["event"], record["detail"]["path"]) for record in self.logged()
-                          if record["event"].startswith("handoff_")]
+        handoff_events = [
+            (record["event"], record["detail"]["path"])
+            for record in self.logged()
+            if record["event"].startswith("handoff_")
+        ]
         self.assertEqual(handoff_events, [("handoff_written", handoff), ("handoff_read", handoff)])
 
-    def test_shell_writes_credit_the_turn_so_stop_does_not_refresh(self):
+    def test_shell_writes_credit_the_turn_so_stop_does_not_refresh(self) -> None:
         self.store.mkdir(parents=True)
         path = self.store / "existing-task-0123456789abcdef.md"
         writes = [f"cat > {path} <<'EOF'\n# Task\nEOF", f"printf '# Task\\n' | tee {path}"]
         for index, command in enumerate(writes):
             with self.subTest(command=command):
                 self.tokens(f"w{index}", 170000, limit=1000000)
-                self.hook("postToolUse", conversation_id=f"w{index}", tool_name="Shell",
-                          tool_input={"command": command})
+                self.hook(
+                    "postToolUse", conversation_id=f"w{index}", tool_name="Shell", tool_input={"command": command}
+                )
                 self.assertEqual(self.hook("stop", conversation_id=f"w{index}", status="completed"), {})
         self.tokens("r1", 170000, limit=1000000)
         self.hook("postToolUse", conversation_id="r1", tool_name="Shell", tool_input={"command": "echo done"})
         follow = self.hook("stop", conversation_id="r1", status="completed")["followup_message"]
         self.assertIn(str(self.store), follow)
-        self.assertEqual([r["detail"] for r in self.logged() if r["event"] == "handoff_requested"],
-                         [{"source": "unwritten"}])
+        self.assertEqual(
+            [r["detail"] for r in self.logged() if r["event"] == "handoff_requested"], [{"source": "unwritten"}]
+        )
 
-    def test_shell_handoff_reads_are_logged(self):
+    def test_relative_shell_writes_resolve_against_the_tool_cwd(self) -> None:
+        self.store.mkdir(parents=True)
+        self.hook(
+            "postToolUse",
+            tool_name="Shell",
+            tool_input={"command": "printf x > task-0123456789abcdef.md", "cwd": str(self.store)},
+        )
+        self.assertEqual(
+            [(r["event"], r["detail"]["path"]) for r in self.logged()],
+            [("handoff_written", str(self.store / "task-0123456789abcdef.md"))],
+        )
+
+    def test_shell_handoff_reads_are_logged(self) -> None:
         self.store.mkdir(parents=True)
         path = self.store / "task-0123456789abcdef.md"
         self.hook("postToolUse", tool_name="Shell", tool_input={"command": f"sed -n 1,5p {path}"})
         self.hook("postToolUse", tool_name="Shell", tool_input={"command": "cat README.md"})
-        self.assertEqual([(record["event"], record["detail"]["path"]) for record in self.logged()],
-                         [("handoff_read", str(path))])
+        self.assertEqual(
+            [(record["event"], record["detail"]["path"]) for record in self.logged()], [("handoff_read", str(path))]
+        )
 
 
-class EntryPointTests(CursorHookCase):
-    def invoke(self, native, stdin):
-        environ = {key: value for key, value in os.environ.items() if not key.startswith("CONTEXT_GUARD_")}
-        environ["HOME"] = str(self.home)
-        result = subprocess.run([sys.executable, str(HOOKS_FILE), native], input=stdin, capture_output=True,
-                                text=True, cwd=self.home, env=environ, timeout=30, check=True)
-        return json.loads(result.stdout)
+class EntryPointTests(harness.HookBoundaryChecks, CursorHookCase):
+    """The Cursor hook process entry passes on missing arguments, errors, overruns and bad user tiers."""
 
-    def test_script_runs_outside_the_source_tree_and_fails_open(self):
-        self.tokens("c1", 190000)
-        payload = json.dumps({"conversation_id": "c1", "prompt": "next"})
-        self.assertFalse(self.invoke("beforeSubmitPrompt", payload)["continue"])
-        self.assertEqual(self.invoke("beforeSubmitPrompt", "not json"), {"continue": True})
-        self.assertEqual(self.invoke("sessionStart", "[]"), {})
+    hook_module, hook_event, pass_response = hooks, "beforeSubmitPrompt", {"continue": True}
 
-    def test_malformed_user_tiers_pass(self):
-        (self.home / ".context-guard").mkdir(exist_ok=True)
-        (self.home / ".context-guard" / "config.json").write_text(json.dumps({"tiers": {"huge": "opus"}}))
+    def test_malformed_user_tiers_pass(self) -> None:
+        self.user_config({"tiers": {"huge": "opus"}})
         task = {"subagent_type": "reviewer", "model": "opus"}
-        payload = json.dumps({"conversation_id": "c1", "tool_name": "Task", "tool_input": task})
-        self.assertEqual(self.invoke("preToolUse", payload), {})
+        self.assertEqual(self.hook("preToolUse", tool_name="Task", tool_input=task), {})
         self.assertEqual(self.logged()[0]["detail"]["tier"], None)
-
-    def main(self, native, stdin):
-        out, err = io.StringIO(), io.StringIO()
-        with (patch.object(sys, "argv", ["hooks.py", native]), patch.object(sys, "stdin", stdin),
-              patch.dict(os.environ, {"HOME": str(self.home)}), redirect_stdout(out), redirect_stderr(err)):
-            hooks.main()
-        return json.loads(out.getvalue()), err.getvalue()
-
-    def test_unexpected_errors_print_the_pass_response_and_one_stderr_line(self):
-        with patch.object(hooks, "handle", side_effect=AttributeError("boom")):
-            response, err = self.main("beforeSubmitPrompt", io.StringIO('{"conversation_id": "c1"}'))
-        self.assertEqual(response, {"continue": True})
-        self.assertEqual(err.count("\n"), 1)
-        self.assertIn("AttributeError: boom", err)
-
-    def test_stdin_is_read_inside_the_deadline(self):
-        stdin = unittest.mock.Mock(read=lambda *args: time.sleep(5) or "{}")
-        started = time.monotonic()
-        with patch.object(hooks.deadline, "run_within", partial(deadline.run_within, seconds=0.2)):
-            response, _ = self.main("beforeSubmitPrompt", stdin)
-        self.assertEqual(response, {"continue": True})
-        self.assertLess(time.monotonic() - started, 2)
 
 
 if __name__ == "__main__":

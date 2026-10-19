@@ -1,34 +1,77 @@
 """Cursor-native rendering of the shared content and the install plan for ~/.cursor."""
+
 import json
 import re
-import shlex
 from functools import partial
 from pathlib import Path
+from typing import NamedTuple
 
-from core import render
-from core.install_spec import InstallSpec, JsonMerge
+from core import deadline, hookfile, render
+from core.install_spec import InstallSpec, JsonMerge, frontmatter_signatures
+from core.observation import PROMPT, SESSION, STOP, TOOL
+
+
+class HookEvent(NamedTuple):
+    """How a native Cursor hook event is registered and observed.
+
+    Attributes:
+        event: The core event the native hook maps to.
+        options: Extra hooks.json keys for its registration, as (key, value) pairs.
+        spawn_only: Whether the hook only observes spawns (a preToolUse on Task).
+    """
+
+    event: str
+    options: tuple[tuple[str, object], ...] = ()
+    spawn_only: bool = False
+
 
 RUNTIME = "cursor"
 CURSOR_DIR = ".cursor"
 HOOKS_FILE = f"{CURSOR_DIR}/hooks.json"
+HOOKS_LABEL = "hooks.json"
 AGENTS_DIR = f"{CURSOR_DIR}/agents"
 SKILLS_DIR = f"{CURSOR_DIR}/skills"
 POLICY_FILE = f"{CURSOR_DIR}/rules/context-guard.mdc"
 HOOK_SCRIPT = "adapters/cursor/hooks.py"
-OVERRIDE_SYNTAX = ("the Task tool `model` argument set to the tier's slug from this table; omit it to run the "
-                   "role's default tier")
+HOOK_EVENTS = {
+    "sessionStart": HookEvent(SESSION),
+    "beforeSubmitPrompt": HookEvent(PROMPT),
+    "preToolUse": HookEvent(TOOL, (("matcher", "Task"),), spawn_only=True),
+    "postToolUse": HookEvent(TOOL),
+    "stop": HookEvent(STOP, (("loop_limit", 1),)),
+}
+OVERRIDE_SYNTAX = (
+    "the Task tool `model` argument set to the tier's slug from this table; omit it to run the role's default tier"
+)
 TRANSCRIPTS = "Cursor keeps chat transcripts as JSONL files under `~/.cursor/projects/<workspace>/agent-transcripts/`."
-POLICY_FRONTMATTER = ("---\ndescription: context-guard delegation, context and handoff policy\n"
-                      "alwaysApply: true\n---\n\n")
+POLICY_FRONTMATTER = (
+    "---\ndescription: context-guard delegation, context and handoff policy\nalwaysApply: true\n---\n\n"
+)
 CONTEXT_OPTION = re.compile(r"context=[^,\]]*")
 
 
-def describe_tier(profile: dict) -> str:
+def describe_tier(profile: dict[str, str]) -> str:
+    """Describe a tier for the policy's tier table.
+
+    Args:
+        profile: Tier profile with the Task `call` slug and the `agent_model` of agent files.
+
+    Returns:
+        Markdown naming both model forms.
+    """
     return f"`{profile['call']}` (agent files use `{profile['agent_model']}`)"
 
 
 def with_context(model: str, context: str | None) -> str:
-    """Set the context option of a Cursor `id[opt=val,...]` model for a variant agent."""
+    """Set the context option of a Cursor `id[opt=val,...]` model for a variant agent.
+
+    Args:
+        model: Cursor model id, with or without an option list.
+        context: Context size option, e.g. `300k`; None or empty keeps the model unchanged.
+
+    Returns:
+        The model with its `context` option replaced or added.
+    """
     if not context:
         return model
     if CONTEXT_OPTION.search(model):
@@ -38,62 +81,101 @@ def with_context(model: str, context: str | None) -> str:
     return f"{model}[context={context}]"
 
 
-def render_agent(agent: render.Agent, profile: dict) -> render.RenderedFile:
-    """Cursor can only restrict a role by `readonly`, which also removes the shell."""
+def render_agent(agent: render.Agent, profile: dict[str, str]) -> render.RenderedFile:
+    """Render a role as a Cursor agent file.
+
+    Cursor can only restrict a role by `readonly`, which also removes the shell.
+
+    Args:
+        agent: The role variant to render.
+        profile: Tier profile whose `agent_model` the agent runs on.
+
+    Returns:
+        The agent markdown file under the agents directory.
+    """
     readonly = "false" if agent.role.capabilities["shell"] else "true"
-    lines = ["---", f"name: {agent.name}", f"description: {json.dumps(agent.role.description)}",
-             f"model: {with_context(profile['agent_model'], agent.context)}", f"readonly: {readonly}", "---", ""]
+    lines = [
+        "---",
+        f"name: {agent.name}",
+        f"description: {json.dumps(agent.role.description)}",
+        f"model: {with_context(profile['agent_model'], agent.context)}",
+        f"readonly: {readonly}",
+        "---",
+        "",
+    ]
     return render.RenderedFile(f"{AGENTS_DIR}/{agent.name}.md", "\n".join(lines) + "\n" + agent.body.strip() + "\n")
 
 
-def enforced_limits(capabilities: dict) -> frozenset[str]:
-    """`readonly` blocks edits and the shell; everything else a shell role could do anyway."""
+def enforced_limits(capabilities: dict[str, bool]) -> frozenset[str]:
+    """Name the capability limits Cursor enforces for a role.
+
+    `readonly` blocks edits and the shell; everything else a shell role could do anyway.
+
+    Args:
+        capabilities: The role's capability flags.
+
+    Returns:
+        `shell` and `write` for a role without shell, else nothing.
+    """
     return frozenset() if capabilities["shell"] else frozenset({"shell", "write"})
 
 
 def wrap_policy(text: str) -> str:
+    """Wrap the rendered policy as an always-applied Cursor rule.
+
+    Args:
+        text: Rendered policy markdown.
+
+    Returns:
+        The rule file text with its frontmatter.
+    """
     return POLICY_FRONTMATTER + text.strip() + "\n"
 
 
 def runtime_mapping(config: dict) -> render.RuntimeMapping:
+    """Describe Cursor's rendering of the shared content.
+
+    Args:
+        config: Loaded Cursor adapter configuration.
+
+    Returns:
+        The runtime mapping the renderer uses for agents, skills and the policy rule.
+    """
     return render.RuntimeMapping(
-        runtime=RUNTIME, runtime_name="Cursor", handoff_dir=config["paths"]["handoff_dir"], tiers=config["tiers"],
-        override_syntax=OVERRIDE_SYNTAX, transcripts=TRANSCRIPTS, channel="rule_file", describe_tier=describe_tier,
-        render_agent=render_agent, skills_dir=SKILLS_DIR, policy_file=POLICY_FILE, wrap_policy=wrap_policy,
-        enforced_limits=enforced_limits)
-
-
-def hook_command(python: Path, kit: Path, native: str) -> str:
-    return shlex.join([str(python), str(kit / HOOK_SCRIPT), native])
-
-
-def managed(entry: object, script: str) -> bool:
-    if not isinstance(entry, dict) or not isinstance(entry.get("command"), str):
-        return False
-    try:
-        tokens = shlex.split(entry["command"])
-    except ValueError:
-        return False
-    return script in tokens
-
-
-def hook_lists(doc: dict) -> dict:
-    hooks = doc.get("hooks", {})
-    if not isinstance(hooks, dict) or not all(isinstance(entries, list) for entries in hooks.values()):
-        raise ValueError("hooks.json: hooks must map event names to lists")
-    return hooks
+        runtime=RUNTIME,
+        runtime_name="Cursor",
+        handoff_dir=config["paths"]["handoff_dir"],
+        tiers=config["tiers"],
+        override_syntax=OVERRIDE_SYNTAX,
+        transcripts=TRANSCRIPTS,
+        channel="rule_file",
+        describe_tier=describe_tier,
+        render_agent=render_agent,
+        skills_dir=SKILLS_DIR,
+        policy_file=POLICY_FILE,
+        wrap_policy=wrap_policy,
+        enforced_limits=enforced_limits,
+    )
 
 
 def unmerge_hooks(doc: dict, script: str) -> dict:
     """Remove managed entries and emptied events; keep every other event, entry and key.
 
     An emptied `hooks` object goes too, and a `version` left alone means nothing else
-    remains, so a hooks.json the install created can be deleted on uninstall.
+    remains, so a hooks.json the install created can be deleted on uninstall. A malformed
+    `hooks` section raises ValueError from `hookfile.event_lists`.
+
+    Args:
+        doc: Parsed hooks.json; it is not modified.
+        script: Path of the managed hook script that identifies our entries.
+
+    Returns:
+        A copy without our entries, or `{}` when nothing but `version` remains.
     """
     result = json.loads(json.dumps(doc))
-    hooks = hook_lists(result)
+    hooks = hookfile.event_lists(result, HOOKS_LABEL)
     for event in list(hooks):
-        hooks[event] = [entry for entry in hooks[event] if not managed(entry, script)]
+        hooks[event] = [entry for entry in hooks[event] if not hookfile.runs_script(entry, script)]
         if not hooks[event]:
             del hooks[event]
     if "hooks" in result and not hooks:
@@ -102,10 +184,24 @@ def unmerge_hooks(doc: dict, script: str) -> dict:
 
 
 def merge_hooks(doc: dict, registrations: dict[str, dict], script: str) -> dict:
-    """Register our entries; a file already holding exactly them is returned as is, so user hooks
-    added after ours are not reordered."""
-    owned = {event: [entry for entry in entries if managed(entry, script)]
-             for event, entries in hook_lists(doc).items()}
+    """Register our hook entries in hooks.json.
+
+    A file already holding exactly our entries is returned as is, so user hooks added after
+    ours are not reordered. A malformed `hooks` section raises ValueError from
+    `hookfile.event_lists`.
+
+    Args:
+        doc: Parsed hooks.json; it is not modified.
+        registrations: Our entry per native event.
+        script: Path of the managed hook script that identifies our entries.
+
+    Returns:
+        The document with a `version` and our entries appended after the user's.
+    """
+    owned = {
+        event: [entry for entry in entries if hookfile.runs_script(entry, script)]
+        for event, entries in hookfile.event_lists(doc, HOOKS_LABEL).items()
+    }
     expected = {native: [entry] for native, entry in registrations.items()}
     if "version" in doc and {event: found for event, found in owned.items() if found} == expected:
         return doc
@@ -117,26 +213,49 @@ def merge_hooks(doc: dict, registrations: dict[str, dict], script: str) -> dict:
     return result
 
 
-def registrations(config: dict, python: Path, kit: Path) -> dict[str, dict]:
-    return {native: {"command": hook_command(python, kit, native), **spec.get("hook", {})}
-            for native, spec in config["hook_events"].items()}
+def registrations(python: Path, kit: Path) -> dict[str, dict]:
+    """Build the hooks.json entry of every registered native event.
 
+    Args:
+        python: Interpreter that runs the hook script.
+        kit: Installed kit root holding the hook script.
 
-def kit_signatures(home: Path, mapping: render.RuntimeMapping) -> dict[Path, tuple[str, ...]]:
-    """An unrecorded kit agent carries its role's name and the first line of its body."""
-    signatures = {}
-    for agent in render.agents(mapping):
-        first = agent.body.strip().splitlines()[0].strip()
-        signatures[home / AGENTS_DIR / f"{agent.name}.md"] = ("---", f"name: {agent.name}", first)
-    return signatures
+    Returns:
+        Entry per native event: command, timeout and the event's options.
+    """
+    return {
+        native: {
+            "command": hookfile.hook_command(python, kit / HOOK_SCRIPT, native),
+            "timeout": deadline.HOOK_TIMEOUT_SECONDS,
+            **dict(spec.options),
+        }
+        for native, spec in HOOK_EVENTS.items()
+    }
 
 
 def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSpec:
+    """Plan the Cursor install: rendered files under ~/.cursor and the hooks.json merge.
+
+    Args:
+        home: Home directory to install into.
+        kit: Installed kit root.
+        python: Interpreter that runs the hook script.
+        config: Loaded Cursor adapter configuration.
+
+    Returns:
+        The install spec for the shared installer.
+    """
     mapping = runtime_mapping(config)
     files = {home / item.path: item.text for item in render.rendered_files(mapping)}
     script = str(kit / HOOK_SCRIPT)
-    hooks = JsonMerge(home / HOOKS_FILE, partial(merge_hooks, registrations=registrations(config, python, kit),
-                                                 script=script),
-                      partial(unmerge_hooks, script=script))
-    return InstallSpec(RUNTIME, files=files, json_merges=[hooks],
-                       kit_signatures=kit_signatures(home, mapping))
+    hooks = JsonMerge(
+        home / HOOKS_FILE,
+        partial(merge_hooks, registrations=registrations(python, kit), script=script),
+        partial(unmerge_hooks, script=script),
+    )
+    return InstallSpec(
+        RUNTIME,
+        files=files,
+        json_merges=[hooks],
+        kit_signatures=frontmatter_signatures(home / AGENTS_DIR, render.agents(mapping)),
+    )

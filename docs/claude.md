@@ -11,7 +11,7 @@ Shared behaviour is in [architecture.md](architecture.md). This page lists only 
 | Notes | `hookSpecificOutput.additionalContext` in the same hook, logged as `note` and `note_delivered`; block and stop refresh as `{"decision":"block","reason"}`. |
 | Agents | `~/.claude/agents/<role>.md`, frontmatter `name, description, model, effort`, plus tool restrictions. |
 | Capability mapping | `shell: false` gives `tools: Read, Glob, Grep`, which enforces every limit. Otherwise `disallowedTools` lists `Edit, Write, NotebookEdit` when `write` is false and `WebFetch, WebSearch` when `network` is false, but Bash can still do both, and no documented agent setting removes MCP tools, so a shell role's limits are advisory and the policy's role table lists them as not enforced. |
-| Per-spawn override | Agent tool `model` alias. No per-call effort: effort is fixed in the agent definition. The tool description discourages setting `model`, so the rendered policy explicitly authorises it per tier. |
+| Per-spawn override | Agent tool `model` alias. No per-call effort: effort is fixed in the agent definition. The tool description discourages setting `model`, so the rendered policy explicitly authorises it per tier. Without `model`, `subagent_spawn` logs the role's default tier and that tier's `model`; the logged effort is always the default tier's. |
 | Transcripts | `~/.claude/projects/<project-slug>/<session-id>.jsonl`. |
 
 ## Tiers

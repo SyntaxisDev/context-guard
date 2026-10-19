@@ -24,14 +24,14 @@ uv run --python 3.14 python cli.py uninstall --runtime all
 
 Options: `--runtime` (repeatable; `cursor`, `codex`, `claude` or `all`), `--home DIR` (install into
 another home, for testing), `--dry-run`, `--force` (replace conflicting kit files, keeping
-backups), `--set section.key=value` (write the user config).
+backups), `--set section.key=value` (write the user config; the key must exist in
+`content/defaults.json` or an adapter `config.json`).
 Exit codes: 0 ok, 1 conflicts, doctor problems or (doctor) nothing installed, 2 the command could not run.
 
 Installation copies one kit to `~/.context-guard/kit` with a pinned Python 3.14 venv; hooks
 call that interpreter. Start a new session afterwards and review the new hooks in the
-runtime: context-guard never writes hook trust. Unrelated hooks and settings are preserved.
-An older install's kit directory is cleaned up and its settings are carried over; see
-[docs/architecture.md](docs/architecture.md#install-engine).
+runtime: context-guard never writes hook trust. Unrelated hooks and settings are preserved;
+see [docs/architecture.md](docs/architecture.md#install-engine).
 
 ### Updating
 
@@ -67,6 +67,9 @@ State, events and handoffs live under `~/.context-guard/` (layout in
 [docs/architecture.md](docs/architecture.md)). Hooks keep state in the home of the kit they run from (`<home>/.context-guard/kit`, so a kit
 installed with `--home <dir>` stays in `<dir>`); `CONTEXT_GUARD_HOME=<dir>` overrides it for a
 checkout or plugin, while an installed kit from another home then passes without acting.
+
+The optional runner, classifier and calibration keys are listed in the
+[runner key table](docs/architecture.md#optional-runner).
 
 ## Tests
 

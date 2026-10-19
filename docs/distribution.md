@@ -22,6 +22,9 @@ uv run --python 3.14 python cli.py package --runtime claude --out dist [--market
 ```
 
 - The version is `project.version` from `pyproject.toml`; a marketplace pins users to it until it changes.
+- An existing `marketplace.json` is merged: only the entry named like this plugin is replaced,
+  other plugins' entries and the listing's own fields are kept. A file that is not a JSON object
+  with a `plugins` list is an error and nothing is written.
 - `--set` values are validated like the installer's and baked into the package's
   `adapters/<rt>/config.json`; they are never written to a user config. Precedence inside a
   package is therefore: shipped defaults, adapter config with baked values, the user's

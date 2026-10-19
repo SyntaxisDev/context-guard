@@ -14,13 +14,6 @@
     "window_fallback": 0,
     "timeout_seconds": 1
   },
-  "hook_events": {
-    "sessionStart": {"event": "session", "hook": {"timeout": 5}},
-    "beforeSubmitPrompt": {"event": "prompt", "hook": {"timeout": 5}},
-    "preToolUse": {"event": "tool", "spawn_only": true, "hook": {"timeout": 5, "matcher": "Task"}},
-    "postToolUse": {"event": "tool", "hook": {"timeout": 5}},
-    "stop": {"event": "stop", "hook": {"timeout": 5, "loop_limit": 1}}
-  },
   "tools": {
     "read": ["Read"],
     "write": ["Write", "StrReplace", "Edit", "MultiEdit"],

@@ -1,33 +1,41 @@
-"""Optional prompt classification and decision logging with explicit runtime inputs."""
-import collections
-import json
-from pathlib import Path
+"""Optional prompt classification with explicit runtime inputs."""
+
+from collections.abc import Callable
+
 from core.runner import intent_labels, prefilter
-from core.state import file_lock
-
-TRIM_SLACK = 100
 
 
-def decide(prompt: str, config: dict, cache, ask_model=None, needed=True) -> dict:
-    conf = config['classifier']
-    found = {'prefilter': prefilter.passes(prompt, conf), 'label': None,
-             'latency_s': None, 'cached': False, 'asked': False}
-    if needed and found['prefilter'] and conf['enabled'] and ask_model is not None:
-        found['asked'] = True
-        found['label'], found['latency_s'], found['cached'] = intent_labels.classify(prompt, conf, cache, ask_model)
+def decide(
+    prompt: str,
+    classifier: dict,
+    cache: intent_labels.LabelCache,
+    ask_model: Callable[[str, str, float], str | None],
+    *,
+    ask: bool,
+) -> dict:
+    """Run the prefilter and, when `ask` is set and it passes, ask the classifier (cached).
+
+    Args:
+        prompt: The user's prompt text.
+        classifier: The `classifier` config section.
+        cache: The runtime's label cache.
+        ask_model: Called as `ask_model(model, prompt, timeout)`; returns the reply text or None.
+        ask: Whether the classifier may be asked at all.
+
+    Returns:
+        A decision record: `prefilter` (bool), `label` (str or None), `latency_s` (float or None),
+        `cached` and `asked` (bool).
+    """
+    found = {
+        "prefilter": prefilter.passes(prompt, classifier),
+        "label": None,
+        "latency_s": None,
+        "cached": False,
+        "asked": False,
+    }
+    if ask and found["prefilter"]:
+        found["asked"] = True
+        found["label"], found["latency_s"], found["cached"] = intent_labels.classify(
+            prompt, classifier, cache, ask_model
+        )
     return found
-
-
-def log_decision(path: Path, record: dict, window: int) -> None:
-    try:
-        with file_lock(path.with_suffix('.lock')):
-            with path.open('a') as handle:
-                handle.write(json.dumps(record) + '\n')
-            with path.open() as handle:
-                lines = collections.deque(handle, maxlen=window + TRIM_SLACK + 1)
-            if len(lines) > window + TRIM_SLACK:
-                # The lock is held by every service writer, including while trimming.
-                with path.open('w') as handle:
-                    handle.writelines(list(lines)[-window:])
-    except OSError:
-        return

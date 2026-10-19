@@ -1,10 +1,9 @@
 """Codex provider for the optional runner: one `codex exec` call, read-only, with tools and hooks off."""
+
 import json
-import sys
 from functools import partial
 from pathlib import Path
 
-from core import config as config_mod
 from core.runner import service
 from core.runner.provider import Invocation, Provider
 
@@ -13,18 +12,46 @@ EXECUTABLE = "codex"
 ADAPTER_DIR = Path(__file__).resolve().parent
 ANSWER_FILE = "answer.txt"
 SCHEMA_FILE = "schema.json"
-DISABLED = ("features.shell_tool=false", "features.hooks=false", "features.apps=false",
-            "features.plugins=false", "features.multi_agent=false", 'web_search="disabled"')
+DISABLED = (
+    "features.shell_tool=false",
+    "features.hooks=false",
+    "features.apps=false",
+    "features.plugins=false",
+    "features.multi_agent=false",
+    'web_search="disabled"',
+)
 MESSAGE_ITEMS = (None, "agent_message", "reasoning")
 
 
-def cheap_profile(config: dict) -> dict:
-    return config["tiers"]["cheap"]
-
-
 def command(effort: str, program: str, model: str, prompt: str, scratch: Path, schema: dict | None) -> Invocation:
-    argv = [program, "exec", "--ignore-user-config", "--ignore-rules", "--ephemeral", "--skip-git-repo-check",
-            "--sandbox", "read-only", "--json", "--model", model, "--output-last-message", str(scratch / ANSWER_FILE)]
+    """Build a read-only, ephemeral `codex exec` call with tools and hooks off that reads the prompt from stdin.
+
+    Args:
+        effort: The reasoning effort setting.
+        program: The resolved `codex` path.
+        model: The model to call.
+        prompt: The full prompt text.
+        scratch: The scratch directory that receives the last message and the schema file.
+        schema: A JSON schema the answer must match, written to the scratch directory; None for free text.
+
+    Returns:
+        The invocation.
+    """
+    argv = [
+        program,
+        "exec",
+        "--ignore-user-config",
+        "--ignore-rules",
+        "--ephemeral",
+        "--skip-git-repo-check",
+        "--sandbox",
+        "read-only",
+        "--json",
+        "--model",
+        model,
+        "--output-last-message",
+        str(scratch / ANSWER_FILE),
+    ]
     if schema:
         (scratch / SCHEMA_FILE).write_text(json.dumps(schema))
         argv += ["--output-schema", str(scratch / SCHEMA_FILE)]
@@ -34,7 +61,14 @@ def command(effort: str, program: str, model: str, prompt: str, scratch: Path, s
 
 
 def only_messages(stdout: str) -> bool:
-    """A run whose JSON event stream shows any tool item is discarded."""
+    """Return whether a run's JSON event stream holds only message items; a run with any tool item is discarded.
+
+    Args:
+        stdout: The run's `--json` event stream.
+
+    Returns:
+        False when a line is not JSON or carries a non-message item.
+    """
     for line in stdout.splitlines():
         try:
             event = json.loads(line)
@@ -47,20 +81,42 @@ def only_messages(stdout: str) -> bool:
 
 
 def answer(stdout: str, scratch: Path) -> str | None:
+    """Read the last message of a run that used no tools.
+
+    Args:
+        stdout: The run's `--json` event stream.
+        scratch: The scratch directory holding the last-message file.
+
+    Returns:
+        The last message, or None when the run used a tool or the file cannot be read.
+    """
     if not only_messages(stdout):
         return None
     try:
         return (scratch / ANSWER_FILE).read_text()
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return None
 
 
 def provider(config: dict) -> Provider:
-    return Provider(EXECUTABLE, partial(command, cheap_profile(config)["effort"]), answer)
+    """Build the Codex provider at the cheap tier's reasoning effort.
+
+    Args:
+        config: The merged configuration.
+
+    Returns:
+        The provider.
+    """
+    return Provider(EXECUTABLE, partial(command, config["tiers"]["cheap"]["effort"]), answer)
 
 
 def services(home: Path) -> service.Services:
-    loader = config_mod.ConfigLoader(config_mod.sources_for(RUNTIME, home, ADAPTER_DIR / "config.json"))
-    config = loader.load()
-    return service.Services(loader, home, RUNTIME, provider(config), cheap_profile(config)["model"],
-                            [sys.executable, str(ADAPTER_DIR / "hooks.py")])
+    """Build Codex's prompt services.
+
+    Args:
+        home: The home directory that config, state and handoff paths resolve against.
+
+    Returns:
+        The services bound to the Codex provider and the cheap tier's `model`.
+    """
+    return service.build(RUNTIME, home, ADAPTER_DIR, provider, "model")

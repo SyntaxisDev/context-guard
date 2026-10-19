@@ -17,6 +17,7 @@
 #   KEEP=1          keep the temporary sandbox after the run
 #   SANDBOX=<dir>   reuse a persistent sandbox (never deleted), e.g. after the Codex hook review
 #   SMOKE_PYTHON=<path>  interpreter for cli.py (default: uv run --python 3.14 python)
+#   CLAUDE_USE_API_KEY=1  keep ANTHROPIC_API_KEY for Claude (default: unset, use the login)
 #   CLAUDE_MODEL, CODEX_MODEL, CODEX_EFFORT, CURSOR_MODEL override the cheap defaults
 # shellcheck disable=SC2329  # cleanup and claude_agents run through trap and run()
 set -euo pipefail
@@ -37,7 +38,7 @@ while (($#)); do
         --only) [[ $# -ge 2 ]] || { echo "--only needs a runtime" >&2; exit 2; }; ONLY=$2; shift 2 ;;
         --only=*) ONLY=${1#*=}; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
-        -h|--help) sed -n '2,20s/^# \{0,1\}//p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,21s/^# \{0,1\}//p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done

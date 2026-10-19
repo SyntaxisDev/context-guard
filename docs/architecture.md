@@ -27,7 +27,7 @@ No dispatcher superclass. Each adapter supplies functions:
 | `observe(payload) -> Observation`                                | native payload to `Observation` (tokens, window, model, `is_subagent`, `compacted`, cwd, prompt, `ToolUse`). `ValueError` means fail open. |
 | `respond(decision) -> payload`                                   | `Decision` to the runtime's response shape; any error means pass.                                                                          |
 | `mapping.runtime_mapping`/render                                 | tier profiles, override syntax, capability to native permissions, channel, skills dir.                                                     |
-| `mapping.install_spec(home, kit, python, config) -> InstallSpec` | kit-owned files, JSON merges, text edits.                                                                                                  |
+| `mapping.install_spec(home, kit, python, config) -> InstallSpec` | kit-owned files, JSON merges (hook events and matchers, `deadline.HOOK_TIMEOUT_SECONDS`), text edits, kit signatures.                      |
 | `config.json`                                                    | tiers plus runtime-specific telemetry and hook settings.                                                                                   |
 | `runner.py`                                                      | provider for the optional runner.                                                                                                          |
 
@@ -47,6 +47,8 @@ unknown tokens fail open.
 - **Once per tier.** State records the highest tier fired; a jump fires only the highest.
 - **Block** happens only on prompt events. The message states tokens and limit. An identical
   (stripped) resend passes, is logged as `resend`, and is followed by silence until a higher tier.
+  Session state keeps a sha256 of the blocked prompt and only the slug of the first prompt
+  (the handoff name), never prompt text.
 - **Re-arm.** Compaction (`compacted` or the `compact` event), or live context back under the
   note threshold, resets fired tiers. A zero token reading is unknown telemetry and never re-arms.
 - **Pass-through prompts.** `[context-guard]` prompts pass silently; handoff requests
@@ -55,8 +57,9 @@ unknown tokens fail open.
   it records the turn and the current tokens as the last handoff, adopts that file as the
   session's handoff path and acknowledges a pending request. Writes are Cursor's write tools
   and `Shell`, Codex `apply_patch` and shell or code-mode commands, and Claude `Write`/`Edit`/`MultiEdit`/
-  `NotebookEdit` and `Bash`; a shell command writes when the handoff is a `>`, `>>` or `tee`
-  target. Notes ask for the write in the same turn and forbid claiming an update not written.
+  `NotebookEdit` and `Bash`; a shell command writes when the handoff is a `>` or `>>` target,
+  any `tee` operand (options such as `-a` allowed), or the destination (last operand) of `cp`,
+  `mv` or `install`; a write wins over a read in the same command. Notes ask for the write in the same turn and forbid claiming an update not written.
 - **Stop refresh.** At or above the note threshold, at most once per turn and never in a turn
   that wrote the handoff. A turn whose note or handoff request got no write is refreshed at
   once, saying the handoff file was not modified this turn and naming it (`source:
@@ -146,8 +149,14 @@ Precedence, low to high: `content/defaults.json`, `adapters/<rt>/config.json`,
 `~/.context-guard/config.json` top level, its `runtimes.<rt>` section, then environment
 `CONTEXT_GUARD_<SECTION>_<KEY>`. User and environment values must match the type of the
 shipped value; malformed values are ignored, unknown keys kept, except that a new entry in a
-nested section of objects (tier profiles, hook events) must be an object. The user file is
-written by `cli.py ... --set section.key=value`.
+nested section of objects (tier profiles) must be an object. The user file is
+written by `cli.py ... --set section.key=value`, which rejects a `section.key` absent from the
+defaults and every adapter config (except a new object entry in a section of objects) and a
+value of the wrong type, so a typo fails instead of being silently ignored.
+
+Hooks delete session state files in `paths.state_dir/<runtime>/` untouched for
+`paths.prune_days` (30) days; each state file's lock goes with its json, and an orphaned lock
+of the same age goes too.
 
 Hooks and the runner worker resolve their home once in `main()` (`config.resolve_home`):
 `CONTEXT_GUARD_HOME`, else the home of the installed kit they run from
@@ -163,7 +172,12 @@ run would otherwise also get duplicate events from the user's own installation.
 `core/install.py` plans, then applies; adapters only describe their `InstallSpec`.
 
 1. **Plan** compares the rendered spec with disk and the manifest: create, update, remove,
-   JSON merges (unrelated hooks and settings preserved) and text edits.
+   JSON merges (unrelated hooks and settings preserved) and text edits. `core/hookfile.py` holds
+   the hook command (`shlex`-joined python, script, event), hook ownership (the kit's hook script
+   is one token of the command, so a wrapper or `hooks.py.bak` is not ours) and the grouped
+   `{"hooks": {event: [{matcher?, hooks: [...]}]}}` merge used by Codex and Claude Code. A hook
+   event that is not a list is a conflict; user groups and events are kept even when empty, and
+   only what removing our handlers emptied goes.
 2. **Conflicts.** A kit-owned file whose hash differs from the manifest (user edited) is
    reported and skipped unless `--force`; replaced files are backed
    up under `~/.context-guard/backups/<ts>/`. JSON merges leave a file that already holds
@@ -171,9 +185,12 @@ run would otherwise also get duplicate events from the user's own installation.
    **Stale kit output.** Unrecorded content that is demonstrably ours (for example after the
    manifest was lost) is replaced without `--force`, with a backup and its diff in the plan.
    The rule is deterministic: the adapter's `InstallSpec.kit_signatures` maps a path to lines
-   that must all appear (whitespace-trimmed); Cursor uses `name: <role>` plus the first line of
-   the role body for agent files. Anything else stays a conflict.
-3. **Apply** writes files, then records `state/<rt>/install-manifest.json` (sha256 of
+   that must all appear (whitespace-trimmed). For agent files, Cursor and Claude Code use
+   `name: <role>` plus the first line of the role body; Codex, whose role body is one TOML string,
+   uses the `name` and `description` lines. Anything else stays a conflict.
+3. **Apply** writes each file to a temporary file beside it and renames it into place (through a
+   symlink to its target, keeping the existing mode), so a hook importing a kit module during an
+   install reads the old or the new file, never a partial one. It then records `state/<rt>/install-manifest.json` (sha256 of
    files, merges, edits, and the original text of a user JSON file a merge rewrote; files
    whose content would not change are not rewritten). **Dry run** prints the plan and writes nothing.
 4. **Uninstall** reverses via the manifest; the shared kit goes only with the last runtime.
@@ -188,12 +205,15 @@ run would otherwise also get duplicate events from the user's own installation.
    (omitted outside a git repo). On the `session` event (not `compact`), unless
    `kit_check.enabled` is false, `policy.session_context` adds one line when `git rev-parse HEAD`
    (1 s timeout) in `source` differs from the recorded commit; a missing source, commit or git
-   failure adds nothing. With `kit_check.auto_update` (default false) the hook instead spawns
+   failure adds nothing. The line names the update command for this home: `<kit python>
+   <source>/cli.py install --runtime <each installed runtime> --home <home>`.
+   With `kit_check.auto_update` (default false) the hook instead spawns
    `<kit python> <source>/cli.py install --runtime <each installed runtime> --home <home>` in
    its own session without waiting, writes its output to `~/.context-guard/kit-update.log`, and
    says the update starts in the next session. It runs without `--force`, so edited files are
    skipped and listed in that log. A log younger than 10 minutes means an update is running or
-   just failed; the hook then shows the manual notice instead. `status` prints source and commit,
+   just failed; the hook then shows the manual notice instead. The age check and touching the log
+   happen under one lock (`kit-update.log.lock`), so sessions starting together launch one install. `status` prints source and commit,
    `doctor` reports the stale kit. The CoWork plugin package is not checked; repackage and re-upload it.
 
 Hook trust is never written; each runtime reviews new hooks itself. Exit codes: 0 ok,
@@ -208,7 +228,16 @@ neither get notes nor write events or handoffs.
 
 ## Optional runner
 
-`core/runner/`, off by default (`runner.enabled`, `classifier.enabled`). One contract on
+`core/runner/`, off by default. Each switch works on its own:
+
+- `runner.enabled`: hand mechanical prompts to the runner. It turns on the classifier routing it
+  needs; `classifier.enabled` is not required.
+- `classifier.enabled`: classify prompts and add a delegation note (mechanical) or a fresh-chat
+  note (new task); no job runs.
+- `calibration.enabled`: log prompt decisions and periodically tune the prefilter.
+
+Subagent prompts, prompts starting with `!`, bookkeeping prompts and handoff requests are never
+routed. One contract on
 every runtime: the adapter's provider _plans_ commands, `mechanical.execute_plan`
 _validates_ the whole plan (fail closed: configured exact commands or a narrow Git grammar,
 no shell metacharacters), then a detached worker _executes_. Scheduling is two-phase so a
@@ -221,13 +250,60 @@ through the handoff store's `pending/` directory.
 
 - **Prefilter** (`prefilter.py`): a cheap recall-oriented check on the prompt (single line, length,
   question wording, `classifier.keywords`) that decides whether the classifier is asked at all.
-- **Prompt services** (`prompt_services.py`): run the prefilter, ask the classifier when enabled
-  and cache its label, and append each decision to a bounded log.
-- **Calibration** (`calibration.py`, `calibration.enabled` false by default): a periodic job that
-  scores logged decisions against model labels and writes a proposal of `classifier` keyword and
-  threshold updates. `calibration.mode` `propose` leaves the proposal for review; `auto` applies it.
+- **Prompt services** (`prompt_services.py`): run the prefilter and, when the runner or classifier
+  is on, ask the classifier and cache its label.
+- **Calibration** (`calibration.py`): see below.
 
-Hooks delete session state files untouched for `paths.prune_days` (30) days.
+Validation (`mechanical.py`) accepts only exact `runner.commands` entries or this Git grammar:
+`status`, `diff`, `log` with fixed flags, `branch --show-current`, `add <paths>`, `commit -m <msg>`
+and a bare `push`; `add`, `commit` and `push` also need an affirmative request in the prompt.
+`add` paths must resolve inside the workspace and must not start with `-` or `:`; Git runs with
+`GIT_LITERAL_PATHSPECS=1`, so globs and pathspec magic are literal. `git commit` and `git push`
+run the repository's own hooks. Any argument with shell characters, a shell or `env` as the
+program, or `-c`/`-e`/`--eval`/`--command` rejects the whole plan.
+
+**Calibration.** With `calibration.enabled`, each prompt's decision (prefilter result, label,
+tokens, model, the prompt cut to `classifier.max_chars` + 1 characters and its full length, which
+calibration's length check uses) is appended to `decisions.jsonl`, bounded to `calibration.window` lines.
+Nothing is logged with calibration off. Once `first_run_prompts` decisions exist and
+`interval_days` have passed since the last run, a prompt spawns a detached `hooks.py --calibrate`.
+It labels unlabelled prompts in batches, tunes `keywords`, `short_keywords`, `short_max_words` and
+`max_chars` on half of them and drops changes that score worse on the other half. With `mode`
+`propose` it writes `calibration/proposal.json` and the next prompt carries a one-time note; the
+user replies `calibration apply`, `calibration auto` (apply and switch to `auto`) or
+`calibration keep` (discard and stay on `propose`). With `mode` `auto` the update goes straight to
+the runtime's user config, the note says so once, and `calibration keep` switches back to
+`propose`. Such a reply is intercepted only while calibration is on and a proposal is pending or
+was just applied; otherwise it is an ordinary prompt.
+
+Entry points of each adapter's `hooks.py`: `--worker <job.json>` plans and executes one staged
+job; `--calibrate` runs calibration now; `--calibrate --dry-run` prints the result from existing
+labels without model calls or writes.
+
+| key | default | meaning |
+| --- | --- | --- |
+| `runner.model`, `classifier.model` | `""` | planner and classifier model; empty means the adapter's cheap tier |
+| `runner.commands` | `[]` | exact argv lists the planner may use, e.g. `[["make", "test"]]`; `argv[0]` is a program name on `PATH`, not a path |
+| `runner.max_commands` | 8 | commands per plan (at most 8) |
+| `runner.timeout_seconds` | 300 | execution time per job (at most 1800) |
+| `runner.plan_timeout_seconds` | 60 | planner call |
+| `runner.cooldown_seconds` | 60 | minimum gap between scheduled jobs |
+| `classifier.timeout_seconds` | 20 | classifier call, further bounded by the hook deadline |
+| `classifier.cache_entries` | 5000 | cached labels |
+| `classifier.max_chars`, `max_question_words`, `polite_words`, `keywords`, `short_keywords`, `short_max_words` | see `content/defaults.json` | prefilter rules (`prefilter.py`) |
+| `calibration.mode` | `propose` | `propose` or `auto` |
+| `calibration.first_run_prompts` | 1000 | logged decisions before the first run |
+| `calibration.interval_days` | 30 | days between runs |
+| `calibration.window` | 10000 | decision lines kept and read |
+| `calibration.sample_rejected` | 2000 | prefilter-rejected prompts sampled for labelling |
+| `calibration.batch_size` | 50 | prompts per labelling call |
+| `calibration.max_fp_per_tp` | 3 | extra classifier calls accepted per extra chore caught |
+| `calibration.min_mechanical` | 20 | labelled mechanical prompts needed to tune |
+| `calibration.model` | `""` | labelling model; empty means `classifier.model`, then the cheap tier |
+
+State lives in `paths.state_dir/<runtime>/`: `decisions.jsonl`, `classifier_cache.json`,
+`calibration/` (`proposal.json`, `report.md`, `last_run.json`, `run.log`, locks) and `runner/`
+(`<job>.json` record and `<job>.log` output per job, `last.json` for the cooldown).
 
 ## Failure contracts
 

@@ -6,8 +6,10 @@ import sys
 import tempfile
 import types
 import unittest
+from collections.abc import Callable
 from contextlib import redirect_stderr
 from pathlib import Path
+from typing import Never
 
 import cli
 from core import events, kit
@@ -27,21 +29,19 @@ def fake_venv(base: Path, venv: Path) -> None:
     link.symlink_to(base)
 
 
-TOOLCHAIN = kit.Toolchain(
-    find_python=lambda: Path(sys.executable), create_venv=fake_venv
-)
+TOOLCHAIN = kit.Toolchain(find_python=lambda: Path(sys.executable), create_venv=fake_venv)
 
 
 def fake_mapping(runtime: str) -> types.SimpleNamespace:
     return types.SimpleNamespace(
-        install_spec=lambda home, kit_root, python, config: fake_spec(
-            home, kit_root, python, config, runtime
-        )
+        install_spec=lambda home, kit_root, python, config: fake_spec(home, kit_root, python, config, runtime)
     )
 
 
 class CliCase(unittest.TestCase):
-    def setUp(self):
+    """A temporary home and a minimal source tree for cli.main with a fake runtime mapping."""
+
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.home, self.source = root / "home", root / "source"
@@ -56,11 +56,11 @@ class CliCase(unittest.TestCase):
             (self.source / relative).parent.mkdir(parents=True, exist_ok=True)
             (self.source / relative).write_text(text)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tmp.cleanup()
 
     def run_cli(
-        self, *argv: str, load_mapping=fake_mapping, source=None
+        self, *argv: str, load_mapping: Callable[[str], object] = fake_mapping, source: Path | None = None
     ) -> tuple[int, str, str]:
         out, err = io.StringIO(), io.StringIO()
         with redirect_stderr(err):
@@ -75,7 +75,9 @@ class CliCase(unittest.TestCase):
 
 
 class InstallCommandTests(CliCase):
-    def test_dry_run_prints_plan_and_writes_nothing(self):
+    """Install dry runs, idempotence, conflicts, --set validation and clear setup errors."""
+
+    def test_dry_run_prints_plan_and_writes_nothing(self) -> None:
         (self.home / ".cursor-home").mkdir()
         (self.home / ".cursor-home" / "settings.json").write_text('{"theme": "dark"}')
         before = snapshot(self.home)
@@ -93,7 +95,7 @@ class InstallCommandTests(CliCase):
         self.assertIn("Dry run", out)
         self.assertEqual(snapshot(self.home), before)
 
-    def test_install_then_reinstall_is_up_to_date(self):
+    def test_install_then_reinstall_is_up_to_date(self) -> None:
         self.assertEqual(self.run_cli("install", "--runtime", "cursor")[0], cli.EXIT_OK)
         self.assertTrue(kit.venv_python(kit.kit_dir(self.home)).exists())
         before = snapshot(self.home)
@@ -103,7 +105,7 @@ class InstallCommandTests(CliCase):
         self.assertIn("[cursor] up to date", out)
         self.assertEqual(snapshot(self.home), before)
 
-    def test_conflict_exit_code_and_force(self):
+    def test_conflict_exit_code_and_force(self) -> None:
         self.run_cli("install", "--runtime", "cursor")
         agent = self.home / ".cursor-home" / "agents" / "scout.md"
         agent.write_text("mine\n")
@@ -111,12 +113,13 @@ class InstallCommandTests(CliCase):
         self.assertEqual(code, cli.EXIT_ISSUES)
         self.assertIn("conflict", out)
         self.assertEqual(agent.read_text(), "mine\n")
-        self.assertEqual(
-            self.run_cli("install", "--runtime", "cursor", "--force")[0], cli.EXIT_OK
-        )
+        self.assertEqual(self.run_cli("install", "--runtime", "cursor", "--force")[0], cli.EXIT_OK)
         self.assertEqual(agent.read_text(), "scout\n")
 
-    def test_set_writes_user_config_and_rejects_wrong_types(self):
+    def test_set_writes_user_config_and_rejects_wrong_types(self) -> None:
+        adapter = self.source / "adapters" / "claude" / "config.json"
+        adapter.parent.mkdir(parents=True)
+        adapter.write_text('{"transcript": {"tail_bytes": 1}}')
         code, _, _ = self.run_cli(
             "status",
             "--runtime",
@@ -124,31 +127,37 @@ class InstallCommandTests(CliCase):
             "--set",
             "events.max_lines=10",
             "--set",
-            "custom.flag=true",
+            "transcript.tail_bytes=2",
         )
         self.assertEqual(code, cli.EXIT_OK)
         written = json.loads((self.home / ".context-guard" / "config.json").read_text())
-        self.assertEqual(
-            written, {"events": {"max_lines": 10}, "custom": {"flag": True}}
-        )
-        code, _, err = self.run_cli(
-            "status", "--runtime", "cursor", "--set", "events.max_lines=many"
-        )
+        self.assertEqual(written, {"events": {"max_lines": 10}, "transcript": {"tail_bytes": 2}})
+        code, _, err = self.run_cli("status", "--runtime", "cursor", "--set", "events.max_lines=many")
         self.assertEqual(code, cli.EXIT_ERROR)
         self.assertIn("expects int", err)
 
-    def test_missing_mapping_is_a_clear_error(self):
-        def missing(runtime):
-            raise ModuleNotFoundError(f"No module named 'adapters.{runtime}.mapping'")
+    def test_set_rejects_unknown_settings_and_writes_nothing(self) -> None:
+        for setting in ("events.max_line=10", "custom.flag=true"):
+            with self.subTest(setting=setting):
+                code, _, err = self.run_cli("status", "--runtime", "cursor", "--set", setting)
+                self.assertEqual(code, cli.EXIT_ERROR)
+                self.assertIn("unknown setting", err)
+        self.assertFalse((self.home / ".context-guard" / "config.json").exists())
+
+    def test_missing_mapping_is_a_clear_error(self) -> None:
+        def missing(runtime: str) -> Never:
+            msg = f"No module named 'adapters.{runtime}.mapping'"
+            raise ModuleNotFoundError(msg)
 
         code, _, err = self.run_cli("install", "--runtime", "all", load_mapping=missing)
         self.assertEqual(code, cli.EXIT_ERROR)
         self.assertIn("mapping.py is unavailable", err)
         self.assertFalse((self.home / ".context-guard").exists())
 
-    def test_missing_interpreter_writes_nothing(self):
-        def no_python():
-            raise kit.ToolchainError("context-guard needs Python >=3.14")
+    def test_missing_interpreter_writes_nothing(self) -> None:
+        def no_python() -> Never:
+            msg = "context-guard needs Python >=3.14"
+            raise kit.ToolchainError(msg)
 
         out, err = io.StringIO(), io.StringIO()
         with redirect_stderr(err):
@@ -165,11 +174,11 @@ class InstallCommandTests(CliCase):
 
 
 class LifecycleTests(CliCase):
-    def test_uninstall_leaves_home_as_before_except_user_files(self):
+    """Uninstall, doctor, status, package and runtime selection on an installed home."""
+
+    def test_uninstall_leaves_home_as_before_except_user_files(self) -> None:
         (self.home / ".cursor-home").mkdir()
-        (self.home / ".cursor-home" / "settings.json").write_text(
-            json.dumps({"theme": "dark"}, indent=2) + "\n"
-        )
+        (self.home / ".cursor-home" / "settings.json").write_text(json.dumps({"theme": "dark"}, indent=2) + "\n")
         before = snapshot(self.home)
         self.run_cli("install", "--runtime", "all", "--set", "events.max_lines=10")
         handoffs = self.home / ".context-guard" / "handoffs"
@@ -189,7 +198,7 @@ class LifecycleTests(CliCase):
             ["backups", "config.json", "config.json.lock", "handoffs"],
         )
 
-    def test_doctor_detects_drift_and_broken_interpreter(self):
+    def test_doctor_detects_drift_and_broken_interpreter(self) -> None:
         self.run_cli("install", "--runtime", "cursor")
         self.assertEqual(self.run_cli("doctor", "--runtime", "cursor")[0], cli.EXIT_OK)
         (self.home / ".cursor-home" / "rules" / "policy.md").write_text("changed\n")
@@ -204,7 +213,7 @@ class LifecycleTests(CliCase):
         self.run_cli("install", "--runtime", "cursor", "--force")
         self.assertEqual(self.run_cli("doctor", "--runtime", "cursor")[0], cli.EXIT_OK)
 
-    def test_doctor_reports_kit_drift(self):
+    def test_doctor_reports_kit_drift(self) -> None:
         self.run_cli("install", "--runtime", "cursor")
         (self.source / "content" / "policy.md").write_text("new policy")
         code, out, _ = self.run_cli("doctor", "--runtime", "cursor")
@@ -212,25 +221,38 @@ class LifecycleTests(CliCase):
         self.assertIn("[kit]", out)
         self.assertIn("policy.md differs", out)
 
-    def test_status_reports_version_manifest_and_events(self):
-        self.assertIn(
-            "[kit] not installed", self.run_cli("status", "--runtime", "cursor")[1]
-        )
+    def test_status_reports_version_manifest_and_events(self) -> None:
+        self.assertIn("[kit] not installed", self.run_cli("status", "--runtime", "cursor")[1])
         self.run_cli("install", "--runtime", "cursor")
         state = self.home / ".context-guard" / "state" / "cursor"
-        (state / events.EVENTS_FILE).write_text(
-            json.dumps({"ts": 0, "event": "note"}) + "\n"
-        )
+        (state / events.EVENTS_FILE).write_text(json.dumps({"ts": 0, "event": "note"}) + "\n")
         code, out, _ = self.run_cli("status", "--runtime", "all")
         self.assertEqual(code, cli.EXIT_OK)
         self.assertIn("version 9.9.9", out)
         self.assertIn("2 files, 1 merges, 1 edits; 1 events (last: note", out)
         self.assertIn("[codex] not installed", out)
 
-    def test_repeated_runtime_selects_each_once(self):
-        code, out, _ = self.run_cli(
-            "status", "--runtime", "codex", "--runtime", "cursor", "--runtime", "codex"
+    def test_package_marketplace_keeps_other_plugins(self) -> None:
+        out = self.home / "market"
+        listing = out / ".claude-plugin" / "marketplace.json"
+        listing.parent.mkdir(parents=True)
+        listing.write_text(
+            json.dumps(
+                {"name": "team", "owner": {"name": "team"}, "plugins": [{"name": "other", "source": "./plugins/other"}]}
+            )
         )
+        argv = ("package", "--runtime", "claude", "--out", str(out), "--marketplace", "renamed")
+        self.assertEqual(self.run_cli(*argv, source=cli.ROOT)[0], cli.EXIT_OK)
+        code, said, _ = self.run_cli(*argv, source=cli.ROOT)
+        self.assertEqual(code, cli.EXIT_OK)
+        self.assertIn(f"marketplace team: {listing}", said)
+        self.assertEqual(json.loads(listing.read_text())["name"], "team")
+        names = [entry["name"] for entry in json.loads(listing.read_text())["plugins"]]
+        self.assertEqual(names[0], "other")
+        self.assertEqual(len(names), 2)
+
+    def test_repeated_runtime_selects_each_once(self) -> None:
+        code, out, _ = self.run_cli("status", "--runtime", "codex", "--runtime", "cursor", "--runtime", "codex")
         self.assertEqual(code, cli.EXIT_OK)
         self.assertEqual(out.count("[codex] not installed"), 1)
         self.assertIn("[cursor] not installed", out)

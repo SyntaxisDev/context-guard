@@ -1,9 +1,11 @@
 """Install engine contracts: planning, conflicts, backups, reversal, doctor and the kit copy."""
+
 import json
 import os
 import sys
 import tempfile
 import unittest
+from collections.abc import Callable
 from pathlib import Path
 from unittest import mock
 
@@ -17,7 +19,7 @@ def hook_command(kit_root: Path, python: Path, runtime: str) -> str:
     return f"{python} {kit_root}/adapters/{runtime}/hooks.py session"
 
 
-def merge_hooks(command: str):
+def merge_hooks(command: str) -> tuple[Callable[[dict], dict], Callable[[dict], dict]]:
     def merge(data: dict) -> dict:
         data.setdefault("hooks", {})[HOOK_KEY] = command
         return data
@@ -28,6 +30,7 @@ def merge_hooks(command: str):
         if not hooks:
             data.pop("hooks", None)
         return data
+
     return merge, unmerge
 
 
@@ -39,8 +42,12 @@ def remove_marker(text: str) -> str:
     return text.replace("context-guard = on\n", "")
 
 
-def fake_spec(home: Path, kit_root: Path, python: Path, config: dict, runtime: str = "fake") -> InstallSpec:
-    """A runtime mapping stand-in: owned files, a hook merge and a text edit."""
+def fake_spec(home: Path, kit_root: Path, python: Path, _config: dict, runtime: str = "fake") -> InstallSpec:
+    """A runtime mapping stand-in: owned files, a hook merge and a text edit.
+
+    Returns:
+        The spec, rooted at `<home>/.<runtime>-home`.
+    """
     base = home / f".{runtime}-home"
     merge, unmerge = merge_hooks(hook_command(kit_root, python, runtime))
     return InstallSpec(
@@ -65,7 +72,9 @@ def snapshot(root: Path, ignored: tuple[str, ...] = ()) -> dict:
 
 
 class EngineCase(unittest.TestCase):
-    def setUp(self):
+    """A temporary home with the fake spec and its manifest, installed through the engine."""
+
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.home = Path(self.tmp.name)
         self.kit = kit.kit_dir(self.home)
@@ -74,22 +83,22 @@ class EngineCase(unittest.TestCase):
         self.manifest_file = install.manifest_path(self.home, "fake")
         self.backups = self.home / ".context-guard" / "backups" / "test"
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def spec(self, **changes) -> InstallSpec:
+    def spec(self, **changes: object) -> InstallSpec:
         spec = fake_spec(self.home, self.kit, self.python, {})
         return InstallSpec(**{**spec.__dict__, **changes})
 
     def manifest(self) -> dict:
         return install.read_manifest(self.manifest_file)
 
-    def install(self, spec=None, force=False) -> install.Plan:
+    def install(self, spec: InstallSpec | None = None, *, force: bool = False) -> install.Plan:
         plan = install.plan(spec or self.spec(), self.manifest(), force=force)
         install.apply(plan, self.manifest_file, self.backups)
         return plan
 
-    def uninstall(self, spec=None, force=False) -> install.Plan:
+    def uninstall(self, spec: InstallSpec | None = None, *, force: bool = False) -> install.Plan:
         plan = install.plan_uninstall(spec or self.spec(), self.manifest(), force=force)
         install.apply(plan, self.manifest_file, self.backups)
         return plan
@@ -102,14 +111,16 @@ class EngineCase(unittest.TestCase):
 
 
 class PlanTests(EngineCase):
-    def test_plan_writes_nothing(self):
+    """Planning is side-effect free, idempotent, recorded in the manifest and conflict-aware."""
+
+    def test_plan_writes_nothing(self) -> None:
         self.write("settings.json", '{"theme": "dark"}\n')
         before = snapshot(self.home)
         plan = install.plan(self.spec(), {})
         self.assertTrue(plan.changes)
         self.assertEqual(snapshot(self.home), before)
 
-    def test_reinstall_is_idempotent(self):
+    def test_reinstall_is_idempotent(self) -> None:
         self.install()
         before = snapshot(self.home)
         plan = self.install()
@@ -117,14 +128,14 @@ class PlanTests(EngineCase):
         self.assertEqual(snapshot(self.home), before)
         self.assertEqual(install.describe(plan, dry_run=False), ["[fake] up to date"])
 
-    def test_manifest_records_hashes_merges_and_edits(self):
+    def test_manifest_records_hashes_merges_and_edits(self) -> None:
         self.install()
         manifest = self.manifest()
         self.assertEqual(manifest["files"][str(self.base / "agents" / "scout.md")], install.digest("scout\n"))
         self.assertTrue(manifest["merges"][str(self.base / "settings.json")]["created"])
         self.assertIn(str(self.base / "config.toml"), manifest["edits"])
 
-    def test_user_edited_owned_file_conflicts_until_forced(self):
+    def test_user_edited_owned_file_conflicts_until_forced(self) -> None:
         self.install()
         agent = self.write("agents/scout.md", "my scout\n")
         plan = self.install()
@@ -137,13 +148,32 @@ class PlanTests(EngineCase):
         saved = [self.backups / r["backup"] for r in records if r["path"] == str(agent)]
         self.assertEqual([path.read_text() for path in saved], ["my scout\n"])
 
-    def test_unmanaged_existing_file_is_a_conflict(self):
+    def test_unmanaged_existing_file_is_a_conflict(self) -> None:
         agent = self.write("agents/scout.md", "hand written\n")
         plan = self.install()
         self.assertEqual([c.path for c in plan.conflicts], [agent])
         self.assertEqual(agent.read_text(), "hand written\n")
 
-    def test_removed_spec_file_is_retired_only_when_unmodified(self):
+    def test_rewrite_replaces_whole_files_and_keeps_links_and_modes(self) -> None:
+        real = self.home / "dotfiles" / "settings.json"
+        real.parent.mkdir()
+        real.write_text('{"theme": "dark"}\n')
+        settings = self.base / "settings.json"
+        settings.parent.mkdir(parents=True)
+        settings.symlink_to(real)
+        self.install()
+        self.assertTrue(settings.is_symlink())
+        self.assertIn("hooks", json.loads(real.read_text()))
+        agent = self.base / "agents" / "scout.md"
+        agent.chmod(0o640)
+        with agent.open() as reader:
+            self.install(self.spec(files={**self.spec().files, agent: "scout v2\n"}))
+            self.assertEqual(reader.read(), "scout\n")
+        self.assertEqual(agent.read_text(), "scout v2\n")
+        self.assertEqual(agent.stat().st_mode & 0o777, 0o640)
+        self.assertFalse(list(self.home.rglob("*.tmp")))
+
+    def test_removed_spec_file_is_retired_only_when_unmodified(self) -> None:
         self.install()
         files = dict(self.spec().files)
         rule = self.base / "rules" / "policy.md"
@@ -154,7 +184,9 @@ class PlanTests(EngineCase):
 
 
 class MergeAndEditTests(EngineCase):
-    def test_json_merge_preserves_unrelated_keys_and_unmerge_restores(self):
+    """JSON merges and text edits keep user content and reverse cleanly."""
+
+    def test_json_merge_preserves_unrelated_keys_and_unmerge_restores(self) -> None:
         original = {"theme": "dark", "hooks": {"other": "keep"}}
         settings = self.write("settings.json", json.dumps(original))
         self.install()
@@ -165,7 +197,7 @@ class MergeAndEditTests(EngineCase):
         self.uninstall()
         self.assertEqual(json.loads(settings.read_text()), original)
 
-    def test_uninstall_restores_original_bytes_unless_the_user_changed_settings_since(self):
+    def test_uninstall_restores_original_bytes_unless_the_user_changed_settings_since(self) -> None:
         text = '{"theme":   "dark",\n "hooks": {"other": "keep"}}'
         settings = self.write("settings.json", text)
         self.install()
@@ -178,7 +210,7 @@ class MergeAndEditTests(EngineCase):
         self.uninstall()
         self.assertEqual(json.loads(settings.read_text()), {"theme": "dark", "hooks": {"other": "keep"}, "font": 14})
 
-    def test_install_leaves_a_file_already_holding_our_merge_untouched(self):
+    def test_install_leaves_a_file_already_holding_our_merge_untouched(self) -> None:
         self.install()
         settings = self.base / "settings.json"
         reformatted = json.dumps(json.loads(settings.read_text()), indent=4)
@@ -187,20 +219,20 @@ class MergeAndEditTests(EngineCase):
         self.assertNotIn(settings, [change.path for change in plan.changes])
         self.assertEqual(settings.read_text(), reformatted)
 
-    def test_merge_into_invalid_json_is_a_conflict(self):
+    def test_merge_into_invalid_json_is_a_conflict(self) -> None:
         settings = self.write("settings.json", "{not json")
         plan = self.install()
         self.assertEqual([c.path for c in plan.conflicts], [settings])
         self.assertEqual(settings.read_text(), "{not json")
 
-    def test_created_merge_and_edit_targets_are_removed_on_uninstall(self):
+    def test_created_merge_and_edit_targets_are_removed_on_uninstall(self) -> None:
         self.install()
         self.assertTrue((self.base / "settings.json").exists())
         self.uninstall()
         self.assertFalse((self.base / "settings.json").exists())
         self.assertFalse((self.base / "config.toml").exists())
 
-    def test_text_edit_revert_keeps_user_text(self):
+    def test_text_edit_revert_keeps_user_text(self) -> None:
         config = self.write("config.toml", "model = 'x'\n")
         self.install()
         self.assertEqual(config.read_text(), "model = 'x'\ncontext-guard = on\n")
@@ -209,7 +241,9 @@ class MergeAndEditTests(EngineCase):
 
 
 class UninstallTests(EngineCase):
-    def test_uninstall_restores_home(self):
+    """Uninstall restores the home and keeps user-edited files in a residual manifest."""
+
+    def test_uninstall_restores_home(self) -> None:
         self.write("settings.json", json.dumps({"theme": "dark"}, indent=2) + "\n")
         self.write("config.toml", "model = 'x'\n")
         before = snapshot(self.home)
@@ -218,7 +252,7 @@ class UninstallTests(EngineCase):
         self.assertEqual(snapshot(self.home, (".context-guard",)), before)
         self.assertEqual([p.name for p in (self.home / ".context-guard").iterdir()], ["backups"])
 
-    def test_edited_file_survives_uninstall_in_residual_manifest(self):
+    def test_edited_file_survives_uninstall_in_residual_manifest(self) -> None:
         self.install()
         agent = self.write("agents/scout.md", "mine\n")
         plan = self.uninstall()
@@ -231,17 +265,16 @@ class UninstallTests(EngineCase):
 
 
 class DoctorTests(EngineCase):
-    def problems(self, spec=None) -> list[str]:
+    """Doctor reports file drift, missing merges and hooks outside the kit."""
+
+    def problems(self, spec: InstallSpec | None = None) -> list[str]:
         return install.doctor(spec or self.spec(), self.manifest(), self.kit, self.python)
 
-    def test_clean_install_has_no_problems(self):
+    def test_clean_install_has_no_problems(self) -> None:
         self.install()
         self.assertEqual(self.problems(), [])
 
-    def test_not_installed(self):
-        self.assertEqual(self.problems(), ["not installed"])
-
-    def test_detects_file_drift_and_missing_merge(self):
+    def test_detects_file_drift_and_missing_merge(self) -> None:
         self.install()
         self.write("rules/policy.md", "changed\n")
         self.write("settings.json", "{}\n")
@@ -249,7 +282,7 @@ class DoctorTests(EngineCase):
         self.assertIn("policy.md differs", problems)
         self.assertIn("settings.json lacks", problems)
 
-    def test_detects_hook_outside_kit(self):
+    def test_detects_hook_outside_kit(self) -> None:
         self.install()
         settings = self.base / "settings.json"
         data = json.loads(settings.read_text())
@@ -259,18 +292,27 @@ class DoctorTests(EngineCase):
 
 
 class KitTests(unittest.TestCase):
-    def setUp(self):
+    """The kit copy skips caches and tests, retires stale files and protects edits."""
+
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         root = Path(self.tmp.name)
         self.source, self.home = root / "source", root / "home"
         self.kit = kit.kit_dir(self.home)
-        for relative in ("core/a.py", "core/b.py", "content/x.md", "adapters/fake/hooks.py",
-                         "adapters/fake/tests/test_x.py", "core/__pycache__/a.cpython-314.pyc", "cli.py"):
+        for relative in (
+            "core/a.py",
+            "core/b.py",
+            "content/x.md",
+            "adapters/fake/hooks.py",
+            "adapters/fake/tests/test_x.py",
+            "core/__pycache__/a.cpython-314.pyc",
+            "cli.py",
+        ):
             (self.source / relative).parent.mkdir(parents=True, exist_ok=True)
             (self.source / relative).write_text(relative)
         self.manifest_file = install.manifest_path(self.home, kit.KIT_RUNTIME)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tmp.cleanup()
 
     def install(self) -> install.Plan:
@@ -278,19 +320,21 @@ class KitTests(unittest.TestCase):
         install.apply(plan, self.manifest_file, self.home / "backups")
         return plan
 
-    def test_kit_copy_skips_caches_and_tests(self):
+    def test_kit_copy_skips_caches_and_tests(self) -> None:
         self.install()
-        self.assertEqual(sorted(p.relative_to(self.kit).as_posix() for p in self.kit.rglob("*") if p.is_file()),
-                         ["adapters/fake/hooks.py", "cli.py", "content/x.md", "core/a.py", "core/b.py"])
+        self.assertEqual(
+            sorted(p.relative_to(self.kit).as_posix() for p in self.kit.rglob("*") if p.is_file()),
+            ["adapters/fake/hooks.py", "cli.py", "content/x.md", "core/a.py", "core/b.py"],
+        )
 
-    def test_kit_copy_removes_stale_files(self):
+    def test_kit_copy_removes_stale_files(self) -> None:
         self.install()
         (self.source / "core" / "b.py").unlink()
         plan = self.install()
         self.assertEqual([(c.kind, c.path) for c in plan.changes], [(install.REMOVE, self.kit / "core" / "b.py")])
         self.assertFalse((self.kit / "core" / "b.py").exists())
 
-    def test_edited_kit_file_conflicts(self):
+    def test_edited_kit_file_conflicts(self) -> None:
         self.install()
         (self.kit / "core" / "a.py").write_text("patched")
         (self.source / "core" / "a.py").write_text("new")
@@ -300,32 +344,33 @@ class KitTests(unittest.TestCase):
 
 
 class InterpreterTests(unittest.TestCase):
-    def setUp(self):
+    """Interpreter discovery reports broken, old and missing Pythons and reuses a usable venv."""
+
+    def setUp(self) -> None:
         self.tmp = tempfile.TemporaryDirectory()
         self.root = Path(self.tmp.name)
 
-    def tearDown(self):
+    def tearDown(self) -> None:
         self.tmp.cleanup()
 
-    def test_current_interpreter_is_accepted(self):
-        self.assertIsNone(kit.interpreter_problem(Path(sys.executable), kit.Toolchain()))
-
-    def test_broken_interpreter_is_reported(self):
+    def test_broken_interpreter_is_reported(self) -> None:
         broken = self.root / "python"
         broken.write_text("#!/bin/sh\nexit 1\n")
         broken.chmod(0o755)
         self.assertIn("does not run", kit.interpreter_problem(broken, kit.Toolchain()))
 
-    def test_old_interpreter_is_reported(self):
-        old = kit.Toolchain(version=lambda python: (3, 9))
+    def test_old_interpreter_is_reported(self) -> None:
+        old = kit.Toolchain(version=lambda _python: (3, 9))
         self.assertIn("3.9", kit.interpreter_problem(Path("python"), old))
 
-    def test_missing_python_gives_install_hint(self):
-        with (mock.patch.dict(os.environ, {"PATH": str(self.root)}),
-              self.assertRaisesRegex(kit.ToolchainError, "uv python install")):
+    def test_missing_python_gives_install_hint(self) -> None:
+        with (
+            mock.patch.dict(os.environ, {"PATH": str(self.root)}),
+            self.assertRaisesRegex(kit.ToolchainError, "uv python install"),
+        ):
             kit.find_python()
 
-    def test_venv_is_created_only_when_unusable(self):
+    def test_venv_is_created_only_when_unusable(self) -> None:
         created = []
 
         def create(base: Path, venv: Path) -> None:

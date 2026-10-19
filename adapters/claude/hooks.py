@@ -1,14 +1,13 @@
-#!/usr/bin/env python3
 """Claude Code hooks: `hooks.py <HookEvent>` reads the hook payload on stdin and prints the response.
 
 Payloads carrying agent_id come from subagents: they run in leaf mode on the subagent's own
 transcript and never touch the parent session. The context window is the learned
 auto-compaction point when known, else the configured window for the model.
 """
-import json
-import os
+
 import sys
 import time
+from collections.abc import Mapping
 from pathlib import Path
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
@@ -16,11 +15,22 @@ if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
 
 from adapters.claude import runner, transcript
-from core import config as config_mod, deadline, handoffs, policy, render, state as state_mod
-from core.runner import service
-from core.runner.provider import INTERNAL_ENV
-from core.observation import (BLOCK, COMPACT, PASS, PROMPT, READ, SESSION, SPAWN, STOP, TOOL, WRITE,
-                              Decision, Observation, ToolUse)
+from core import config as config_mod, handoffs, hook, spawn, state as state_mod
+from core.observation import (
+    BLOCK,
+    COMPACT,
+    PASS,
+    PROMPT,
+    READ,
+    SESSION,
+    SPAWN,
+    STOP,
+    TOOL,
+    WRITE,
+    Decision,
+    Observation,
+    ToolUse,
+)
 
 RUNTIME = "claude"
 ADAPTER_CONFIG = Path(__file__).resolve().parent / "config.json"
@@ -32,20 +42,49 @@ COMPACT_SOURCE = "compact"
 SPAWN_TOOL = "Agent"
 SHELL_TOOL = "Bash"
 READ_TOOLS = {"Read": "file_path"}
-WRITE_TOOLS = {"Write": "file_path", "Edit": "file_path", "MultiEdit": "file_path",
-               "NotebookEdit": "notebook_path"}
-TEXT_FIELDS = ("session_id", "cwd", "transcript_path", "prompt", "model", "source", "trigger",
-               "tool_name", "agent_id", "agent_type", "agent_transcript_path")
+WRITE_TOOLS = {"Write": "file_path", "Edit": "file_path", "MultiEdit": "file_path", "NotebookEdit": "notebook_path"}
+TEXT_FIELDS = (
+    "session_id",
+    "cwd",
+    "transcript_path",
+    "prompt",
+    "model",
+    "source",
+    "trigger",
+    "tool_name",
+    "agent_id",
+    "agent_type",
+    "agent_transcript_path",
+)
+WINDOW_ENTRY_SIZE = 2
 LEARNED_FILE = Path("learned", "windows.json")
 PLUGIN_NAME = "context-guard"
 PLUGIN_POLICY_FILE = "policy/context-guard.md"
 
 
-def load_config(home: Path, environ=None) -> dict:
+def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
+    """Load the Claude Code configuration: defaults, adapter config, user config, environment.
+
+    Args:
+        home: Home directory holding the user configuration.
+        environ: Environment overrides; None reads the process environment.
+
+    Returns:
+        The merged configuration.
+    """
     return config_mod.load_config(config_mod.sources_for(RUNTIME, home, ADAPTER_CONFIG), environ)
 
 
 def valid_payload(payload: object) -> bool:
+    """Tell whether a Claude Code hook payload has fields the hook can interpret.
+
+    Args:
+        payload: Decoded stdin JSON of the hook call.
+
+    Returns:
+        True for an object whose known text fields are text and whose `stop_hook_active` is
+        absent or a bool.
+    """
     if not isinstance(payload, dict):
         return False
     if any(payload.get(key) is not None and not config_mod.valid_text(payload[key]) for key in TEXT_FIELDS):
@@ -54,40 +93,93 @@ def valid_payload(payload: object) -> bool:
 
 
 def text(value: object) -> str | None:
+    """Validate an untrusted JSON text field.
+
+    Args:
+        value: Untrusted JSON value.
+
+    Returns:
+        The value when it is a non-empty string without NUL, else None.
+    """
     return value if isinstance(value, str) and value and "\0" not in value else None
 
 
 def tier_of_model(model: str, tiers: dict) -> str | None:
-    return next((tier for tier, profile in tiers.items()
-                 if isinstance(profile, dict) and model in (profile.get("call"), profile.get("model"))), None)
+    """Find the tier an Agent `model` argument selects.
+
+    Args:
+        model: The spawn's model, an alias (`call`) or a full model id.
+        tiers: Tier profiles from the configuration.
+
+    Returns:
+        The first tier whose `call` or `model` equals it, else None.
+    """
+    return next(
+        (
+            tier
+            for tier, profile in tiers.items()
+            if isinstance(profile, dict) and model in (profile.get("call"), profile.get("model"))
+        ),
+        None,
+    )
 
 
 def role_name(value: object) -> str | None:
-    """Plugin agents are namespaced `context-guard:<role>`; the role is the part after the prefix."""
+    """Read a role from an agent type; plugin agents are namespaced `context-guard:<role>`.
+
+    Args:
+        value: Untrusted `subagent_type` or `agent_type` value.
+
+    Returns:
+        The agent type without the plugin prefix, or None when it is not text.
+    """
     name = text(value)
     return (name.removeprefix(f"{PLUGIN_NAME}:") or None) if name else None
 
 
-def role_default_tier(role: str | None) -> str | None:
-    if role is None:
-        return None
-    try:
-        found = render.load_roles().get(role)
-    except render.RenderError:
-        return None
-    return found.default_tier if found else None
+def profile_model(profile: dict) -> tuple[str | None, str | None]:
+    """Read a tier profile's model and effort.
+
+    Args:
+        profile: One tier profile from the configuration.
+
+    Returns:
+        Model and effort, each None when not text.
+    """
+    return text(profile.get("model")), text(profile.get("effort"))
 
 
-def spawn_detail(data: dict, tiers: dict) -> dict:
-    """The Agent tool takes no effort: effort is the agent definition's, i.e. its default tier's."""
+def spawn_detail(data: dict[str, object], tiers: dict) -> dict[str, str | None]:
+    """Describe an Agent spawn by role, tier, model and effort.
+
+    The Agent tool takes no effort: effort is the agent definition's, i.e. its default tier's.
+
+    Args:
+        data: The Agent tool input from the payload.
+        tiers: Tier profiles from the configuration.
+
+    Returns:
+        The spawn detail logged with the event; the tier is None when the model matches no tier.
+    """
     role, model = role_name(data.get("subagent_type")), text(data.get("model"))
-    default = role_default_tier(role)
-    tier = tier_of_model(model, tiers) if model else default
-    profile, defined = tiers.get(tier) or {}, tiers.get(default) or {}
-    return {"role": role, "tier": tier, "model": model or profile.get("model"), "effort": defined.get("effort")}
+    default = spawn.default_detail(role, tiers, profile_model)
+    if model is None:
+        return default
+    return {"role": role, "tier": tier_of_model(model, tiers), "model": model, "effort": default["effort"]}
 
 
-def tool_use(payload: dict, config: dict, home: Path) -> ToolUse | None:
+def tool_use(payload: dict[str, object], config: dict, home: Path) -> ToolUse | None:
+    """Classify the tool of a PostToolUse payload.
+
+    Args:
+        payload: Validated hook payload.
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory that the handoff store resolves against.
+
+    Returns:
+        A spawn, a read or write of the tool's path, a handoff a Bash command names, or an
+        unclassified tool use; None without a tool name.
+    """
     name = text(payload.get("tool_name"))
     if name is None:
         return None
@@ -99,16 +191,30 @@ def tool_use(payload: dict, config: dict, home: Path) -> ToolUse | None:
     if name in WRITE_TOOLS:
         return ToolUse(name, WRITE, text(data.get(WRITE_TOOLS[name])))
     command = text(data.get("command")) if name == SHELL_TOOL else None
-    access = command and handoffs.shell_access(command, payload.get("cwd") or "", home,
-                                               config_mod.handoff_dir(config, home))
+    access = command and handoffs.shell_access(
+        command, payload.get("cwd") or "", home, config_mod.handoff_dir(config, home)
+    )
     return ToolUse(name, *access) if access else ToolUse(name)
 
 
-def configured_window(models: tuple, patterns: list) -> int | None:
-    """First [substring, window] pair matching any known model name."""
+def configured_window(models: tuple[str | None, ...], patterns: list[object]) -> int | None:
+    """Find the configured window of the first [substring, window] pair matching a model.
+
+    Args:
+        models: Known model names of the session; None entries are skipped.
+        patterns: Configured [substring, window] pairs; malformed entries are skipped.
+
+    Returns:
+        The window of the first matching pair, else None.
+    """
     for entry in patterns:
-        if not (isinstance(entry, list) and len(entry) == 2 and text(entry[0])
-                and type(entry[1]) is int and entry[1] > 0):
+        if not (
+            isinstance(entry, list)
+            and len(entry) == WINDOW_ENTRY_SIZE
+            and text(entry[0])
+            and type(entry[1]) is int
+            and entry[1] > 0
+        ):
             continue
         if any(model and entry[0] in model for model in models):
             return entry[1]
@@ -116,11 +222,28 @@ def configured_window(models: tuple, patterns: list) -> int | None:
 
 
 def learned_window(directory: Path, model: str | None, minimum: int) -> int | None:
+    """Look up the auto-compaction point learned for a model.
+
+    Args:
+        directory: Claude Code state directory.
+        model: The session's model, or None when unknown.
+        minimum: Smallest window that counts as learned.
+
+    Returns:
+        The learned window, or None when unknown or below the minimum.
+    """
     value = state_mod.read_json(directory / LEARNED_FILE).get(model) if model else None
     return value if type(value) is int and value >= minimum else None
 
 
 def remember_window(directory: Path, model: str, tokens: int) -> None:
+    """Store a model's learned window under the learned-windows lock.
+
+    Args:
+        directory: Claude Code state directory.
+        model: Model the compaction happened on.
+        tokens: Tokens at the automatic compaction.
+    """
     path = directory / LEARNED_FILE
     with state_mod.file_lock(path.with_name(path.name + ".lock")):
         data = state_mod.read_json(path)
@@ -129,9 +252,18 @@ def remember_window(directory: Path, model: str, tokens: int) -> None:
 
 
 def learn(session: dict, directory: Path, model: str | None, tokens: int | None, config: dict) -> None:
-    """An automatic compaction point becomes this session's and this model's window."""
-    if tokens is None or tokens < config["transcript"]["min_learned_window"] \
-            or session.get("learned_window") == tokens:
+    """Make an automatic compaction point this session's and this model's window.
+
+    Counts below the configured minimum and repeats of the session's window are ignored.
+
+    Args:
+        session: Mutable session state.
+        directory: Claude Code state directory.
+        model: Model the compaction happened on, or None when unknown.
+        tokens: Tokens at the automatic compaction, or None when unknown.
+        config: Loaded Claude Code adapter configuration.
+    """
+    if tokens is None or tokens < config["transcript"]["min_learned_window"] or session.get("learned_window") == tokens:
         return
     session["learned_window"] = tokens
     if model:
@@ -139,29 +271,76 @@ def learn(session: dict, directory: Path, model: str | None, tokens: int | None,
 
 
 def window(session: dict, model: str | None, directory: Path, config: dict) -> int | None:
+    """Pick the context window of the main session.
+
+    Args:
+        session: Session state; its `adapter` section must exist.
+        model: The session's latest model, or None when unknown.
+        directory: Claude Code state directory.
+        config: Loaded Claude Code adapter configuration.
+
+    Returns:
+        The session's learned window, else the model's learned window, else the configured
+        window for the start or latest model, else None.
+    """
     minimum = config["transcript"]["min_learned_window"]
     if session.get("learned_window", 0) >= minimum:
         return session["learned_window"]
     start = session["adapter"].get("start_model")
     return learned_window(directory, model, minimum) or configured_window(
-        (text(start), model), config["context_windows"])
+        (text(start), model), config["context_windows"]
+    )
 
 
-def read_main(payload: dict, adapter: dict, config: dict) -> transcript.Reading:
+def read_main(payload: dict[str, object], adapter: dict, config: dict) -> transcript.Reading:
+    """Read the main session's transcript after its latest compaction.
+
+    Args:
+        payload: Validated hook payload.
+        adapter: The session state's `adapter` section.
+        config: Loaded Claude Code adapter configuration.
+
+    Returns:
+        The transcript reading; unknown fields stay None.
+    """
     since_bytes = adapter.get("compacted_bytes")
     since_time = adapter.get("compacted_at")
-    return transcript.read(payload.get("transcript_path"), config["transcript"]["tail_bytes"],
-                           since_bytes if type(since_bytes) is int else 0,
-                           since_time if type(since_time) in (int, float) else None)
+    return transcript.read(
+        payload.get("transcript_path"),
+        config["transcript"]["tail_bytes"],
+        since_bytes if type(since_bytes) is int else 0,
+        since_time if type(since_time) in (int, float) else None,
+    )
 
 
-def observed_event(event: str, payload: dict) -> str:
+def observed_event(event: str, payload: dict[str, object]) -> str:
+    """Map a native observed event to its core event.
+
+    Args:
+        event: Native event, one of the observed ones.
+        payload: Validated hook payload.
+
+    Returns:
+        The core event; a SessionStart after compaction is a compaction.
+    """
     if event == "SessionStart" and payload.get("source") == COMPACT_SOURCE:
         return COMPACT
     return OBSERVED[event]
 
 
-def observe_main(event: str, payload: dict, config: dict, directory: Path, home: Path) -> Observation:
+def observe_main(event: str, payload: dict[str, object], config: dict, directory: Path, home: Path) -> Observation:
+    """Observe the main session, updating its model, learned window and compaction reset.
+
+    Args:
+        event: Native observed event.
+        payload: Validated hook payload with a session_id.
+        config: Loaded Claude Code adapter configuration.
+        directory: Claude Code state directory.
+        home: Home directory that the handoff store resolves against.
+
+    Returns:
+        The observation of the main session.
+    """
     session_id = payload["session_id"]
     with state_mod.session_state(directory, RUNTIME, session_id) as session:
         adapter = session.setdefault("adapter", {})
@@ -174,22 +353,55 @@ def observe_main(event: str, payload: dict, config: dict, directory: Path, home:
         learn(session, directory, model, reading.compaction, config)
         compacted = adapter.pop("reset", False) is True
         size = window(session, model, directory, config)
-    return Observation(RUNTIME, session_id, observed_event(event, payload), tokens=reading.tokens,
-                       window=size, model=model, compacted=compacted, cwd=payload.get("cwd") or "",
-                       prompt=payload.get("prompt") if event == "UserPromptSubmit" else None,
-                       tool=tool_use(payload, config, home) if event == "PostToolUse" else None)
+    return Observation(
+        RUNTIME,
+        session_id,
+        observed_event(event, payload),
+        tokens=reading.tokens,
+        window=size,
+        model=model,
+        compacted=compacted,
+        cwd=payload.get("cwd") or "",
+        prompt=payload.get("prompt") if event == "UserPromptSubmit" else None,
+        tool=tool_use(payload, config, home) if event == "PostToolUse" else None,
+    )
 
 
-def observe_leaf(event: str, payload: dict, config: dict, home: Path) -> Observation:
+def observe_leaf(event: str, payload: dict[str, object], config: dict, home: Path) -> Observation:
+    """Observe a subagent from its own transcript, without touching session state.
+
+    Args:
+        event: Native leaf event.
+        payload: Validated subagent hook payload with an agent_id.
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory that the handoff store resolves against.
+
+    Returns:
+        The subagent's observation, keyed by its agent id, with no window.
+    """
     reading = transcript.read(transcript.subagent_path(payload), config["transcript"]["tail_bytes"])
-    return Observation(RUNTIME, payload["agent_id"], OBSERVED[event], tokens=reading.tokens,
-                       model=reading.model, is_subagent=True, role=role_name(payload.get("agent_type")),
-                       cwd=payload.get("cwd") or "",
-                       prompt=payload.get("prompt") if event == "UserPromptSubmit" else None,
-                       tool=tool_use(payload, config, home) if event == "PostToolUse" else None)
+    return Observation(
+        RUNTIME,
+        payload["agent_id"],
+        OBSERVED[event],
+        tokens=reading.tokens,
+        model=reading.model,
+        is_subagent=True,
+        role=role_name(payload.get("agent_type")),
+        cwd=payload.get("cwd") or "",
+        prompt=payload.get("prompt") if event == "UserPromptSubmit" else None,
+        tool=tool_use(payload, config, home) if event == "PostToolUse" else None,
+    )
 
 
-def on_precompact(payload: dict, config: dict, directory: Path) -> None:
+def on_precompact(payload: dict[str, object], config: dict, directory: Path) -> None:
+    """Learn the window from an automatic compaction about to happen; manual ones are ignored.
+
+    Args:
+        payload: Validated PreCompact payload with a session_id.
+        config: Loaded Claude Code adapter configuration.
+        directory: Claude Code state directory.
+    """
     if payload.get("trigger") != transcript.AUTO_TRIGGER:
         return
     with state_mod.session_state(directory, RUNTIME, payload["session_id"]) as session:
@@ -198,21 +410,49 @@ def on_precompact(payload: dict, config: dict, directory: Path) -> None:
         learn(session, directory, reading.model or text(adapter.get("model")), reading.tokens, config)
 
 
-def on_postcompact(payload: dict, directory: Path) -> None:
-    """Usage recorded before the compaction is obsolete; the next observation resets fired tiers."""
+def on_postcompact(payload: dict[str, object], directory: Path) -> None:
+    """Mark the transcript up to now as compacted.
+
+    Usage recorded before the compaction is obsolete; the next observation resets fired tiers.
+
+    Args:
+        payload: Validated PostCompact payload with a session_id.
+        directory: Claude Code state directory.
+    """
     with state_mod.session_state(directory, RUNTIME, payload["session_id"]) as session:
         session.setdefault("adapter", {}).update(
-            compacted_bytes=transcript.size(payload.get("transcript_path")), compacted_at=time.time(), reset=True)
+            compacted_bytes=transcript.size(payload.get("transcript_path")), compacted_at=time.time(), reset=True
+        )
 
 
 def clip(message: str, limit: int) -> str:
+    """Shorten a message to a character limit, at a line break when there is one.
+
+    Args:
+        message: Message to clip.
+        limit: Maximum length, including the trailing ellipsis.
+
+    Returns:
+        The message, or its clipped prefix ending in an ellipsis.
+    """
     if len(message) <= limit:
         return message
-    cut = message[:limit - 1]
+    cut = message[: limit - 1]
     return (cut.rsplit("\n", 1)[0] if "\n" in cut else cut) + "…"
 
 
-def respond(decision: Decision, event: str, config: dict) -> dict:
+def respond(decision: Decision, event: str, config: dict) -> dict[str, object]:
+    """Render a decision as the Claude Code hook response for a native event.
+
+    Args:
+        decision: The decision to render.
+        event: Native event being answered.
+        config: Loaded Claude Code adapter configuration with the output limits.
+
+    Returns:
+        `decision: block` for blocks and Stop continuations, clipped additional context
+        otherwise, or `{}` for a pass.
+    """
     if decision.kind == PASS or not decision.message:
         return {}
     if decision.kind == BLOCK or event == "Stop":
@@ -223,76 +463,94 @@ def respond(decision: Decision, event: str, config: dict) -> dict:
 
 
 def plugin_policy() -> str:
-    """Only a packaged plugin ships the rendered policy; an installed kit uses the rules file."""
+    """Read the packaged policy that a plugin puts into the session context.
+
+    Only a packaged plugin ships the rendered policy; an installed kit uses the rules file.
+
+    Returns:
+        The policy text, or an empty string outside a plugin.
+    """
     try:
         return (KIT_ROOT / PLUGIN_POLICY_FILE).read_text()
     except FileNotFoundError:
         return ""
 
 
-def leaf_response(event: str, payload: dict, config: dict, home: Path) -> dict:
-    if event not in LEAF_EVENTS:
-        return {}
-    return respond(policy.evaluate(observe_leaf(event, payload, config, home), config, home), event, config)
+def observed(event: str, payload: dict[str, object], config: dict, home: Path) -> Observation | None:
+    """Observe a hook call, or apply its bookkeeping.
 
+    Args:
+        event: Registered native event.
+        payload: Validated hook payload.
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory of the context-guard install.
 
-def handle(event: str, payload: object, config: dict, home: Path) -> dict:
-    if os.environ.get(INTERNAL_ENV) == "1" or config_mod.foreign_home(KIT_ROOT) \
-            or event not in HOOK_EVENTS or not valid_payload(payload):
-        return {}
+    Returns:
+        The observation to evaluate; None when the event only maintains state or must pass.
+    """
     if payload.get("agent_id"):
-        return leaf_response(event, payload, config, home)
+        return observe_leaf(event, payload, config, home) if event in LEAF_EVENTS else None
     if not payload.get("session_id"):
-        return {}
+        return None
     directory = config_mod.state_dir(config, home, RUNTIME)
     if event == "PreCompact":
         on_precompact(payload, config, directory)
-        return {}
+        return None
     if event == "PostCompact":
         on_postcompact(payload, directory)
-        return {}
-    if event == "Stop" and payload.get("stop_hook_active"):
-        return {}
-    obs = observe_main(event, payload, config, directory, home)
-    policy_text = ""
-    if obs.event in (SESSION, COMPACT):
-        state_mod.prune(directory, config["paths"]["prune_days"])
-        policy_text = plugin_policy()
-    routing = service.route(obs, config, lambda: runner.services(home))
-    if routing.blocked:
-        return respond(service.combine(Decision(), routing), event, config)
-    decision = service.combine(policy.evaluate(obs, config, home, policy_text), routing)
-    response = respond(decision, event, config)
-    if "hookSpecificOutput" in response:
-        policy.log_delivered(obs, decision, config, home)
-    return response
-
-
-def run(event: str, payload: object, home: Path) -> dict:
-    """Unreadable state, configuration or telemetry fails open."""
-    try:
-        return handle(event, payload, load_config(home), home)
-    except (OSError, ValueError):
-        return {}
-
-
-def read_payload(stream) -> object:
-    try:
-        return json.loads(stream.read())
-    except (OSError, ValueError):
         return None
+    if event == "Stop" and payload.get("stop_hook_active"):
+        return None
+    return observe_main(event, payload, config, directory, home)
+
+
+def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, object]:
+    """Observe, evaluate and answer one Claude Code hook call.
+
+    Args:
+        event: Native event from the command line.
+        payload: Decoded stdin JSON of the hook call.
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory of the context-guard install.
+
+    Returns:
+        The native response; `{}` for unknown events, invalid payloads and bookkeeping events.
+    """
+    if event not in HOOK_EVENTS or not valid_payload(payload):
+        return {}
+    obs = observed(event, payload, config, home)
+    if obs is None:
+        return {}
+    return hook.evaluate(
+        obs,
+        config,
+        home,
+        lambda: runner.services(home),
+        lambda decision: respond(decision, event, config),
+        lambda response: "hookSpecificOutput" in response,
+        plugin_policy,
+    )
+
+
+def run(event: str, payload: object, home: Path, environ: Mapping[str, str] | None = None) -> dict[str, object]:
+    """Answer one Claude Code hook call, failing open.
+
+    Args:
+        event: Native event from the command line.
+        payload: Decoded stdin JSON of the hook call.
+        home: Home directory of the context-guard install.
+        environ: Environment overrides; None reads the process environment.
+
+    Returns:
+        The native response, or `{}` for internal runs, foreign homes and unreadable
+        configuration, state or telemetry.
+    """
+    return hook.guarded(KIT_ROOT, lambda: handle(event, payload, load_config(home, environ), home), {}, environ)
 
 
 def main() -> None:
-    home = config_mod.resolve_home(KIT_ROOT)
-    if service.is_worker_call(sys.argv[1:]):
-        raise SystemExit(runner.services(home).work(sys.argv[1:]))
-    event, fallback = (sys.argv[1] if len(sys.argv) == 2 else ""), {}
-    response = deadline.boundary(
-        lambda: deadline.run_within(lambda: run(event, read_payload(sys.stdin.buffer), home), fallback),
-        fallback, event)
-    print(json.dumps(response), flush=True)
-    service.confirm_staged(response, fallback)
+    """Run the hook process: argv names the event, stdin holds the payload, stdout gets one response."""
+    hook.main(KIT_ROOT, sys.argv[1:], runner.services, run, lambda _event: {})
 
 
 if __name__ == "__main__":

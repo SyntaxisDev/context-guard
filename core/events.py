@@ -1,4 +1,5 @@
 """One bounded event log schema shared by every runtime."""
+
 import collections
 import json
 import time
@@ -10,16 +11,55 @@ from core.state import file_lock
 
 EVENTS_FILE = "events.jsonl"
 TRIM_SLACK = 100
-EVENT_NAMES = frozenset({"prompt", "note", "note_delivered", "block", "resend", "handoff_requested",
-                         "handoff_written", "handoff_read", "subagent_spawn", "subagent_budget"})
+EVENT_NAMES = frozenset(
+    {
+        "prompt",
+        "note",
+        "note_delivered",
+        "block",
+        "resend",
+        "handoff_requested",
+        "handoff_written",
+        "handoff_read",
+        "subagent_spawn",
+        "subagent_budget",
+    }
+)
 
 
-def record(event: str, obs: Observation, tier: str | None = None,
-           detail: Mapping[str, object] | None = None, ts: float | None = None) -> dict:
+def record(
+    event: str,
+    obs: Observation,
+    tier: str | None = None,
+    detail: Mapping[str, object] | None = None,
+    ts: float | None = None,
+) -> dict:
+    """Build one event log record.
+
+    Args:
+        event: One of EVENT_NAMES.
+        obs: The observation the event belongs to; supplies runtime, session and token counts.
+        tier: The context tier involved, if any; omitted from the record when None.
+        detail: Event-specific fields.
+        ts: Epoch seconds; None reads the clock.
+
+    Returns:
+        The record, ready for `append`.
+
+    Raises:
+        ValueError: When `event` is not one of EVENT_NAMES.
+    """
     if event not in EVENT_NAMES:
-        raise ValueError(f"unknown event {event!r}")
-    entry = {"ts": time.time() if ts is None else ts, "runtime": obs.runtime, "session": obs.session_id,
-             "event": event, "tokens": obs.tokens, "window": obs.window}
+        msg = f"unknown event {event!r}"
+        raise ValueError(msg)
+    entry = {
+        "ts": time.time() if ts is None else ts,
+        "runtime": obs.runtime,
+        "session": obs.session_id,
+        "event": event,
+        "tokens": obs.tokens,
+        "window": obs.window,
+    }
     if tier is not None:
         entry["tier"] = tier
     entry["detail"] = dict(detail or {})
@@ -27,7 +67,14 @@ def record(event: str, obs: Observation, tier: str | None = None,
 
 
 def append(path: Path, records: Iterable[dict], max_lines: int, slack: int = TRIM_SLACK) -> None:
-    """Append records and trim to the newest max_lines; I/O failures are dropped (fail open)."""
+    """Append records and trim to the newest max_lines; I/O failures are dropped (fail open).
+
+    Args:
+        path: The JSONL log file.
+        records: Records to append; values JSON cannot encode are written as strings.
+        max_lines: Lines kept after a trim.
+        slack: Extra lines allowed past `max_lines` before the file is trimmed.
+    """
     lines = [json.dumps(entry, default=str) + "\n" for entry in records]
     if not lines:
         return
@@ -45,9 +92,18 @@ def append(path: Path, records: Iterable[dict], max_lines: int, slack: int = TRI
 
 
 def read(path: Path) -> list[dict]:
+    """Read every well-formed record of an event log.
+
+    Args:
+        path: The JSONL log file.
+
+    Returns:
+        The object lines in file order; a missing or unreadable file gives an empty list and malformed
+        lines are skipped.
+    """
     try:
         text = path.read_text()
-    except (OSError, UnicodeDecodeError):
+    except OSError, UnicodeDecodeError:
         return []
     found = []
     for line in text.splitlines():
