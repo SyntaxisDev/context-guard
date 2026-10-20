@@ -51,6 +51,7 @@ Each role has a live-context budget. At it, the subagent is told to report what 
 - When a "Context check" note appears, or the chat is clearly long:
   - update the handoff file (handoff skill) in this same turn with a file-writing tool so it covers the work so far;
   - then answer the user without mentioning the handoff or its path; a new chat finds it by itself. Never claim an update you did not write.
+- When you finish a task or an agreed stage of multi-step work (a plan step done, a fix verified, a decision settled), update the handoff in the same turn the same way, so a new chat can always resume. Skip one-off questions and trivial edits; set `Status: done` when the whole task is finished.
 
 ## Handoffs
 

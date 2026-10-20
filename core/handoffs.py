@@ -15,7 +15,13 @@ from core.observation import READ, WRITE
 
 PLACEHOLDER_LABELS = {"new chat", "new conversation", "untitled", "untitled chat", "untitled conversation"}
 BOOKKEEPING_PREFIX = "[context-guard]"
-HANDOFF_REQUEST = re.compile(r"\b(handoff|hand-off|wrap up|new chat)\b", re.IGNORECASE)
+HANDOFF_REQUEST = re.compile(
+    r"^\W*hand-?off\b"
+    r"|\b(?:write|save|update|create|make|prepare|refresh|do)\s+(?:(?:a|an|the|my|our|this)\s+)?hand-?off\b"
+    r"|\bwrap\s+(?:it\s+|this\s+)?up\b"
+    r"|\b(?:start|open|move\s+to|switch\s+to|continue\s+in)\s+a\s+(?:new|fresh)\s+chat\b",
+    re.IGNORECASE,
+)
 IDENTITY_SUFFIX = re.compile(r"-([0-9a-f]{16})\.md$")
 SCRATCH_DIRS = ("", "Documents", "Desktop", "Downloads")
 FINAL_JOB_STATUSES = ("done", "failed", "timed out")

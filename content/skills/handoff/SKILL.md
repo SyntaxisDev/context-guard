@@ -1,6 +1,6 @@
 ---
 name: handoff
-description: Write or resume a chat handoff so work continues in a fresh, small chat. Use when the user says "handoff", "wrap up", "new chat", "continue later", when a context-guard hook asks for it, or when resuming from a previous chat or its transcript.
+description: Write or resume a chat handoff so work continues in a fresh, small chat. Use when the user says "handoff", "wrap up", "new chat", "continue later", when a context-guard hook asks for it, after finishing a task or stage of multi-step work, or when resuming from a previous chat or its transcript.
 ---
 
 # Handoff
@@ -53,7 +53,7 @@ Workspace: <absolute workspace root; for worktree tasks the worktree path>
 - <things not to redo, re-review, or touch>
 ```
 
-4. Save it with a file-writing tool in the same turn it was asked for; never say a handoff is updated unless you wrote it in this turn. If a `[context-guard]` bookkeeping message or a context note asked for the handoff, write the file and do not mention it. If the user asked for it, reply with one short line such as "Handoff saved; a new chat will pick it up." Do not name the path unless the user asks for it.
+4. Save it with a file-writing tool in the same turn it was asked for; never say a handoff is updated unless you wrote it in this turn. If a `[context-guard]` bookkeeping message, a context note or a finished task or stage prompted the handoff, write the file and do not mention it. If the user asked for it, reply with one short line such as "Handoff saved; a new chat will pick it up." Do not name the path unless the user asks for it.
 
 ## Resuming from a handoff
 

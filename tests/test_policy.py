@@ -5,7 +5,7 @@ import time
 import unittest
 from pathlib import Path
 
-from core import config, deadline, events, policy
+from core import config, deadline, events, handoffs, policy
 from core.observation import Decision, Observation, ToolUse
 
 
@@ -159,6 +159,18 @@ class TierTests(PolicyFixture):
         decision = self.prompt("please write a handoff", 300_000)
         self.assertEqual(decision.kind, "pass")
         self.assertEqual(self.names(decision), ["prompt", "handoff_requested"])
+
+    def test_handoff_requests_are_recognised_by_phrasing(self) -> None:
+        for prompt in ("/handoff", "Handoff please", "update the handoff", "let's wrap it up", "start a new chat"):
+            with self.subTest(prompt=prompt):
+                self.assertTrue(handoffs.HANDOFF_REQUEST.search(prompt))
+
+    def test_prompts_that_only_mention_handoffs_still_warn(self) -> None:
+        decision = self.prompt("did you receive any handoffs on this chat? or wrote any?", 300_000)
+        self.assertEqual(decision.tier, "block")
+        self.assertNotIn("handoff_requested", self.names(decision))
+        self.assertIsNone(handoffs.HANDOFF_REQUEST.search("check what's the most recent handoff"))
+        self.assertIsNone(handoffs.HANDOFF_REQUEST.search("is this a new chat?"))
 
 
 class LeafTests(PolicyFixture):

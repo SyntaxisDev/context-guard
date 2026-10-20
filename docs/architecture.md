@@ -52,7 +52,9 @@ unknown tokens fail open.
 - **Re-arm.** Compaction (`compacted` or the `compact` event), or live context back under the
   note threshold, resets fired tiers. A zero token reading is unknown telemetry and never re-arms.
 - **Pass-through prompts.** `[context-guard]` prompts pass silently; handoff requests
-  (`handoff`, `hand-off`, `wrap up`, `new chat`) pass and log `handoff_requested`.
+  (a prompt starting with `handoff`, "write/save/update a handoff", "wrap up", "start a new
+  chat") pass and log `handoff_requested`. A prompt that only mentions handoffs is an ordinary
+  prompt and still gets tier warnings.
 - **Handoff writes.** Any write into the handoff store, requested or not, credits the session:
   it records the turn and the current tokens as the last handoff, adopts that file as the
   session's handoff path and acknowledges a pending request. Writes are Cursor's write tools
