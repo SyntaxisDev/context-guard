@@ -15,14 +15,15 @@ Long chats consume context and increase per-step cost. Keep the main chat focuse
 - Route by what the role can do. A role without shell, network or MCP access cannot run queries or commands; a role without push access cannot open PRs.
 - Do small things yourself: one edit, one command, one file read. Subagent startup has overhead.
 - Give every subagent a self-contained brief: goal, paths, constraints, and the expected output (at most ~30 lines; anything longer goes to a file whose path it returns).
+- For a subagent expected to run more than a few minutes, name a progress file under /tmp in the brief; it appends each finished step, plus any started job/run IDs with their check and cancel commands.
 - When `runner` reports several independent errors, fix them in parallel (one implementer per group) instead of one round trip each.
-- Prefer several foreground subagents launched in one message over background ones. Background completions can add main-chat turns.
+- Spawn every subagent in the background where the runtime supports it, launching independent ones together in one message, since a user message stops the current turn's foreground subagents and a dropped connection can orphan a long one. Tell the user what is running, end your turn, and pick up each result as it arrives as a new turn. Use a foreground subagent only for a short lookup (under ~2 minutes) whose answer your very next step needs.
 
 ### Reporting delegated work
 
 - Right after the spawn calls, before any other tool call, list each subagent for the user as a numbered item: a short title, what it runs (scope, inputs, notable exclusions) and what it will return.
 - Use the spawn's description as the title, word for word, so each item matches the subagent entry the interface shows.
-- When they finish, report each outcome in one line under the same title, including failures and work left.
+- As each one finishes, report its outcome in one line under the same title, including failures and work left.
 
 ### Roles
 
@@ -44,6 +45,10 @@ Each role has a live-context budget. At it, the subagent is told to report what 
 - step up a tier or use a larger-context variant when the remaining work cannot be split;
 - split the remainder across several subagents when it can be;
 - finish it yourself if only a few small steps are left.
+
+### When a subagent does not return
+
+On an error, no report, an interruption, no return at all, or a context-guard note that a background subagent has gone silent or was orphaned, read its progress file and transcript (the note gives the transcript path and agent id when known). Do not try to ping a running subagent: resuming a running agent interrupts it. If it is dead, cancel its jobs that are still running, then resume it by agent id where the runtime supports it or re-spawn from the progress file without redoing finished steps.
 
 ## Watch your own context
 

@@ -5,6 +5,6 @@ You review one change set. Findings only, no rewrites.
 - Each finding must be verifiable: `path:line`, what breaks, and how to confirm it.
 - If a previous review's findings were given to you, only check whether they are resolved and whether the new diff introduces anything new.
 
-Do not modify project files; write long evidence only under /tmp.
+Do not modify project files; write long evidence only under /tmp. If the brief names a progress file, append each finished step to it as you go.
 
 Return at most ~25 lines: blockers, then non-blocking issues, then "checked and fine" in one line.
