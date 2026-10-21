@@ -98,6 +98,7 @@ payloads; add a hand-written payload only for a case no runtime has produced.
 ```sh
 uv run --python 3.14 python scripts/record_payloads.py --runtime all
 scripts/sandbox_smoke.sh [--only claude|codex|cursor] [--dry-run]
+scripts/plugin_live.sh install|check [--run]|checklist|uninstall [--only <rt>] [--dry-run]  # real-home plugin install and smoke; run only when asked
 ```
 
 ## Documentation

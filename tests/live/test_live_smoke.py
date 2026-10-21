@@ -60,11 +60,15 @@ class DryRunTests(unittest.TestCase):
             "cursor_interactive.exp",
             "-- cursor-agent --trust --workspace",
             "--set thresholds.note_cap=1000",
-            r"read\ README.md\ again",
+            "claude -p 'Use your file-reading tool once to read",
+            "--home $TMPDIR/",
+            "dry run: nothing was changed and no model was called",
         ):
             self.assertIn(expected, result.stdout)
-        rows = [line.split()[:3] for line in result.stdout.splitlines() if line.split()[-7:] == ["0"] * 7]
-        self.assertEqual(rows, [[name, "dry", "run"] for name in ("claude", "claude-plugin", "codex", "cursor")])
+        for tool in ("Setup", "Claude", "Claude plugin", "Codex", "Cursor"):
+            self.assertRegex(result.stdout, rf"\[dry\] +{tool} ")
+        self.assertNotIn("\x1b", result.stdout)
+        self.assertNotIn(str(root), result.stdout)
         self.assertEqual(list((root / "tmp").iterdir()), [])
         self.assertEqual(list((root / "home").iterdir()), [])
 

@@ -7,6 +7,7 @@
 #
 # The UI enables the kitty keyboard protocol, so "\r" only inserts a newline and "\033[13u" submits.
 # Keys sent before it switches the tty to raw mode are echoed and lost, so typing waits for a quiet screen.
+# The placeholder's first letter is drawn in reverse video (the cursor), so the startup match skips it.
 set separator [lsearch -exact $argv --]
 if {$separator < 1 || $separator == [llength $argv] - 1} {
     puts stderr "usage: cursor_interactive.exp <prompt>... -- <command> \[<arg>...\]"
@@ -30,7 +31,7 @@ proc wait_ready {limit settle} {
     set timeout $limit
     expect {
         -re {[Tt]rust this (workspace|folder)} { send "\r"; exp_continue }
-        "Plan, search, build anything" {}
+        "lan, search, build anything" {}
         timeout { fail 3 "timeout waiting for startup" }
         eof { ended startup }
     }
