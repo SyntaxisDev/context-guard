@@ -1,11 +1,14 @@
 import json
 import sqlite3
 import unittest
+from pathlib import Path
+from unittest import mock
 
-from adapters.cursor import hooks
+from adapters.cursor import hooks, mapping, subagents
 from core import policy
 from tests import harness
 
+START = 1_800_000_000
 RECORDED = {
     "sessionStart": "sessionStart-root",
     "beforeSubmitPrompt": "beforeSubmitPrompt-root",
@@ -71,19 +74,20 @@ class CursorHookCase(harness.RuntimeHookCase):
 
 
 class SessionTests(CursorHookCase):
-    """sessionStart lists open handoffs and nothing else."""
+    """sessionStart marks the hooks as active and lists open handoffs, without policy text."""
 
-    def test_session_start_lists_handoffs_without_policy_text(self) -> None:
+    def test_session_start_lists_handoffs_after_the_marker_without_policy_text(self) -> None:
         self.store.mkdir(parents=True)
         handoff = self.store / "project-task-0123456789abcdef.md"
         handoff.write_text(f"# Project task\nStatus: open · Updated: now\nWorkspace: {self.project}\n")
         response = self.hook("sessionStart")
+        self.assertTrue(response["additional_context"].startswith(mapping.SESSION_MARKER + "\n\n"))
         self.assertIn(str(handoff), response["additional_context"])
         self.assertIn("(likely match)", response["additional_context"])
         self.assertNotIn("Orchestrator mode", response["additional_context"])
 
-    def test_session_start_without_handoffs_adds_nothing(self) -> None:
-        self.assertEqual(self.hook("sessionStart"), {})
+    def test_session_start_without_handoffs_adds_only_the_marker(self) -> None:
+        self.assertEqual(self.hook("sessionStart"), {"additional_context": mapping.SESSION_MARKER})
 
 
 class PromptTests(CursorHookCase):
@@ -297,6 +301,171 @@ class StopTests(CursorHookCase):
         self.assertEqual(self.hook("stop", conversation_id="c2", status="completed", loop_count=1), {})
         self.assertEqual(self.hook("stop", conversation_id="c2", status="aborted"), {})
         self.assertEqual(self.names().count("handoff_requested"), 1)
+
+    def test_subagent_stop_without_parent_id_gets_no_follow_up_once_a_tool_hook_named_its_parent(self) -> None:
+        self.tokens("sub", 170000, limit=1000000)
+        self.hook("postToolUse", conversation_id="sub", parent_tool_call_id="toolu_1", tool_name="Shell")
+        self.assertEqual(self.hook("stop", conversation_id="sub", status="completed", loop_count=0), {})
+        self.assertNotIn("handoff_requested", self.names())
+
+
+class SubagentTrackingTests(CursorHookCase):
+    """Spawned subagents whose result is lost, orphaned or silent leave one note per occurrence for the parent."""
+
+    parent = harness.read_fixture("cursor", "preToolUse-task")["payload"]["conversation_id"]
+    call = harness.read_fixture("cursor", "preToolUse-task")["payload"]["tool_use_id"]
+    agent = harness.read_fixture("cursor", "postToolUse-subagent-read")["payload"]["conversation_id"]
+
+    def recorded(self, name: str, **fields: object) -> dict:
+        payload = harness.payload("cursor", name, self.home, self.project, **fields)
+        return hooks.run(payload["hook_event_name"], payload, self.home, {})
+
+    def task_result(self, *, background: bool = False) -> dict:
+        output = {"status": "success", "agentId": self.agent, "durationMs": 5, "isBackground": background}
+        return self.recorded("postToolUse-task", tool_use_id=self.call, tool_output=json.dumps(output))
+
+    def parent_tool(self) -> dict:
+        return self.recorded("postToolUse-shell", conversation_id=self.parent, session_id=self.parent)
+
+    def unreturned(self) -> list[dict]:
+        return self.details("subagent_unreturned")
+
+    def details(self, event: str) -> list[dict]:
+        return [record["detail"] for record in self.logged() if record["event"] == event]
+
+    def at(self, minutes: float, name: str, **fields: object) -> dict:
+        with mock.patch.object(subagents, "clock", return_value=START + minutes * 60):
+            return self.recorded(name, **fields)
+
+    def parent_tool_at(self, minutes: float, duration_ms: float = 1000) -> dict:
+        return self.at(
+            minutes, "postToolUse-shell", conversation_id=self.parent, session_id=self.parent, duration=duration_ms
+        )
+
+    def transcript(self) -> Path:
+        return self.home / ".cursor/projects/dir/agent-transcripts" / self.parent / "subagents" / f"{self.agent}.jsonl"
+
+    def background_spawn(self) -> None:
+        self.at(0, "preToolUse-task")
+        self.at(1, "postToolUse-subagent-read")
+        with mock.patch.object(subagents, "clock", return_value=START + 60):
+            self.task_result(background=True)
+
+    def test_aborted_parent_gets_the_note_on_its_next_tool_result_once(self) -> None:
+        self.recorded("preToolUse-task")
+        self.recorded("postToolUse-subagent-read")
+        self.recorded("postToolUse-subagent-shell")
+        self.assertEqual(self.recorded("stop-aborted"), {})
+        self.assertEqual(self.recorded("postToolUse-subagent-read"), {})
+        note = self.parent_tool()["additional_context"]
+        transcripts = self.home / ".cursor/projects/dir/agent-transcripts" / self.parent / "subagents"
+        self.assertIn(f"Subagent `implementer` (agent {self.agent}) did not return its result", note)
+        self.assertRegex(note, r"last activity \d\d:\d\d UTC")
+        self.assertIn(f"Transcript: {transcripts / f'{self.agent}.jsonl'}", note)
+        self.assertIn("resume it by agent id", note)
+        self.assertEqual(self.parent_tool(), {})
+        self.assertEqual(self.unreturned(), [{"role": "implementer", "agent": self.agent, "status": "aborted"}])
+
+    def test_returned_or_background_subagent_leaves_no_note(self) -> None:
+        for background in (False, True):
+            with self.subTest(background=background):
+                self.recorded("preToolUse-task")
+                self.recorded("postToolUse-subagent-read")
+                self.task_result(background=background)
+                self.recorded("stop-aborted")
+                self.assertEqual(self.parent_tool(), {})
+        self.assertEqual(self.unreturned(), [])
+
+    def test_subagent_that_never_ran_a_tool_is_reported_at_session_start(self) -> None:
+        self.recorded("preToolUse-task")
+        self.recorded("stop-completed")
+        context = self.recorded("sessionStart-root")["additional_context"]
+        self.assertIn("Subagent `implementer` did not return its result. Transcript:", context)
+        self.assertIn("re-spawn it from its progress file", context)
+        self.assertNotIn("(agent", context)
+        self.assertEqual(self.parent_tool(), {})
+
+    def test_note_merges_with_the_tier_note(self) -> None:
+        self.recorded("preToolUse-task")
+        self.recorded("stop-aborted")
+        self.tokens(self.parent, 190000)
+        note = self.parent_tool()["additional_context"]
+        self.assertIn("190k", note)
+        self.assertIn("did not return its result", note)
+
+    def test_background_subagent_still_running_is_not_unreturned_at_parent_stop(self) -> None:
+        self.background_spawn()
+        self.assertEqual(self.at(2, "stop-completed"), {})
+        self.assertEqual(self.parent_tool_at(3), {})
+        self.assertEqual(self.unreturned(), [])
+
+    def test_silent_background_subagent_gets_one_note_per_silence_period(self) -> None:
+        self.background_spawn()
+        self.assertEqual(self.parent_tool_at(10), {})
+        note = self.parent_tool_at(11.5)["additional_context"]
+        self.assertIn(f"Subagent `implementer` (agent {self.agent}) has been silent for 10 minutes", note)
+        self.assertIn(f"Transcript: {self.transcript()}", note)
+        self.assertIn("It may have died or be stuck", note)
+        self.assertIn("cancel its jobs before re-spawning", note)
+        self.assertEqual(self.parent_tool_at(30), {})
+        self.at(31, "postToolUse-subagent-read")
+        self.assertEqual(self.parent_tool_at(40), {})
+        self.assertIn("silent for 10 minutes", self.parent_tool_at(41)["additional_context"])
+        self.assertEqual(
+            self.details("subagent_silent"), [{"role": "implementer", "agent": self.agent, "minutes": 10}] * 2
+        )
+
+    def test_silence_threshold_follows_the_user_config(self) -> None:
+        self.user_config({"subagents": {"silence_minutes": 3}})
+        self.background_spawn()
+        self.assertIn("silent for 3 minutes", self.parent_tool_at(4)["additional_context"])
+
+    def test_spawn_without_activity_is_silent_from_its_spawn_time_at_session_start(self) -> None:
+        self.at(0, "preToolUse-task")
+        context = self.at(10, "sessionStart-root")["additional_context"]
+        self.assertIn("Subagent `implementer` has been silent for 10 minutes", context)
+
+    def test_background_subagent_closed_by_its_completed_stop_raises_no_silence_note(self) -> None:
+        self.background_spawn()
+        self.at(2, "stop-completed", conversation_id=self.agent, session_id=self.agent)
+        self.assertEqual(self.parent_tool_at(30), {})
+        self.assertEqual(self.details("subagent_silent"), [])
+
+    def test_background_subagent_whose_transcript_ended_raises_no_silence_note(self) -> None:
+        self.background_spawn()
+        self.transcript().parent.mkdir(parents=True)
+        lines = [{"role": "assistant", "message": {"content": []}}, {"type": "turn_ended", "status": "success"}]
+        self.transcript().write_text("".join(json.dumps(line) + "\n" for line in lines))
+        self.assertEqual(self.parent_tool_at(5), {})
+        self.transcript().unlink()
+        self.assertEqual(self.parent_tool_at(30), {})
+        self.assertEqual(self.details("subagent_silent"), [])
+
+    def test_parent_moving_on_without_a_foreground_result_gets_one_orphan_note(self) -> None:
+        self.at(0, "preToolUse-task")
+        self.at(1, "postToolUse-subagent-read")
+        note = self.parent_tool_at(3)["additional_context"]
+        self.assertIn(f"Subagent `implementer` (agent {self.agent}) was orphaned", note)
+        self.assertIn(f"It may still be running. Transcript: {self.transcript()}", note)
+        self.assertEqual(self.parent_tool_at(4), {})
+        self.assertEqual(self.at(5, "stop-aborted"), {})
+        self.assertEqual(self.parent_tool_at(6), {})
+        self.assertEqual(self.details("subagent_orphaned"), [{"role": "implementer", "agent": self.agent}])
+        self.assertEqual(self.unreturned(), [])
+
+    def test_parallel_tool_and_task_results_raise_no_orphan_note(self) -> None:
+        second = "toolu_second"
+        self.at(0, "preToolUse-task")
+        self.at(0, "preToolUse-task", tool_use_id=second)
+        self.assertEqual(self.parent_tool_at(4, duration_ms=4 * 60000 - 500), {})
+        output = json.dumps({"status": "success", "agentId": self.agent, "durationMs": 5, "isBackground": False})
+        for call in (self.call, second):
+            self.assertEqual(self.at(5, "postToolUse-task", tool_use_id=call, tool_output=output), {})
+        self.assertEqual(self.parent_tool_at(6), {})
+        self.assertEqual(self.at(7, "stop-completed"), {})
+        self.assertEqual(self.parent_tool_at(8), {})
+        self.assertEqual(self.details("subagent_orphaned"), [])
+        self.assertEqual(self.unreturned(), [])
 
 
 class ToolEventTests(CursorHookCase):

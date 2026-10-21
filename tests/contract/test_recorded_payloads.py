@@ -52,14 +52,15 @@ def registered_events(runtime: str) -> set[str]:
 def expected(rec: harness.Recorded, state: str = "armed") -> str:
     """The decision class a recorded payload must produce in a state.
 
-    Without telemetry only Codex SessionStart speaks: it is the Codex policy channel. A recorded
-    event the runtime does not register passes.
+    Without telemetry only Codex SessionStart (the Codex policy channel) and Cursor sessionStart
+    (the hooks-active marker) speak. A recorded event the runtime does not register passes.
 
     Returns:
         pass, block, note, budget, refresh or context.
     """
     if state != "armed":
-        return "context" if (rec.runtime, rec.event, state) == ("codex", "SessionStart", "bare") else "pass"
+        bare_context = {("codex", "SessionStart"), ("cursor", "sessionStart")}
+        return "context" if state == "bare" and (rec.runtime, rec.event) in bare_context else "pass"
     if rec.name == "stop-aborted" or rec.event not in registered_events(rec.runtime):
         return "pass"
     if rec.subagent:

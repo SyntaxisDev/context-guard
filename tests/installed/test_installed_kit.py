@@ -252,6 +252,8 @@ class CursorInstalledTests(InstalledCase):
         self.assertEqual(self.fire("beforeSubmitPrompt-root", prompt="Ship the parser"), {"continue": True})
         self.assertTrue(self.fire("postToolUse-shell")["additional_context"].startswith("Context check"))
         self.assertEqual(self.fire("preToolUse-task"), {})
+        call = harness.read_fixture("cursor", "preToolUse-task")["payload"]["tool_use_id"]
+        self.assertEqual(self.fire("postToolUse-task", tool_use_id=call), {})
         self.assertTrue(self.fire("stop-completed", loop_count=0)["followup_message"].startswith("[context-guard]"))
         self.chat(190_000)
         blocked = self.fire("beforeSubmitPrompt-root", prompt="Next step")

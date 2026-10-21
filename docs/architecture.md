@@ -143,7 +143,10 @@ hook in Claude Code and Codex, a later tool result or session start for a held C
 note), `block`, `resend`,
 `handoff_requested` (source `user`, `refresh` or `unwritten`), `handoff_written`, `handoff_read`,
 `subagent_spawn` (role, tier, model,
-effort), `subagent_budget` (role, budget).
+effort), `subagent_budget` (role, budget), `subagent_unreturned` (Cursor: role, agent, parent stop
+status, for a Task subagent whose result never reached the parent), `subagent_orphaned` (Cursor:
+role, agent, for a foreground subagent the parent moved on from), `subagent_silent` (Cursor: role,
+agent, minutes without activity).
 
 ## Configuration
 

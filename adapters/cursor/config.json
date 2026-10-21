@@ -19,5 +19,8 @@
     "write": ["Write", "StrReplace", "Edit", "MultiEdit"],
     "shell": ["Shell"],
     "spawn": ["Task"]
+  },
+  "subagents": {
+    "silence_minutes": 10
   }
 }

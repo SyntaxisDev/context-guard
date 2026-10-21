@@ -19,7 +19,7 @@ KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
 
-from adapters.cursor import mapping, runner
+from adapters.cursor import mapping, runner, subagents
 from core import config as config_mod, events, handoffs, hook, policy, spawn, state as state_mod
 from core.config import valid_text
 from core.observation import (
@@ -67,7 +67,6 @@ CLI_USAGE_FIELD, CLI_TOKENS_FIELD, CLI_WINDOW_FIELD = 5, 1, 2
 VARINT, LENGTH_DELIMITED = 0, 2
 VARINT_BITS, VARINT_CONTINUATION = 64, 0x80
 FIXED_SIZES = {1: 8, 5: 4}
-SPAWN_RECORD = "spawn\0"
 
 
 @dataclass(frozen=True)
@@ -510,7 +509,7 @@ def workspace(payload: dict[str, object]) -> str:
 
 
 def stop_skipped(payload: dict[str, object]) -> bool:
-    """Tell whether a stop hook skips bookkeeping.
+    """Tell whether a stop hook skips policy evaluation; spawn bookkeeping runs regardless.
 
     Args:
         payload: The validated stop hook payload.
@@ -519,19 +518,6 @@ def stop_skipped(payload: dict[str, object]) -> bool:
         True unless the turn completed and is not our own follow-up loop.
     """
     return payload.get("status", "completed") != "completed" or payload.get("loop_count", 0) > 0
-
-
-def session_file(directory: Path, conversation: str) -> Path:
-    """Name the state file of a Cursor session.
-
-    Args:
-        directory: Cursor state directory.
-        conversation: Session key, a conversation id or a spawn record key.
-
-    Returns:
-        The JSON state file path for that key.
-    """
-    return directory / f"{state_mod.session_key(RUNTIME, conversation)}.json"
 
 
 def telemetry_for(config: dict, home: Path, event: str, payload: dict[str, object], *, spawn_only: bool) -> Telemetry:
@@ -557,50 +543,35 @@ def telemetry_for(config: dict, home: Path, event: str, payload: dict[str, objec
     )
 
 
-def spawn_record(directory: Path, call: str) -> Path:
-    """Name the state file that keeps a spawn's role.
+def remember_parent(directory: Path, payload: dict[str, object]) -> None:
+    """Record a subagent's parent Task call in its session state.
+
+    Only subagent tool hooks carry `parent_tool_call_id`; its stop and prompt hooks do not,
+    so this is how those learn they belong to a subagent.
 
     Args:
         directory: Cursor state directory.
-        call: The parent's Task `tool_use_id`.
-
-    Returns:
-        The state file path of the spawn record.
-    """
-    return session_file(directory, SPAWN_RECORD + call)
-
-
-def remember_spawn(directory: Path, payload: dict[str, object], tool: ToolUse) -> None:
-    """Record a spawn's role under the parent's Task `tool_use_id`.
-
-    Subagent tool hooks carry only that id, so this is how they learn their role.
-
-    Args:
-        directory: Cursor state directory.
-        payload: The validated preToolUse payload of the Task call.
-        tool: The classified spawn.
-    """
-    call, role = payload.get("tool_use_id"), tool.detail.get("role")
-    if call and role:
-        with state_mod.session_state(directory, RUNTIME, SPAWN_RECORD + call) as record:
-            record.setdefault("adapter", {})["role"] = role
-
-
-def spawned_role(directory: Path, payload: dict[str, object]) -> str | None:
-    """Look up the role a subagent was spawned as.
-
-    Args:
-        directory: Cursor state directory.
-        payload: The validated hook payload; subagent payloads carry `parent_tool_call_id`.
-
-    Returns:
-        The recorded role, or None for the main chat or an unrecorded spawn.
+        payload: The validated hook payload.
     """
     call = payload.get("parent_tool_call_id")
-    if not call:
-        return None
-    role = state_mod.validated(state_mod.read_json(spawn_record(directory, call))).get("adapter", {}).get("role")
-    return role if valid_text(role) and role else None
+    if call and recorded_parent(directory, session_id(payload)) != call:
+        with state_mod.session_state(directory, RUNTIME, session_id(payload)) as state:
+            state.setdefault("adapter", {})[subagents.PARENT_CALL] = call
+
+
+def recorded_parent(directory: Path, conversation: str) -> str | None:
+    """Look up the parent Task call recorded for a conversation.
+
+    Args:
+        directory: Cursor state directory.
+        conversation: The conversation id.
+
+    Returns:
+        The parent's `tool_use_id`, or None for a main chat or a subagent not seen on a tool hook.
+    """
+    state = state_mod.validated(state_mod.read_json(subagents.state_path(directory, conversation)))
+    call = state.get("adapter", {}).get(subagents.PARENT_CALL)
+    return call if valid_text(call) and call else None
 
 
 def observe(native: str, payload: object, config: dict, home: Path) -> Observation | None:
@@ -626,6 +597,8 @@ def observe(native: str, payload: object, config: dict, home: Path) -> Observati
         return None
     chat = telemetry_for(config, home, event, payload, spawn_only=spawn_only)
     fallback = config["telemetry"]["window_fallback"] or None
+    directory = config_mod.state_dir(config, home, RUNTIME)
+    parent = payload.get("parent_tool_call_id") or recorded_parent(directory, session_id(payload))
     return Observation(
         RUNTIME,
         session_id(payload),
@@ -633,8 +606,8 @@ def observe(native: str, payload: object, config: dict, home: Path) -> Observati
         tokens=chat.tokens,
         window=chat.window or fallback,
         model=payload.get("model") or None,
-        is_subagent=bool(payload.get("parent_tool_call_id")),
-        role=spawned_role(config_mod.state_dir(config, home, RUNTIME), payload),
+        is_subagent=bool(parent),
+        role=subagents.spawned_role(directory, parent),
         cwd=workspace(payload),
         prompt=payload.get("prompt") if event == PROMPT else None,
         tool=tool,
@@ -716,17 +689,19 @@ def respond(decision: Decision, event: str) -> dict[str, object]:
         event: Core event of the hook.
 
     Returns:
-        The native response: `continue` for prompts, `additional_context` for session starts and
-        tool notes, `followup_message` for stops, or `{}` when the event cannot carry the decision.
+        The native response: `continue` for prompts, `additional_context` for session starts (always,
+        led by `mapping.SESSION_MARKER`) and tool notes, `followup_message` for stops, or `{}` when
+        the event cannot carry the decision.
     """
     if event == PROMPT:
         if decision.kind == BLOCK:
             return {"continue": False, "user_message": decision.message}
         return {"continue": True}
+    if event == SESSION:
+        message = decision.message if decision.kind == CONTEXT else ""
+        return {"additional_context": "\n\n".join(part for part in (mapping.SESSION_MARKER, message) if part)}
     if decision.kind == PASS or not decision.message:
         return {}
-    if event == SESSION and decision.kind == CONTEXT:
-        return {"additional_context": decision.message}
     if event == TOOL and decision.kind == NOTE:
         return {"additional_context": decision.message}
     if event == STOP and decision.kind == CONTEXT:
@@ -749,11 +724,13 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
         The native hook response.
     """
     obs = observe(native, payload, config, home)
+    directory = config_mod.state_dir(config, home, RUNTIME)
+    remember_parent(directory, payload)
+    subagents.track(config, directory, native, payload)
     if obs is None:
         return respond(Decision(), event_spec(native).event)
-    directory = config_mod.state_dir(config, home, RUNTIME)
     if obs.tool is not None and obs.tool.action == SPAWN:
-        remember_spawn(directory, payload, obs.tool)
+        subagents.remember_spawn(directory, payload, obs.tool.detail.get("role"))
     return hook.evaluate(
         obs,
         config,
@@ -761,7 +738,7 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
         lambda: runner.services(home),
         lambda decision: respond(decision, obs.event),
         lambda response: obs.event == TOOL and "additional_context" in response,
-        carry=lambda decision: carry_prompt_note(obs, decision, directory, config),
+        carry=lambda decision: subagents.deliver(obs, carry_prompt_note(obs, decision, directory, config), directory),
     )
 
 

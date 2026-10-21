@@ -23,6 +23,9 @@ EVENT_NAMES = frozenset(
         "handoff_read",
         "subagent_spawn",
         "subagent_budget",
+        "subagent_unreturned",
+        "subagent_orphaned",
+        "subagent_silent",
     }
 )
 
