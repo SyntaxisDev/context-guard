@@ -3,7 +3,13 @@ name = "context-guard"
 version = "0.1.0"
 description = "Context warnings, task handoffs and delegation support for AI coding runtimes"
 requires-python = ">=3.14"
+license = "Apache-2.0"
+license-files = ["LICENSE", "NOTICE"]
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/SyntaxDev/context-guard"
+Repository = "https://github.com/SyntaxDev/context-guard"
 
 [tool.uv]
 package = false

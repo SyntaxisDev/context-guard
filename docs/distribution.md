@@ -2,26 +2,38 @@
 
 context-guard ships two ways: the script installer writes native files into a runtime home,
 and `cli.py package` renders a self-contained plugin for runtimes that load plugins. Both
-render the same `content/` through the same adapter mapping.
+render the same `content/` through the same adapter mapping. Tagged releases attach the built
+plugins to the GitHub release; no built plugin is committed to the repository.
 
-| path                                        | for                                                       | what it writes                                                                                                                                                   |
-| ------------------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cli.py install --runtime <rt>`             | Cursor, Codex, Claude Code CLI                            | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
-| `cli.py package --runtime claude --out DIR` | Claude Code (`--plugin-dir`, marketplaces), Claude CoWork | `DIR/plugins/context-guard/`: vendored code, launcher, plugin manifest, hooks, agents, skills, policy. Nothing outside `DIR`.                                    |
-| `... --marketplace NAME`                    | Sharing through a marketplace repo                        | Also `DIR/.claude-plugin/marketplace.json` listing the plugin at `./plugins/context-guard`.                                                                      |
+| path                                      | for                                                                     | what it writes                                                                                                                                                   |
+| ----------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `cli.py install --runtime <rt>`           | Cursor, Codex, Claude Code CLI                                          | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
+| `cli.py package --runtime <rt> --out DIR` | Runtimes with a plugin spec: Claude Code and CoWork, Cursor, Codex      | `DIR/<rt>/plugins/context-guard/`: vendored code, `LICENSE`, `NOTICE`, launcher, plugin manifest, hooks (not Cursor), agents, skills, policy. Nothing outside `DIR`. |
+| `... --marketplace NAME`                  | Sharing through a marketplace repo                                      | Also the runtime's marketplace listing under `DIR/<rt>/` (Claude: `.claude-plugin/marketplace.json`) listing the plugin at `./plugins/context-guard`.           |
+| GitHub release assets                     | Users who do not clone the repository                                   | Per runtime a plugin zip (plugin root at the zip root) and a marketplace zip (listing + `plugins/`), plus `SHA256SUMS`. See Releases.                            |
 
-Use one path per runtime: the installed hooks and the plugin hooks would both fire in Claude Code.
+Use one path per runtime: the installed hooks and the plugin hooks would both fire.
+
+Some plugin features need one extra command, run by the user through the packaged launcher,
+because the runtime cannot load them from a plugin: Codex role agents
+(`adapters/codex/agents.py`, see [codex.md](codex.md#installing-the-plugin)) and Cursor hooks
+(`adapters/cursor/hooks_install.py`, see [cursor.md](cursor.md#registering-the-hooks); the Cursor
+app runs plugin hooks only with Third-Party Imports on, so the Cursor plugin ships none). Each
+keeps its own install manifest and reverses cleanly. Install, verification, update and removal
+steps per runtime are on the runtime pages ([claude.md](claude.md#plugin) for Claude).
 
 ## Package command
 
-`package` supports `--runtime claude` only; other runtimes have no plugin spec and the command fails.
-
 ```sh
-uv run --python 3.14 python cli.py package --runtime claude --out dist [--marketplace NAME] \
+uv run --python 3.14 python cli.py package --runtime <rt|all> --out dist [--marketplace NAME] \
     [--set section.key=value ...] [--dry-run]
 ```
 
+- Each runtime renders into its own `DIR/<rt>/`, so `--runtime all` builds every package side by
+  side. `all` packages each runtime that has `adapters/<rt>/plugin.py` and prints a one-line note
+  for the others; naming a runtime without a plugin spec is an error.
 - The version is `project.version` from `pyproject.toml`; a marketplace pins users to it until it changes.
+- Every package carries the repository's `LICENSE` and `NOTICE`; packaging fails when either is missing.
 - An existing `marketplace.json` is merged: only the entry named like this plugin is replaced,
   other plugins' entries and the listing's own fields are kept. A file that is not a JSON object
   with a `plugins` list is an error and nothing is written.
@@ -37,10 +49,34 @@ uv run --python 3.14 python cli.py package --runtime claude --out dist [--market
 Try a package without touching your configuration:
 
 ```sh
-claude --plugin-dir dist/plugins/context-guard
-claude plugin validate dist/plugins/context-guard
-claude plugin marketplace add ./dist        # when built with --marketplace
+claude --plugin-dir dist/claude/plugins/context-guard
+claude plugin validate dist/claude/plugins/context-guard
+claude plugin marketplace add ./dist/claude        # when built with --marketplace
 ```
+
+## Releases
+
+Pushing a tag `v<version>` runs `.github/workflows/release.yml`: it checks that the tag equals
+`v` + `project.version`, runs the CI workflow (tests on Python 3.14 and 3.15, ruff, packaging),
+then builds and publishes:
+
+```sh
+uv run --python 3.14 python cli.py package --runtime all --marketplace context-guard --out dist
+uv run --python 3.14 python scripts/build_release.py --out dist [--tag v<version>]
+```
+
+`build_release.py` writes two zips per runtime and `dist/SHA256SUMS` covering all of them:
+
+- `context-guard-<rt>-<version>.zip`: `dist/<rt>/plugins/context-guard` with the plugin root at
+  the zip root, because CoWork uploads need the manifest directory there. For CoWork upload,
+  `claude --plugin-dir` and Cursor's local plugin directory.
+- `context-guard-<rt>-marketplace-<version>.zip`: the whole `dist/<rt>/` tree, the marketplace
+  listing plus `plugins/context-guard`, for `claude plugin marketplace add <dir>` and
+  `codex plugin marketplace add <dir>`. Codex cannot install a bare plugin directory.
+
+A tree packaged without `--marketplace` is rejected before anything is written. Entries are
+sorted with a fixed timestamp, so the same tree zips to identical bytes. The same commands build
+the artifacts locally.
 
 ## Claude plugin layout
 
@@ -88,18 +124,18 @@ Limits:
 `adapters/<rt>/plugin.py` with:
 
 - `plugin_spec(config) -> core.package.PluginSpec(manifest_file, manifest, hooks_file, hooks,
-root_token, files)`: the native manifest and its path, the hooks file content and its path, the
-  token hook commands use for the plugin root, and rendered native files (reuse
+root_token, files)`: the native manifest and its path, the hooks file content and its path (both
+  None for a plugin that registers no hooks), the token hook commands use for the plugin root, and
+  rendered native files (reuse
   `core.render` with the adapter's `mapping.runtime_mapping(config)`). Hook commands should call
   `sh "<root_token>/hooks/context-guard-hook" <script> <args>` so interpreter discovery and fail-open
   behaviour stay shared.
 - `marketplace(name, spec) -> (relative path, listing)`: the runtime's marketplace file.
 
 `cli.py package --runtime <rt>` then works without CLI changes; the engine vendors
-`adapters/<rt>/` only. Known targets:
+`adapters/<rt>/` only, and `--runtime all` and the release workflow pick the runtime up. Known targets:
 
-- Cursor and private plugin marketplaces: a marketplace can serve Claude-format plugins
-  (`.claude-plugin/plugin.json` + `skills/`) to Cursor and sync the same plugin to Claude and
-  CoWork. A Cursor package needs Cursor's hook events and root variable and the session-context
-  policy channel.
-- Codex: `.codex-plugin/plugin.json` (`skills`, `interface`), cached per version; needs its own spec.
+- Cursor: `adapters/cursor/plugin.py`; layout and install in [cursor.md](cursor.md).
+- Codex: `adapters/codex/plugin.py`; layout and install in [codex.md](codex.md).
+- Organisation marketplaces that serve Claude-format plugins (`.claude-plugin/plugin.json` +
+  `skills/`) to several runtimes can take the Claude package as is.
