@@ -2,6 +2,7 @@
 
 import json
 import re
+from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from typing import NamedTuple
@@ -33,6 +34,8 @@ AGENTS_DIR = f"{CURSOR_DIR}/agents"
 SKILLS_DIR = f"{CURSOR_DIR}/skills"
 POLICY_FILE = f"{CURSOR_DIR}/rules/context-guard.mdc"
 HOOK_SCRIPT = "adapters/cursor/hooks.py"
+SESSION_MARKER = "context-guard hooks: active."
+PLUGIN_HOOKS = "cursor-hooks"
 HOOK_EVENTS = {
     "sessionStart": HookEvent(SESSION),
     "beforeSubmitPrompt": HookEvent(PROMPT),
@@ -213,19 +216,18 @@ def merge_hooks(doc: dict, registrations: dict[str, dict], script: str) -> dict:
     return result
 
 
-def registrations(python: Path, kit: Path) -> dict[str, dict]:
+def registrations(command: Callable[[str], str]) -> dict[str, dict]:
     """Build the hooks.json entry of every registered native event.
 
     Args:
-        python: Interpreter that runs the hook script.
-        kit: Installed kit root holding the hook script.
+        command: Builds an event's hook command: the installed kit's or the plugin launcher's.
 
     Returns:
         Entry per native event: command, timeout and the event's options.
     """
     return {
         native: {
-            "command": hookfile.hook_command(python, kit / HOOK_SCRIPT, native),
+            "command": command(native),
             "timeout": deadline.HOOK_TIMEOUT_SECONDS,
             **dict(spec.options),
         }
@@ -250,7 +252,11 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
     script = str(kit / HOOK_SCRIPT)
     hooks = JsonMerge(
         home / HOOKS_FILE,
-        partial(merge_hooks, registrations=registrations(python, kit), script=script),
+        partial(
+            merge_hooks,
+            registrations=registrations(partial(hookfile.hook_command, python, kit / HOOK_SCRIPT)),
+            script=script,
+        ),
         partial(unmerge_hooks, script=script),
     )
     return InstallSpec(

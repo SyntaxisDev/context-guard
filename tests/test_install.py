@@ -232,6 +232,21 @@ class MergeAndEditTests(EngineCase):
         self.assertFalse((self.base / "settings.json").exists())
         self.assertFalse((self.base / "config.toml").exists())
 
+    def test_existing_merge_target_left_empty_is_removed_with_a_backup(self) -> None:
+        text = json.dumps({"hooks": {HOOK_KEY: "an older install"}})
+        settings = self.write("settings.json", text)
+        self.install()
+        self.uninstall()
+        self.assertFalse(settings.exists())
+        records = [json.loads(line) for line in (self.backups / "paths.jsonl").read_text().splitlines()]
+        self.assertIn(str(settings), [record["path"] for record in records])
+
+    def test_existing_empty_merge_target_is_restored_not_removed(self) -> None:
+        settings = self.write("settings.json", "{}\n")
+        self.install()
+        self.uninstall()
+        self.assertEqual(settings.read_text(), "{}\n")
+
     def test_text_edit_revert_keeps_user_text(self) -> None:
         config = self.write("config.toml", "model = 'x'\n")
         self.install()

@@ -2,6 +2,7 @@
 
 import io
 import json
+import shutil
 import sys
 import tempfile
 import types
@@ -232,9 +233,43 @@ class LifecycleTests(CliCase):
         self.assertIn("2 files, 1 merges, 1 edits; 1 events (last: note", out)
         self.assertIn("[codex] not installed", out)
 
+    def test_package_all_renders_each_runtime_into_its_own_directory(self) -> None:
+        out = self.home / "dist"
+        code, said, _ = self.run_cli("package", "--runtime", "all", "--out", str(out), "--dry-run", source=cli.ROOT)
+        self.assertEqual(code, cli.EXIT_OK)
+        for runtime in cli.RUNTIMES:
+            with self.subTest(runtime=runtime):
+                if (cli.ROOT / "adapters" / runtime / "plugin.py").is_file():
+                    self.assertIn(f"at {out / runtime / 'plugins'}", said)
+                else:
+                    self.assertIn(f"[{runtime}] skipped: no plugin package", said)
+        self.assertIn(f"at {out / 'claude' / 'plugins' / 'context-guard'}", said)
+        self.assertFalse(out.exists())
+
+    def test_package_runtime_without_plugin_fails_only_when_named(self) -> None:
+        code, _, err = self.run_cli("package", "--runtime", "cursor", "--out", str(self.home / "dist"))
+        self.assertEqual(code, cli.EXIT_ERROR)
+        self.assertIn("cursor has no plugin package", err)
+        code, said, err = self.run_cli("package", "--runtime", "all", "--out", str(self.home / "dist"))
+        self.assertEqual(code, cli.EXIT_ERROR)
+        self.assertEqual(said.count("skipped: no plugin package"), len(cli.RUNTIMES))
+        self.assertIn("no selected runtime has a plugin package", err)
+        self.assertFalse((self.home / "dist").exists())
+
+    def test_package_without_license_files_fails_closed(self) -> None:
+        source = self.home / "checkout"
+        for relative in ("core", "content", "adapters/claude", "pyproject.toml", "LICENSE"):
+            target = source / relative
+            target.parent.mkdir(parents=True, exist_ok=True)
+            (shutil.copytree if (cli.ROOT / relative).is_dir() else shutil.copy)(cli.ROOT / relative, target)
+        code, _, err = self.run_cli("package", "--runtime", "claude", "--out", str(self.home / "dist"), source=source)
+        self.assertEqual(code, cli.EXIT_ERROR)
+        self.assertIn("NOTICE", err)
+        self.assertFalse((self.home / "dist").exists())
+
     def test_package_marketplace_keeps_other_plugins(self) -> None:
         out = self.home / "market"
-        listing = out / ".claude-plugin" / "marketplace.json"
+        listing = out / "claude" / ".claude-plugin" / "marketplace.json"
         listing.parent.mkdir(parents=True)
         listing.write_text(
             json.dumps(

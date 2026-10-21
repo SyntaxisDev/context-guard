@@ -34,6 +34,7 @@ from core.state import read_json, write_json
 
 MANIFEST_NAME = "install-manifest.json"
 BACKUPS_DIR = "backups"
+OFFERS_DIR = "offers"
 DIFF_LINES = 40
 WRITE, REMOVE, REMOVE_TREE = "write", "remove", "remove-tree"
 SECTIONS = ("files", "merges", "edits")
@@ -131,6 +132,33 @@ def backup_dir(home: Path) -> Path:
         A directory named after the current local time, not created.
     """
     return kit_root(home) / BACKUPS_DIR / dt.datetime.now().astimezone().strftime("%Y%m%d-%H%M%S-%f")
+
+
+def offer_marker(home: Path, name: str) -> Path:
+    """Locate the marker recording that an optional setup step was offered once.
+
+    Its path does not follow the configured state directory, so text shipped to a model can name it.
+
+    Args:
+        home: The user home.
+        name: The setup step, named like the manifest it installs.
+
+    Returns:
+        `<home>/.context-guard/state/offers/<name>`.
+    """
+    return kit_root(home) / "state" / OFFERS_DIR / name
+
+
+def record_offer(home: Path, name: str) -> None:
+    """Create an offer marker so the step is not offered again; an existing one is kept.
+
+    Args:
+        home: The user home.
+        name: The setup step, named like the manifest it installs.
+    """
+    marker = offer_marker(home, name)
+    marker.parent.mkdir(parents=True, exist_ok=True)
+    marker.touch()
 
 
 def read_manifest(path: Path) -> dict:
@@ -517,8 +545,9 @@ class UninstallPlanner(Planner):
     ) -> None:
         """Plan the reversal of every recorded merge or edit in one section.
 
-        A recorded path the spec no longer describes conflicts; a file the install created is
-        removed when reversing leaves it empty.
+        A recorded path the spec no longer describes conflicts. A file reversing leaves empty is
+        removed (with a backup) when the install created it, or when it is a merge target whose
+        recorded original was not empty: some runtimes reject an empty JSON object.
 
         Args:
             section: "merges" or "edits".
@@ -541,7 +570,8 @@ class UninstallPlanner(Planner):
                 continue
             if restored is None:
                 continue
-            if entry["created"] and restored.strip() in EMPTY_TEXTS:
+            emptied = restored.strip() in EMPTY_TEXTS
+            if emptied and (entry["created"] or (section == "merges" and restored != entry.get("original"))):
                 self.change(REMOVE, path, reason=section)
             elif restored != text:
                 self.change(WRITE, path, restored, section)

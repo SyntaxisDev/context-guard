@@ -37,6 +37,7 @@ class PluginTestCase(unittest.TestCase):
         self.tmp = tempfile.TemporaryDirectory()
         self.base = Path(self.tmp.name).resolve()
         self.out = self.base / "out"
+        self.claude_out = self.out / "claude"
         self.home = self.base / "home"
         self.home.mkdir()
 
@@ -46,7 +47,7 @@ class PluginTestCase(unittest.TestCase):
     def build(self, *extra: str) -> Path:
         code, text = run_cli("package", "--runtime", "claude", "--out", str(self.out), *extra)
         self.assertEqual(code, cli.EXIT_OK, text)
-        return self.out / package.PLUGINS_DIR / plugin.NAME
+        return self.claude_out / package.PLUGINS_DIR / plugin.NAME
 
     def hook_commands(self, root: Path) -> list[tuple[str, str]]:
         data = json.loads((root / plugin.HOOKS_FILE).read_text())
@@ -77,10 +78,10 @@ class LayoutTests(PluginTestCase):
         root = self.build("--marketplace", "team-tools")
         manifest = json.loads((root / plugin.MANIFEST_FILE).read_text())
         self.assertEqual((manifest["name"], manifest["version"]), (plugin.NAME, kit.source_version()))
-        listing = json.loads((self.out / plugin.MARKETPLACE_FILE).read_text())
+        listing = json.loads((self.claude_out / plugin.MARKETPLACE_FILE).read_text())
         self.assertEqual(listing["name"], "team-tools")
         [entry] = listing["plugins"]
-        self.assertEqual((self.out / entry["source"]).resolve(), root)
+        self.assertEqual((self.claude_out / entry["source"]).resolve(), root)
         self.assertEqual(entry["version"], manifest["version"])
 
     def test_package_ships_agents_skills_policy_and_no_tests_or_caches(self) -> None:
@@ -94,6 +95,9 @@ class LayoutTests(PluginTestCase):
         shipped = [p.relative_to(root).parts for p in root.rglob("*")]
         self.assertFalse([parts for parts in shipped if {"tests", "__pycache__", ".venv"} & set(parts)])
         self.assertFalse((root / "adapters" / "cursor").exists())
+        for name in package.LICENSE_FILES:
+            with self.subTest(name=name):
+                self.assertEqual((root / name).read_text(), (ROOT / name).read_text())
 
     def test_package_has_no_top_level_bin_directory(self) -> None:
         """claude.ai rejects uploaded plugins that ship bin/ executables."""
@@ -166,7 +170,7 @@ class WriteTests(PluginTestCase):
         self.assertFalse(stale.exists())
 
     def test_foreign_directory_is_never_replaced(self) -> None:
-        target = self.out / package.PLUGINS_DIR / plugin.NAME
+        target = self.claude_out / package.PLUGINS_DIR / plugin.NAME
         target.mkdir(parents=True)
         (target / "notes.txt").write_text("mine")
         with contextlib.redirect_stderr(io.StringIO()) as errors:

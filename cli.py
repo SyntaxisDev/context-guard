@@ -4,8 +4,8 @@
 Exit codes: 0 success, 1 conflicts were skipped or doctor found problems, 2 the command
 could not run (bad arguments, missing adapter mapping, no usable interpreter, I/O error).
 Hook trust is never written: review new hooks through each runtime's own controls.
-`package` renders a self-contained plugin into --out instead of installing into a home;
-its --set values are baked into the package rather than written to the user config.
+`package` renders a self-contained plugin into <--out>/<runtime> instead of installing into a
+home; its --set values are baked into the package rather than written to the user config.
 """
 
 import argparse
@@ -604,7 +604,7 @@ def package_runtime(
     Args:
         ctx: The command context.
         runtime: The runtime name.
-        out: The package output directory.
+        out: This runtime's package output directory; the plugin and listing go below it.
         marketplace: Name of a marketplace listing to write as well, or None.
         overrides: Settings baked into the package.
         dry_run: Whether to plan and validate without writing.
@@ -642,13 +642,40 @@ def package_runtime(
     )
 
 
+def packaged_runtimes(ctx: Context, runtimes: tuple[str, ...], *, every: bool) -> tuple[str, ...]:
+    """Select the runtimes whose source checkout has a plugin package spec.
+
+    Args:
+        ctx: The command context.
+        runtimes: The selected runtimes.
+        every: Whether `--runtime all` selected them; runtimes without a plugin are then skipped
+            with a note instead of failing.
+
+    Returns:
+        The runtimes with `adapters/<runtime>/plugin.py`, in selection order.
+
+    Raises:
+        CliError: An explicitly selected runtime has no plugin, or no selected runtime has one.
+    """
+    found = tuple(rt for rt in runtimes if (ctx.source / "adapters" / rt / "plugin.py").is_file())
+    missing = [rt for rt in runtimes if rt not in found]
+    if missing and not every:
+        msg = f"{missing[0]} has no plugin package (adapters/{missing[0]}/plugin.py)"
+        raise CliError(msg)
+    ctx.say(*(f"[{rt}] skipped: no plugin package (adapters/{rt}/plugin.py)" for rt in missing))
+    if not found:
+        msg = "no selected runtime has a plugin package"
+        raise CliError(msg)
+    return found
+
+
 def cmd_package(ctx: Context, runtimes: tuple[str, ...], args: argparse.Namespace) -> int:
-    """Render each runtime's plugin into `--out`, baking in `--set` values.
+    """Render each runtime's plugin into `<--out>/<runtime>/`, baking in `--set` values.
 
     Args:
         ctx: The command context.
         runtimes: The runtimes to package.
-        args: The parsed arguments, for out, marketplace, settings and dry_run.
+        args: The parsed arguments, for runtime, out, marketplace, settings and dry_run.
 
     Returns:
         EXIT_OK.
@@ -661,8 +688,8 @@ def cmd_package(ctx: Context, runtimes: tuple[str, ...], args: argparse.Namespac
         raise CliError(msg)
     overrides = setting_updates(ctx, args.settings)
     out = args.out.expanduser().absolute()
-    for runtime in runtimes:
-        package_runtime(ctx, runtime, out, args.marketplace, overrides, dry_run=args.dry_run)
+    for runtime in packaged_runtimes(ctx, runtimes, every="all" in args.runtime):
+        package_runtime(ctx, runtime, out / runtime, args.marketplace, overrides, dry_run=args.dry_run)
     if args.dry_run:
         ctx.say("Dry run: nothing was written.")
     return EXIT_OK
@@ -719,7 +746,7 @@ def parser() -> argparse.ArgumentParser:
         help="write a setting to <home>/.context-guard/config.json (repeatable); "
         "with package, bake it into the package instead",
     )
-    result.add_argument("--out", type=Path, help="package: directory to render the plugin into")
+    result.add_argument("--out", type=Path, help="package: directory to render <DIR>/<runtime>/ plugins into")
     result.add_argument("--marketplace", metavar="NAME", help="package: also write a marketplace listing")
     return result
 

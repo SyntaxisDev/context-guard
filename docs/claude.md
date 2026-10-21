@@ -24,6 +24,30 @@ Shared behaviour is in [architecture.md](architecture.md). This page lists only 
 | deep | `opus` | `high` | `opus` |
 <!-- END generated: tiers -->
 
+## Plugin
+
+`cli.py package --runtime claude` renders a Claude plugin; its layout, CoWork limits and the
+launcher are in [distribution.md](distribution.md). Use one path per machine: with both the
+installed kit and the plugin, both sets of hooks fire.
+
+- Claude Code: unzip `context-guard-claude-marketplace-<version>.zip`, then
+  `claude plugin marketplace add <dir>` and `claude plugin install context-guard@context-guard`,
+  and start a new session. Claude copies the plugin to
+  `~/.claude/plugins/cache/<marketplace>/context-guard/<version>/` and loads its hooks, agents and
+  skills from there; there is no extra install step.
+- CoWork: upload `context-guard-claude-<version>.zip` (the plugin root is the zip root). CoWork
+  loads plugins only, so the script installer has no effect there.
+- Verify: `claude plugin list` shows `context-guard@context-guard` enabled, `/hooks` lists its
+  `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `PreCompact` and `PostCompact`
+  hooks, and after a prompt `~/.context-guard/state/claude/events.jsonl` ends with a `prompt`
+  record.
+- Update: replace the marketplace directory with the new release, then
+  `claude plugin marketplace update context-guard` and
+  `claude plugin update context-guard@context-guard`, and restart Claude Code. In CoWork, upload
+  the new zip.
+- Remove: `claude plugin uninstall context-guard@context-guard` (optionally
+  `claude plugin marketplace remove context-guard`); in CoWork, remove the uploaded plugin.
+
 ## Unverified
 
 - `~/.claude/rules` loading and its application to subagents come from documentation only.

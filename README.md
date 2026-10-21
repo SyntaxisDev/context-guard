@@ -12,6 +12,12 @@ See [docs/architecture.md](docs/architecture.md) and the runtime pages
 
 ## Install
 
+There are two ways to install, and each runtime should use only one: an installed kit and a
+plugin in the same runtime would both run their hooks. Both need Python 3.14+ on the machine;
+without it the hooks do nothing.
+
+### Script installer
+
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.14+. From the repository root:
 
 ```sh
@@ -29,9 +35,11 @@ backups), `--set section.key=value` (write the user config; the key must exist i
 Exit codes: 0 ok, 1 conflicts, doctor problems or (doctor) nothing installed, 2 the command could not run.
 
 Installation copies one kit to `~/.context-guard/kit` with a pinned Python 3.14 venv; hooks
-call that interpreter. Start a new session afterwards and review the new hooks in the
-runtime: context-guard never writes hook trust. Unrelated hooks and settings are preserved;
-see [docs/architecture.md](docs/architecture.md#install-engine).
+call that interpreter. Start a new session afterwards (reload the window in Cursor) and, in
+Codex, trust the new hooks in `/hooks`: context-guard never writes hook trust. `doctor` checks
+the install; after a prompt, `~/.context-guard/state/<runtime>/events.jsonl` ends with a `prompt`
+record. Unrelated hooks and settings are preserved; see
+[docs/architecture.md](docs/architecture.md#install-engine).
 
 ### Updating
 
@@ -40,17 +48,37 @@ tells you when the checkout has a newer commit, and `status`/`doctor` report it.
 `--set kit_check.auto_update=true` to update in the background. Details are in the Kit
 section of [docs/architecture.md](docs/architecture.md#install-engine).
 
-## Claude Code plugin and CoWork
+### Plugins from GitHub Releases
 
-Claude CoWork loads plugins only. `package` supports `claude` only and renders a
-self-contained plugin instead of installing:
+Each [release](https://github.com/SyntaxDev/context-guard/releases) attaches, per runtime, a plugin
+zip `context-guard-<runtime>-<version>.zip` (plugin at the zip root), a marketplace zip
+`context-guard-<runtime>-marketplace-<version>.zip` (listing plus `plugins/`), and `SHA256SUMS`.
+
+- Claude CoWork: upload the Claude plugin zip (CoWork loads plugins only). Claude Code: unzip the
+  Claude marketplace zip, then
+  `claude plugin marketplace add <dir>` and `claude plugin install context-guard@context-guard`.
+  Verification, updates and removal: [docs/claude.md](docs/claude.md#plugin).
+- Cursor (the plugin ships no hooks; they are registered once in `~/.cursor/hooks.json`):
+  1. Unzip the Cursor plugin zip into `~/.cursor/plugins/local/context-guard`, or install it from a marketplace.
+  2. Ask the Cursor agent to enable the context-guard hooks, or run
+     `sh "<plugin root>/hooks/context-guard-hook" adapters/cursor/hooks_install.py install`.
+  3. Reload the window, and turn Settings → Agents → Third-Party Imports off: it is not needed and imports duplicate configs.
+  4. Rerun step 2 after every plugin update; until then the hooks run the previous version.
+
+  The agent offers step 2 once, ever. Plugin root, verification and removal: [docs/cursor.md](docs/cursor.md#registering-the-hooks).
+- Codex: unzip the Codex marketplace zip, then `codex plugin marketplace add <dir>` and
+  `codex plugin add context-guard@context-guard`; trust the hooks with `/hooks`. For the named
+  subagents, run the agents command (the first session offers it once); plugin root, verification, updates and removal:
+  [docs/codex.md](docs/codex.md#installing-the-plugin).
+
+To build the same packages from a checkout, with settings baked in through `--set`:
 
 ```sh
-uv run --python 3.14 python cli.py package --runtime claude --out dist [--marketplace NAME]
+uv run --python 3.14 python cli.py package --runtime all --out dist [--marketplace context-guard]
 ```
 
-Use either the plugin or `install --runtime claude`, not both. Formats, settings baked with
-`--set` and CoWork limits are in [docs/distribution.md](docs/distribution.md).
+Layout, marketplace listings, release builds and CoWork limits are in
+[docs/distribution.md](docs/distribution.md).
 
 ## Configuration
 
@@ -75,4 +103,9 @@ The optional runner, classifier and calibration keys are listed in the
 
 Commands, test layers and the live smoke (`scripts/sandbox_smoke.sh`, which spends model calls)
 are described in [AGENTS.md](AGENTS.md). Tests use temporary homes; never test against a live
-installation.
+installation. `scripts/plugin_live.sh` is the exception: it swaps the script install in your real
+home for the plugins and checks them in each runtime (`--dry-run` prints what it would do).
+
+## License
+
+Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).

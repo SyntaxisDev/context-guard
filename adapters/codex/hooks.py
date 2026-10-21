@@ -5,6 +5,7 @@ and tokens come from the subagent's own rollout. Every failure path prints `{}` 
 """
 
 import datetime as dt
+import os
 import re
 import sys
 from collections.abc import Mapping
@@ -15,7 +16,7 @@ if str(KIT) not in sys.path:
     sys.path.insert(0, str(KIT))
 
 from adapters.codex import mapping, rollout, runner, tools
-from core import config as config_mod, hook, render
+from core import config as config_mod, hook, install, render
 from core.observation import BLOCK, COMPACT, CONTEXT, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
 
 RUNTIME = mapping.RUNTIME
@@ -39,6 +40,14 @@ TEXT_FIELDS = (
     "agent_type",
 )
 AGENT_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+PLUGIN_NAME = "context-guard"
+PLUGIN_POLICY_FILE = "policy/context-guard.md"
+PLUGIN_ROLELESS_POLICY_FILE = "policy/context-guard-roleless.md"
+PLUGIN_ROOT_TOKEN = "${PLUGIN_ROOT}"  # noqa: S105
+AGENTS_OFFER = (
+    "context-guard: in your reply, offer the user once to install the named subagents with the "
+    "command under Named subagents above. This note is not shown again."
+)
 
 
 def check_payload(event_name: str, payload: dict[str, object]) -> None:
@@ -158,18 +167,70 @@ def observe(event_name: str, payload: dict[str, object], config: dict, home: Pat
     )
 
 
-def session_policy(config: dict) -> str:
-    """Render the policy that SessionStart puts into the session context.
+def plugin_policy(config: dict, home: Path, environ: Mapping[str, str]) -> str:
+    """Read the packaged policy that matches the role agents in the user's Codex home.
+
+    Plugins cannot ship agents, so the role-less policy, which spawns Codex's default agent
+    with the packaged role brief, is used unless every role's agent TOML is installed.
 
     Args:
         config: Loaded Codex adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME.
 
     Returns:
-        The rendered policy, or an empty string when it cannot be rendered.
+        The named-agent policy, or the role-less one with the plugin root filled in and, once ever,
+        the agents offer from `agents_offer`.
+    """
+    agents = mapping.agents_dir(home, environ)
+    names = [agent.name for agent in render.agents(mapping.runtime_mapping(config))]
+    if all((agents / f"{name}.toml").is_file() for name in names):
+        return (KIT / PLUGIN_POLICY_FILE).read_text()
+    policy = (KIT / PLUGIN_ROLELESS_POLICY_FILE).read_text().replace(PLUGIN_ROOT_TOKEN, str(KIT))
+    offer = agents_offer(home)
+    return f"{policy.rstrip()}\n\n{offer}\n" if offer else policy
+
+
+def agents_offer(home: Path) -> str:
+    """Offer the named role agents once ever, recording the offer before it is made.
+
+    No offer is made when an install manifest shows the agents were installed (by agents.py or the
+    script install), when the offer marker exists, or when the marker cannot be written.
+
+    Args:
+        home: Home directory of the context-guard install.
+
+    Returns:
+        The one-time offer note, or an empty string.
+    """
+    installed = (install.manifest_path(home, name).is_file() for name in (RUNTIME, mapping.PLUGIN_AGENTS))
+    if any(installed) or install.offer_marker(home, mapping.PLUGIN_AGENTS).exists():
+        return ""
+    try:
+        install.record_offer(home, mapping.PLUGIN_AGENTS)
+    except OSError:
+        return ""
+    return AGENTS_OFFER
+
+
+def session_policy(config: dict, home: Path, environ: Mapping[str, str] | None = None) -> str:
+    """Render the policy that SessionStart puts into the session context.
+
+    A packaged plugin ships its policies as files; an installed kit renders the policy.
+
+    Args:
+        config: Loaded Codex adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
+
+    Returns:
+        The policy, or an empty string when it cannot be rendered or read.
     """
     try:
+        if (KIT / PLUGIN_POLICY_FILE).is_file():
+            return plugin_policy(config, home, os.environ if environ is None else environ)
         return mapping.policy_text(config)
-    except render.RenderError:
+    except ValueError, OSError:
         return ""
 
 
@@ -209,7 +270,9 @@ def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
     return config_mod.load_config(config_mod.sources_for(RUNTIME, home, ADAPTER_CONFIG), environ)
 
 
-def handle(event_name: str, payload: object, config: dict, home: Path) -> dict[str, object]:
+def handle(
+    event_name: str, payload: object, config: dict, home: Path, environ: Mapping[str, str] | None = None
+) -> dict[str, object]:
     """Observe, evaluate and answer one Codex hook call.
 
     Invalid payload fields raise ValueError from `observe`; `run` turns that into a pass.
@@ -219,6 +282,7 @@ def handle(event_name: str, payload: object, config: dict, home: Path) -> dict[s
         payload: Decoded stdin JSON of the hook call.
         config: Loaded Codex adapter configuration.
         home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
 
     Returns:
         The native response; `{}` for unknown events, non-object payloads and Stop
@@ -235,7 +299,7 @@ def handle(event_name: str, payload: object, config: dict, home: Path) -> dict[s
         lambda: runner.services(home),
         lambda decision: respond(decision, event_name),
         lambda response: "hookSpecificOutput" in response,
-        lambda: session_policy(config),
+        lambda: session_policy(config, home, environ),
     )
 
 
@@ -252,7 +316,9 @@ def run(event_name: str, payload: object, home: Path, environ: Mapping[str, str]
         The native response, or `{}` for internal runs, foreign homes and unreadable
         configuration, state, telemetry or payloads.
     """
-    return hook.guarded(KIT, lambda: handle(event_name, payload, load_config(home, environ), home), {}, environ)
+    return hook.guarded(
+        KIT, lambda: handle(event_name, payload, load_config(home, environ), home, environ), {}, environ
+    )
 
 
 def main(argv: list[str] | None = None) -> None:

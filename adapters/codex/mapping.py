@@ -4,7 +4,7 @@ import difflib
 import json
 import re
 import tomllib
-from collections.abc import Collection, Mapping
+from collections.abc import Callable, Collection, Mapping
 from functools import partial
 from pathlib import Path
 
@@ -16,7 +16,9 @@ from core.render import Agent, RenderedFile, RuntimeMapping
 RUNTIME = "codex"
 RUNTIME_NAME = "Codex"
 CODEX_DIR = ".codex"
+CODEX_HOME_ENV = "CODEX_HOME"
 AGENTS_DIR = ".codex/agents"
+PLUGIN_AGENTS = "codex-agents"
 SKILLS_DIR = ".codex/skills"
 HOOK_SCRIPT = "adapters/codex/hooks.py"
 SESSION_START = "SessionStart"
@@ -66,16 +68,17 @@ def toml_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False)
 
 
-def developer_instructions(agent: Agent) -> str:
+def developer_instructions(agent: Agent, advisory: Mapping[str, str] = ADVISORY_LIMITS) -> str:
     """Build a Codex agent's instructions: the role body plus the limits Codex cannot enforce.
 
     Args:
         agent: The role variant to render.
+        advisory: Instruction per capability that only text can hold the agent to.
 
     Returns:
-        The role body, followed by an advisory list of every capability the role lacks.
+        The role body, followed by an advisory list of every capability in `advisory` the role lacks.
     """
-    limits = [text for key, text in ADVISORY_LIMITS.items() if not agent.role.capabilities[key]]
+    limits = [text for key, text in advisory.items() if not agent.role.capabilities[key]]
     if not limits:
         return agent.body.strip()
     lines = ["", "Role limits (Codex cannot enforce these for a role; follow them):"]
@@ -164,12 +167,11 @@ def policy_text(config: dict) -> str:
     return render.render_policy(runtime_mapping(config))
 
 
-def hook_groups(python: Path, kit: Path, context_limit: int) -> dict[str, dict]:
+def hook_groups(command: Callable[[str], str], context_limit: int) -> dict[str, dict]:
     """Build the hooks.json handler group of every registered event.
 
     Args:
-        python: Interpreter that runs the hook script.
-        kit: Installed kit root holding the hook script.
+        command: Builds an event's hook command: the installed kit's or the plugin launcher's.
         context_limit: `additionalContextLimit` for SessionStart, in characters.
 
     Returns:
@@ -177,11 +179,7 @@ def hook_groups(python: Path, kit: Path, context_limit: int) -> dict[str, dict]:
     """
     groups = {}
     for event in HOOK_EVENTS:
-        handler = {
-            "type": "command",
-            "command": hookfile.hook_command(python, kit / HOOK_SCRIPT, event),
-            "timeout": HOOK_TIMEOUT_SECONDS,
-        }
+        handler = {"type": "command", "command": command(event), "timeout": HOOK_TIMEOUT_SECONDS}
         if event == SESSION_START:
             handler["additionalContextLimit"] = context_limit
         groups[event] = {"hooks": [handler]}
@@ -411,20 +409,20 @@ def role_descriptions(mapping: RuntimeMapping) -> dict[str, str]:
     return {agent.name: agent.role.description for agent in render.agents(mapping)}
 
 
-def kit_signatures(home: Path, descriptions: dict[str, str]) -> dict[Path, tuple[str, ...]]:
+def kit_signatures(agents_dir: Path, descriptions: dict[str, str]) -> dict[Path, tuple[str, ...]]:
     """Identify kit agent files that no manifest records.
 
     The body is one TOML string, so an unrecorded kit agent is known by its name and description lines.
 
     Args:
-        home: Home directory the agent files are installed under.
+        agents_dir: Directory the agent files are installed in.
         descriptions: Description per agent name.
 
     Returns:
         The lines that mark each agent file as the kit's.
     """
     return {
-        home / AGENTS_DIR / f"{name}.toml": (
+        agents_dir / f"{name}.toml": (
             f"name = {toml_string(name)}",
             f"description = {toml_string(description)}",
         )
@@ -448,14 +446,17 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
     codex = home / CODEX_DIR
     descriptions = role_descriptions(mapping)
     section = registration_section(home, descriptions)
+    script = kit / HOOK_SCRIPT
     return InstallSpec(
         runtime=RUNTIME,
         files={home / rendered.path: rendered.text for rendered in render.rendered_files(mapping)},
         json_merges=[
             hookfile.group_merge(
                 codex / "hooks.json",
-                hook_groups(python, kit, config["hook_output"]["session_context_limit"]),
-                kit / HOOK_SCRIPT,
+                hook_groups(
+                    partial(hookfile.hook_command, python, script), config["hook_output"]["session_context_limit"]
+                ),
+                script,
             )
         ],
         text_edits=[
@@ -465,5 +466,19 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
                 partial(revert_section, section=section, names=descriptions),
             )
         ],
-        kit_signatures=kit_signatures(home, descriptions),
+        kit_signatures=kit_signatures(home / AGENTS_DIR, descriptions),
     )
+
+
+def agents_dir(home: Path, environ: Mapping[str, str]) -> Path:
+    """Locate the agents directory Codex loads user agents from.
+
+    Args:
+        home: The user home.
+        environ: Environment that may set CODEX_HOME.
+
+    Returns:
+        `$CODEX_HOME/agents` when CODEX_HOME is set to an absolute path, else `<home>/.codex/agents`.
+    """
+    codex = environ.get(CODEX_HOME_ENV) or ""
+    return Path(codex) / "agents" if Path(codex).is_absolute() else home / AGENTS_DIR

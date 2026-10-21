@@ -1,10 +1,11 @@
 """Render a self-contained runtime plugin directory from the shipped content, core and one adapter.
 
-A package vendors core/, content/ and adapters/<runtime>/ (no tests, caches or venv), a POSIX
+A package vendors LICENSE, NOTICE, core/, content/ and adapters/<runtime>/ (no tests, caches or venv), a POSIX
 launcher that finds Python >= 3.14 when a hook runs and otherwise exits 0 printing nothing, and the
 files the adapter describes through `plugin_spec(config) -> PluginSpec`: the native manifest, the
-hook registrations and rendered native files (agents, skills, policy). Planning, validation and
-writing are separate so a dry run renders and checks everything without touching the output.
+hook registrations when the plugin ships any, and rendered native files (agents, skills, policy).
+Planning, validation and writing are separate so a dry run renders and checks everything without
+touching the output.
 """
 
 import json
@@ -21,6 +22,7 @@ from core.state import read_json, write_json
 PLUGINS_DIR = "plugins"
 LAUNCHER = "hooks/context-guard-hook"
 VENDORED = ("core", "content")
+LICENSE_FILES = ("LICENSE", "NOTICE")
 ADAPTER_CONFIG = "config.json"
 STAGING_SUFFIX = ".staging"
 LAUNCHER_TEXT = r"""#!/bin/sh
@@ -58,8 +60,8 @@ class PluginSpec:
     Attributes:
         manifest_file: Path of the native plugin manifest.
         manifest: The manifest object; its `name` names the plugin directory.
-        hooks_file: Path of the hook registration file.
-        hooks: The hook registrations.
+        hooks_file: Path of the hook registration file, or None for a plugin that registers no hooks.
+        hooks: The hook registrations, or None with no hooks file.
         root_token: How hook commands name the plugin root (e.g. an environment variable the
             runtime expands).
         files: Further rendered files (agents, skills, policy) mapped to their text.
@@ -67,8 +69,8 @@ class PluginSpec:
 
     manifest_file: str
     manifest: Mapping
-    hooks_file: str
-    hooks: Mapping
+    hooks_file: str | None
+    hooks: Mapping | None
     root_token: str
     files: Mapping[str, str] = field(default_factory=dict)
 
@@ -103,8 +105,30 @@ def dump_json(data: Mapping) -> str:
     return json.dumps(data, indent=2) + "\n"
 
 
+def license_files(source: Path) -> dict[str, str]:
+    """Read the license and notice files every package carries.
+
+    Args:
+        source: The source checkout.
+
+    Returns:
+        Each file name in LICENSE_FILES mapped to its text.
+
+    Raises:
+        PackageError: A license file is missing or unreadable.
+    """
+    files = {}
+    for name in LICENSE_FILES:
+        try:
+            files[name] = (source / name).read_text()
+        except (OSError, UnicodeDecodeError) as exc:
+            msg = f"cannot read {source / name}; packages must carry it: {exc}"
+            raise PackageError(msg) from exc
+    return files
+
+
 def vendored_files(source: Path, runtime: str) -> dict[str, str]:
-    """Collect core/, content/ and the runtime's adapter from a source checkout.
+    """Collect the license files, core/, content/ and the runtime's adapter from a source checkout.
 
     Args:
         source: The source checkout.
@@ -112,9 +136,10 @@ def vendored_files(source: Path, runtime: str) -> dict[str, str]:
 
     Returns:
         POSIX paths relative to `source` mapped to file text; tests, caches and venvs are skipped.
+        A missing license file raises PackageError through `license_files`.
     """
     roots = [source / entry for entry in VENDORED] + [source / "adapters" / runtime]
-    files = {}
+    files = license_files(source)
     for root in roots:
         for path in sorted(p for p in root.rglob("*") if p.is_file()):
             if kit.shipped(path, source):
@@ -129,11 +154,13 @@ def rendered_files(spec: PluginSpec) -> dict[str, str]:
         spec: The plugin.
 
     Returns:
-        The manifest, hook registrations, launcher and spec files, by relative path.
+        The manifest, hook registrations (when the spec has a hooks file), launcher and spec files,
+        by relative path.
     """
+    hooks = {spec.hooks_file: dump_json(spec.hooks or {})} if spec.hooks_file else {}
     return {
         spec.manifest_file: dump_json(spec.manifest),
-        spec.hooks_file: dump_json(spec.hooks),
+        **hooks,
         LAUNCHER: LAUNCHER_TEXT,
         **spec.files,
     }
@@ -149,7 +176,8 @@ def plan(source: Path, runtime: str, spec: PluginSpec, overrides: Mapping | None
         overrides: Settings baked into the vendored adapter config; None or empty keeps it as shipped.
 
     Returns:
-        Every package file by relative path.
+        Every package file by relative path. A missing license file raises PackageError through
+        `vendored_files`.
 
     Raises:
         PackageError: A rendered file would replace vendored code, or `validate` rejects the spec.
