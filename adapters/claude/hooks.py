@@ -56,6 +56,7 @@ TEXT_FIELDS = (
     "agent_type",
     "agent_transcript_path",
 )
+FOREIGN_HOST_KEYS = ("cursor_version",)
 WINDOW_ENTRY_SIZE = 2
 LEARNED_FILE = Path("learned", "windows.json")
 PLUGIN_NAME = "context-guard"
@@ -78,14 +79,17 @@ def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
 def valid_payload(payload: object) -> bool:
     """Tell whether a Claude Code hook payload has fields the hook can interpret.
 
+    Cursor imports Claude Code plugins and runs their hooks with its own payloads; those
+    belong to the Cursor adapter, so a payload naming another host is not interpreted.
+
     Args:
         payload: Decoded stdin JSON of the hook call.
 
     Returns:
-        True for an object whose known text fields are text and whose `stop_hook_active` is
-        absent or a bool.
+        True for an object without another host's marker whose known text fields are text
+        and whose `stop_hook_active` is absent or a bool.
     """
-    if not isinstance(payload, dict):
+    if not isinstance(payload, dict) or any(key in payload for key in FOREIGN_HOST_KEYS):
         return False
     if any(payload.get(key) is not None and not config_mod.valid_text(payload[key]) for key in TEXT_FIELDS):
         return False

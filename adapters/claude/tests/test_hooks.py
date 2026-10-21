@@ -179,6 +179,21 @@ class PromptAndToolTests(HookTestCase):
             self.assertEqual(hooks.run("UserPromptSubmit", payload, self.home), {})
         self.assertEqual(self.hook("UserPromptSubmit", prompt="go")["decision"], "block")
 
+    def test_cursor_payloads_from_an_imported_plugin_are_ignored(self) -> None:
+        self.usage(10_000_000)
+        for event, name in (
+            ("SessionStart", "sessionStart-root"),
+            ("UserPromptSubmit", "beforeSubmitPrompt-root"),
+            ("PostToolUse", "postToolUse-read"),
+            ("Stop", "stop-completed"),
+        ):
+            payload = harness.payload("cursor", name, self.home, self.project) | {
+                "transcript_path": str(self.transcript)
+            }
+            with self.subTest(event=event):
+                self.assertEqual(hooks.handle(event, payload, self.config, self.home), {})
+        self.assertEqual(list(self.home.rglob("events.jsonl")), [])
+
 
 class CompactionTests(HookTestCase):
     """Auto compaction teaches the window; compaction discards stale usage and relists handoffs."""
