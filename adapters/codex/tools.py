@@ -14,7 +14,8 @@ from pathlib import Path
 from core import handoffs, spawn
 from core.observation import OTHER, SPAWN, WRITE, ToolUse
 
-SPAWN_TOOLS = {"spawn_agent", "Agent"}
+SPAWN_TOOL = "spawn_agent"
+SPAWN_TOOLS = {SPAWN_TOOL, "Agent"}
 PATCH_TOOL = "apply_patch"
 SHELL_TOOLS = {"Bash", "exec_command", "shell", "shell_command", "local_shell"}
 CODE_MODE_TOOL = "exec"
@@ -163,6 +164,22 @@ def code_mode_access(source: str, cwd: str, home: Path, store: Path) -> tuple[st
     return next((access for access in accesses if access is not None), None)
 
 
+def is_spawn(name: str) -> bool:
+    """Tell whether a hook tool name is a spawn.
+
+    Codex names `spawn_agent` from a non-default tool namespace by joining namespace and name
+    without a separator (`collaborationspawn_agent`), and the namespace is configurable.
+
+    Args:
+        name: The payload's `tool_name`.
+
+    Returns:
+        True for `spawn_agent` under any namespace and for `Agent`.
+    """
+    base = name.rsplit(".", 1)[-1]
+    return base in SPAWN_TOOLS or base.endswith(SPAWN_TOOL)
+
+
 def classify(
     payload: Mapping[str, object], cwd: str, home: Path, store: Path, tiers: Mapping[str, object]
 ) -> ToolUse | None:
@@ -181,7 +198,7 @@ def classify(
     name, tool_input = text(payload.get("tool_name")), payload.get("tool_input")
     if name is None:
         return None
-    if name.rsplit(".", 1)[-1] in SPAWN_TOOLS and isinstance(tool_input, Mapping):
+    if is_spawn(name) and isinstance(tool_input, Mapping):
         return ToolUse(name, SPAWN, detail=spawn_detail(tool_input, tiers))
     if name == PATCH_TOOL:
         targets = PATCH_TARGET.findall(command_text(tool_input))

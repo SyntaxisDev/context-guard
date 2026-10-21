@@ -148,6 +148,7 @@ COMPOSER_KEYS = (
     "contextTokenLimit",
     "isAgentic",
 )
+DEFAULT_TOOL_NAMESPACES = ("", "functions")
 CODEX_SCHEMAS = ("session-start", "user-prompt-submit", "post-tool-use", "stop")
 SCHEMA_MARK = re.compile(rb"\.command\.(input|output)\{")
 PATCH = f"*** Begin Patch\n*** Update File: {PROJECT_TOKEN}/file.py\n@@\n-old\n+new\n*** End Patch\n"
@@ -571,6 +572,21 @@ def codex_rollouts(home: Path) -> tuple[dict, dict]:
     raise SystemExit(msg)
 
 
+def hook_tool_name(call: dict) -> str:
+    """Name a rollout function call the way Codex names it in hook payloads.
+
+    Codex joins a non-default namespace and the tool name without a separator.
+
+    Args:
+        call: The rollout `function_call` payload.
+
+    Returns:
+        The bare name for the default namespace, else namespace and name joined.
+    """
+    namespace, name = call.get("namespace") or "", call.get("name") or ""
+    return name if namespace in DEFAULT_TOOL_NAMESPACES else namespace + name
+
+
 def codex_pool(root: dict, child: dict) -> dict:
     """Gather the real values Codex payloads are built from.
 
@@ -596,6 +612,7 @@ def codex_pool(root: dict, child: dict) -> dict:
         "tool_response": SCRUBBED,
         "tool_use_id": (root.get("call") or root["spawn"]).get("call_id", "call_0"),
         "spawn": spawn_args,
+        "spawn_tool": hook_tool_name(root["spawn"]),
         "child": {
             "agent_id": child["meta"]["id"],
             "agent_type": child["meta"].get("agent_role") or "default",
@@ -624,7 +641,7 @@ def codex_cases(pool: dict) -> dict[str, tuple[str, dict]]:
         "UserPromptSubmit-subagent": ("UserPromptSubmit", agent),
         "PostToolUse-bash": ("PostToolUse", bash),
         "PostToolUse-apply-patch": ("PostToolUse", {"tool_name": "apply_patch", "tool_input": {"command": PATCH}}),
-        "PostToolUse-spawn-agent": ("PostToolUse", {"tool_name": "spawn_agent", "tool_input": pool["spawn"]}),
+        "PostToolUse-spawn-agent": ("PostToolUse", {"tool_name": pool["spawn_tool"], "tool_input": pool["spawn"]}),
         "PostToolUse-subagent-bash": ("PostToolUse", {**bash, **agent}),
         "Stop-root": ("Stop", {}),
     }

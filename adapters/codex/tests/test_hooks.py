@@ -286,7 +286,7 @@ class EventLogTests(HookCase):
                 "fork_turns": "none",
             },
         )
-        self.event("PostToolUse", tool_name="collaboration.spawn_agent", tool_input={"model": "gpt-6-luna"})
+        self.event("PostToolUse", tool_name="collaborationspawn_agent", tool_input={"model": "gpt-6-luna"})
         self.event("PostToolUse", tool_name="spawn_agent", tool_input={"agent_type": "scout", "fork_turns": "none"})
         spawns = [record["detail"] for record in self.logged() if record["event"] == "subagent_spawn"]
         self.assertEqual(

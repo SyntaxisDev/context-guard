@@ -14,7 +14,7 @@
       "reasoning_effort": "low",
       "task_name": "<scrubbed>"
     },
-    "tool_name": "spawn_agent",
+    "tool_name": "collaborationspawn_agent",
     "tool_response": "<scrubbed>",
     "tool_use_id": "call_eacd1240d9cc9bcef6c1ea7c",
     "transcript_path": "{HOME}/.codex/sessions/2026/10/16/rollout-2026-10-16T16-09-01-c30fff5d-9be8-5c49-b3f5-5ecf51c9b324.jsonl",
