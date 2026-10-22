@@ -132,9 +132,15 @@ class PluginLiveTests(unittest.TestCase):
             "cursor_interactive.exp",
             "-- cursor-agent --trust --workspace $TMPDIR/",
             "'Use your file-reading tool once to read",
+            "wake_check.py claude --log $TMPDIR/",
+            "claude -p --input-format stream-json",
+            "--waker-log ~/.context-guard/state/codex/waker.log -- codex app-server",
+            "--enable multi_agent_v2",
+            "-- cursor-agent -p --output-format stream-json --force",
+            "wake_check.py clean-handoffs --store ~/.context-guard/handoffs --workspace $TMPDIR/",
             "dry run: nothing was changed and no model was called",
         )
-        for tool in ("Claude", "Codex", "Cursor"):
+        for tool in ("Claude", "Codex", "Cursor", "Claude wake", "Codex wake", "Cursor wake"):
             self.assertRegex(stdout, rf"\[dry\] +{tool} ")
         self.assertNotIn("--setting-sources", stdout)
         self.assertNotIn("CONTEXT_GUARD_HOME", stdout)

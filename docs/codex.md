@@ -57,6 +57,12 @@ reason). A failure, such as `codex` missing from `PATH` or an app server that do
 - `SubagentStop` is a new hook handler: Codex runs it only after it is approved once in `/hooks`.
 - Switch: `subagents.wake_parent` (default `true`) in `~/.context-guard/config.json` (top level
   or `runtimes.codex`), or `CONTEXT_GUARD_SUBAGENTS_WAKE_PARENT=0`.
+- Live check: `scripts/plugin_live.sh check --run` drives the real Codex home through a
+  `codex app-server` it starts on stdio (`codex exec` exits after its turn, so no process would
+  keep the root loaded). The root spawns a background subagent that sleeps 20 s and answers a
+  token; the case passes when a later root turn quotes it, the root rollout records that turn with
+  trigger `queue`, and `waker.log` has a `sent` line for the root. The thread is archived and the
+  app server stopped afterwards; a running daemon or desktop app only sees the queued message.
 
 ## Tiers
 

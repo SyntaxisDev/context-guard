@@ -11,16 +11,21 @@
 # leftover script-install files and the events each runtime logged; `check --run` spends cheap
 # model calls (Claude 2, Codex 2, Cursor 2) in a temporary work dir with tiny thresholds and
 # passes a runtime when a note fired and was delivered. Hooks keep the real CONTEXT_GUARD_HOME.
+# Then a wake case per runtime (scripts/wake_check.py, a few more calls): the parent spawns a
+# background subagent that sleeps 20 s and answers a token, ends its turn, and passes when it
+# starts a new turn by itself that quotes the token (Codex: through an app server it starts, so the
+# context-guard waker's `codex queue` reaches it). Handoffs the run wrote for its work dir are deleted.
 #
 # Usage: scripts/plugin_live.sh install|check|checklist|uninstall [--only claude|codex|cursor] [--run] [--dry-run] [-v]
 #   --dry-run       print every command without changing anything or calling a model
-#   --run           check: one live smoke per runtime
+#   --run           check: one live smoke and one wake case per runtime
 #   -v, --verbose   also print each command and its output (VERBOSE=1); they always go to the run log
 #   PLUGIN_DIST=<dir>    package output (default: ~/.context-guard/plugins)
 #   KEEP=1          keep the temporary work dir of `check --run` (kept anyway on failure)
 #   SMOKE_PYTHON=<path>  interpreter for cli.py (default: uv run --python 3.14 python)
 #   CLAUDE_USE_API_KEY=1  keep ANTHROPIC_API_KEY for Claude (default: unset, use the login)
 #   CLAUDE_MODEL, CODEX_MODEL, CODEX_EFFORT, CURSOR_MODEL override the cheap defaults
+#   WAKE_TIMEOUT=<s>     seconds each wake case may take (default: 180)
 # shellcheck disable=SC2329  # cleanup runs through trap
 set -euo pipefail
 
@@ -37,8 +42,9 @@ FIRST_PROMPT="Use your file-reading tool once to read README.md, then reply with
 NEXT_PROMPT="Use your file-reading tool once to read README.md again, then reply with only the word ok."
 NAME=context-guard
 PLUGIN=$NAME@$NAME
+WAKE_TIMEOUT=${WAKE_TIMEOUT:-180}
 
-COMMAND="" ONLY="" DRY_RUN=0 LIVE=0 VERBOSE=${VERBOSE:-0} KEEP=${KEEP:-0} FAILED=0
+COMMAND="" ONLY="" DRY_RUN=0 LIVE=0 VERBOSE=${VERBOSE:-0} KEEP=${KEEP:-0} FAILED=0 READY=0 CLEANED=0
 while (($#)); do
     case $1 in
         install|check|checklist|uninstall) [[ -z $COMMAND ]] || { echo "one command only" >&2; exit 2; }; COMMAND=$1; shift ;;
@@ -47,7 +53,7 @@ while (($#)); do
         --run) LIVE=1; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
         -v|--verbose) VERBOSE=1; shift ;;
-        -h|--help) sed -n '2,22s/^# \{0,1\}//p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,28s/^# \{0,1\}//p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -66,9 +72,9 @@ TMP=${TMPDIR:-/tmp}
 TMP=${TMP%/}
 
 if ((DRY_RUN)) || [[ $COMMAND == checklist ]]; then
-    ui_init /dev/null
+    ui_init /dev/null 12
 else
-    ui_init "$(mktemp "$TMP/context-guard-plugin-$COMMAND.XXXXXX")"
+    ui_init "$(mktemp "$TMP/context-guard-plugin-$COMMAND.XXXXXX")" 12
 fi
 
 wanted() { [[ -z $ONLY || $ONLY == "$1" ]]; }
@@ -250,13 +256,20 @@ show_status() {
 
 codex_trust_hint="trust the hooks: open codex, run /hooks, trust context-guard, then rerun $SELF check --run"
 
+claude_auth() {
+    CLAUDE_AUTH=(env -u ANTHROPIC_API_KEY)
+    [[ ${CLAUDE_USE_API_KEY:-0} != 1 ]] || CLAUDE_AUTH=(env)
+}
+
 smoke_claude() {
+    READY=0
     if ! present claude; then smoke_skip Claude "claude not on PATH"; return; fi
     if ((!DRY_RUN)) && ! claude_installed; then smoke_skip Claude "plugin not installed" "$SELF install --only claude"; return; fi
-    local offset auth=(env -u ANTHROPIC_API_KEY) status=ran code=0 log=$LOGS/claude-1.jsonl
+    READY=1
+    local offset status=ran code=0 log=$LOGS/claude-1.jsonl
     offset=$(line_count "$(events_of claude)")
-    [[ ${CLAUDE_USE_API_KEY:-0} != 1 ]] || auth=(env)
-    local base=("${auth[@]}" claude -p --model "$CLAUDE_MODEL" --add-dir "$STORE" --permission-mode acceptEdits
+    claude_auth
+    local base=("${CLAUDE_AUTH[@]}" claude -p --model "$CLAUDE_MODEL" --add-dir "$STORE" --permission-mode acceptEdits
                 --output-format stream-json --verbose --include-hook-events)
     ui_start Claude "running the smoke (2 prompts)" long
     ui_model "$WORK" "$log" "${base[@]}" "$FIRST_PROMPT" || code=$?
@@ -269,10 +282,12 @@ smoke_claude() {
 }
 
 smoke_codex() {
+    READY=0
     if ! present codex; then smoke_skip Codex "codex not on PATH"; return; fi
     local real=${CODEX_HOME:-$HOME/.codex}
     if ((!DRY_RUN)) && [[ ! -f $real/auth.json ]]; then smoke_skip Codex "not logged in" "run codex login"; return; fi
     if ((!DRY_RUN)) && ! codex_installed; then smoke_skip Codex "plugin not installed" "$SELF install --only codex"; return; fi
+    READY=1
     local offset status=ran code=0 hint="" log=$LOGS/codex-1.jsonl
     offset=$(line_count "$(events_of codex)")
     local flags=(--json --skip-git-repo-check -m "$CODEX_MODEL" -c "model_reasoning_effort=\"$CODEX_EFFORT\""
@@ -289,12 +304,14 @@ smoke_codex() {
 }
 
 smoke_cursor() {
+    READY=0
     if ! present cursor-agent; then smoke_skip Cursor "cursor-agent not on PATH"; return; fi
-    if ((!DRY_RUN)) && ! present expect; then smoke_skip Cursor "expect not on PATH"; return; fi
     if ((!DRY_RUN)) && [[ $(cursor-agent status 2>&1 || true) == *[Nn]"ot logged in"* ]]; then
         smoke_skip Cursor "cursor-agent not logged in" "run cursor-agent login"
         return
     fi
+    READY=1
+    if ((!DRY_RUN)) && ! present expect; then smoke_skip Cursor "expect not on PATH"; return; fi
     local offset code=0 status log=$LOGS/cursor.log
     offset=$(line_count "$(events_of cursor)")
     ui_start Cursor "running the smoke (2 prompts in cursor-agent)" long
@@ -309,7 +326,63 @@ smoke_cursor() {
     smoke_report cursor "$status" "$(events_of cursor)" "$offset" "$log"
 }
 
+# wake_run <tool> <runtime> [<hint>] -- <wake_check.py args>: run one wake case and report its verdict.
+wake_run() {
+    local tool=$1 runtime=$2 hint=$3 log=$LOGS/$2-wake.jsonl verdict code=0
+    shift 4
+    ui_start "$tool wake" "background subagent wakes the parent (up to ${WAKE_TIMEOUT}s)" long
+    ui_show "${PY[@]}" "$ROOT/scripts/wake_check.py" "$runtime" --log "$log" "$@"
+    if ((DRY_RUN)); then return 0; fi
+    # The smoke's low thresholds make the Stop hook continue the parent's turn, so no wake is needed.
+    verdict=$(env -u CONTEXT_GUARD_THRESHOLDS_NOTE_CAP -u CONTEXT_GUARD_HANDOFF_REFRESH_REFRESH_TOKENS \
+        "${PY[@]}" "$ROOT/scripts/wake_check.py" "$runtime" --log "$log" "$@" </dev/null 2>>"$UI_LOG") || code=$?
+    { printf -- '--- %s (exit %s): %s\n' "$log" "$code" "$verdict"; cat "$log" 2>/dev/null; printf -- '--- end\n'; } >>"$UI_LOG"
+    if ((code == 0)) && [[ $verdict == ok* ]]; then
+        UI_PASSED=$((UI_PASSED + 1))
+        ui_done ok "woke${UI_SEP}${verdict#ok }"
+        return 0
+    fi
+    FAILED=1 UI_FAILED=$((UI_FAILED + 1))
+    ui_done fail "failed$UI_SEP${verdict#fail }"
+    [[ -n $hint ]] || hint=$(smoke_hint "$runtime" "$log")
+    [[ -z $hint ]] || ui_hint "$hint"
+    if [[ -s $log ]]; then ui_detail "see $log"; ui_tail "$log"; fi
+}
+
+wake_token() { echo "WAKE-OK-$RANDOM$RANDOM"; }
+
+wake_claude() {
+    claude_auth
+    wake_run Claude claude "" -- --token "$(wake_token)" --cwd "$WORK" --timeout "$WAKE_TIMEOUT" -- \
+        "${CLAUDE_AUTH[@]}" claude -p --input-format stream-json --output-format stream-json --verbose \
+        --model "$CLAUDE_MODEL" --add-dir "$STORE" --permission-mode acceptEdits --allowedTools 'Bash(sleep:*)'
+}
+
+wake_codex() {
+    wake_run Codex codex "" -- --token "$(wake_token)" --cwd "$WORK" --timeout "$WAKE_TIMEOUT" \
+        --waker-log "$HOME/.context-guard/state/codex/waker.log" -- \
+        codex app-server -c "model=\"$CODEX_MODEL\"" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
+        -c "sandbox_workspace_write.writable_roots=[\"$STORE\"]" --enable multi_agent_v2
+}
+
+wake_cursor() {
+    wake_run Cursor cursor "" -- --token "$(wake_token)" --cwd "$WORK" --timeout "$WAKE_TIMEOUT" -- \
+        cursor-agent -p --output-format stream-json --force --trust --workspace "$WORK" --model "$CURSOR_MODEL"
+}
+
+# clean_handoffs: delete the handoffs this run's prompts wrote into the real store for its work dir.
+clean_handoffs() {
+    local out
+    CLEANED=1
+    ui_show "${PY[@]}" "$ROOT/scripts/wake_check.py" clean-handoffs --store "$STORE" --workspace "$WORK"
+    if ((DRY_RUN)) || [[ ! -d ${WORK:-} ]]; then return 0; fi
+    out=$("${PY[@]}" "$ROOT/scripts/wake_check.py" clean-handoffs --store "$STORE" --workspace "$WORK" 2>>"$UI_LOG") || true
+    printf '%s\n' "$out" >>"$UI_LOG"
+    ui_say "Handoffs: ${out#ok }"
+}
+
 cleanup() {
+    ((CLEANED)) || clean_handoffs
     if [[ $KEEP != 1 && $FAILED == 0 ]]; then rm -rf "$RUN_DIR"; else printf 'Work dir kept at %s\n' "$RUN_DIR"; fi
 }
 
@@ -323,7 +396,7 @@ live_smoke() {
     fi
     WORK=$RUN_DIR/work
     LOGS=$RUN_DIR/logs
-    ui_section "Live smoke (2 cheap prompts per tool)"
+    ui_section "Live smoke (2 cheap prompts and a wake case per tool)"
     ui_show mkdir -p "$WORK" "$LOGS" "$STORE"
     if ((!DRY_RUN)); then
         mkdir -p "$WORK" "$LOGS" "$STORE"
@@ -336,9 +409,14 @@ live_smoke() {
     export CONTEXT_GUARD_TELEMETRY_CLI_CHATS=$HOME/.cursor/chats
     ui_show export "CONTEXT_GUARD_THRESHOLDS_NOTE_CAP=$NOTE_CAP" "CONTEXT_GUARD_HANDOFF_REFRESH_REFRESH_TOKENS=$REFRESH_TOKENS" \
         CONTEXT_GUARD_HANDOFF_REFRESH_MIN_SECONDS=0 "CONTEXT_GUARD_TELEMETRY_CLI_CHATS=$HOME/.cursor/chats"
-    if wanted claude; then smoke_claude; fi
-    if wanted codex; then smoke_codex; fi
-    if wanted cursor; then smoke_cursor; fi
+    local tool runtime
+    for runtime in claude codex cursor; do
+        wanted "$runtime" || continue
+        tool=$(tr '[:lower:]' '[:upper:]' <<<"${runtime:0:1}")${runtime:1}
+        "smoke_$runtime"
+        if ((READY)); then "wake_$runtime"; else smoke_skip "$tool wake" "the smoke could not start"; fi
+    done
+    clean_handoffs
     smoke_summary
 }
 
@@ -365,7 +443,8 @@ cmd_checklist() {
         "firm: the firm warning asks for a handoff" \
         "block: the block tier stops the prompt; write the handoff, resend, and it goes through" \
         "handoff: the handoff skill writes ~/.context-guard/handoffs/<task>.md; a new chat reads it" \
-        "subagent: a delegated task spawns a role (scout, investigator, implementer, reviewer, runner)"
+        "subagent: a delegated task spawns a role (scout, investigator, implementer, reviewer, runner)" \
+        "wake: a background subagent's result starts a parent turn without a user message (check --run covers cursor-agent -p only)"
     checklist_tool "Claude Code" \
         "/plugin lists $PLUGIN enabled; note, handoff and a role subagent work as in Cursor" \
         "CoWork: upload a zip with the plugin root at the zip root: (cd $DIST/claude/plugins/$NAME && zip -r /tmp/$NAME-claude.zip .)" \
