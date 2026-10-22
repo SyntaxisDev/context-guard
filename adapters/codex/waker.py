@@ -46,6 +46,8 @@ LOG_LIMIT_BYTES = 256 * 1024
 WAKES_DIR = "wakes"
 TURN_STARTED = "task_started"
 TURN_ENDED = frozenset({"task_complete", "turn_aborted"})
+TURN_MARKERS = tuple(kind.encode() for kind in (TURN_STARTED, *TURN_ENDED))
+SCAN_CHUNK_BYTES = 1024 * 1024
 SENT, SKIPPED, FAILED = "sent", "skipped", "failed"
 
 
@@ -275,23 +277,48 @@ def completion(found: list[dict], agent: str) -> str | None:
     return None
 
 
-def busy(found: list[dict]) -> bool:
-    """Tell whether the root is in a turn: its last turn start has no later turn end.
+def busy(path: Path) -> bool:
+    """Tell whether the root is in a turn: the rollout's last turn record is not a turn end.
+
+    The rollout is read backwards in chunks until a turn record is found, so a turn of any length
+    is seen. OSError from reading the rollout propagates.
 
     Args:
-        found: Decoded parent rollout records.
+        path: The parent rollout file.
 
     Returns:
-        True when the last turn record is a `task_started`.
+        False when the last turn record ends a turn; True when it starts one or none exists.
     """
-    running = False
-    for record in found:
-        kind = body(record).get("type")
-        if kind == TURN_STARTED:
-            running = True
-        elif kind in TURN_ENDED:
-            running = False
-    return running
+    with path.open("rb") as handle:
+        end = handle.seek(0, 2)
+        rest = b""
+        while end > 0:
+            start = max(0, end - SCAN_CHUNK_BYTES)
+            handle.seek(start)
+            lines = (handle.read(end - start) + rest).split(b"\n")
+            rest = lines.pop(0) if start else b""
+            for line in reversed(lines):
+                kind = turn_kind(line)
+                if kind:
+                    return kind == TURN_STARTED
+            end = start
+    return True
+
+
+def turn_kind(line: bytes) -> str | None:
+    """Return a rollout line's turn record type.
+
+    Args:
+        line: One raw rollout line.
+
+    Returns:
+        TURN_STARTED or a TURN_ENDED type when the line is that record, else None.
+    """
+    if not any(marker in line for marker in TURN_MARKERS):
+        return None
+    record = rollout.parse(line)
+    kind = body(record).get("type") if record is not None else None
+    return kind if kind == TURN_STARTED or kind in TURN_ENDED else None
 
 
 def started_since(path: Path, tail_bytes: int, offset: int) -> bool:
@@ -362,7 +389,7 @@ def skip_reason(job: Job, mark: int, marker: Path) -> str:
         Why the wake is not needed, or an empty string.
     """
     path = Path(job.rollout)
-    if busy(records(path, job.tail_bytes)):
+    if busy(path):
         return "root is in a turn"
     if started_since(path, job.tail_bytes, mark):
         return "root already took a turn"
@@ -450,7 +477,7 @@ def wake(
     """
     found, mark = await_completion(job, clock, sleep)
     name = found or job.agent
-    if busy(records(Path(job.rollout), job.tail_bytes)):
+    if busy(Path(job.rollout)):
         return Outcome(SKIPPED, "root is in a turn", name, matched=found is not None)
     wakes = Path(job.state_dir) / WAKES_DIR
     marker = wakes / f"{job.root}.json"

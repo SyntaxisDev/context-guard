@@ -168,6 +168,14 @@ class WakeTests(WakeCase):
         self.assertEqual((result.outcome, result.reason), (waker.SKIPPED, "root is in a turn"))
         self.run.assert_not_called()
 
+    def test_the_last_turn_record_decides_however_far_back_it_is(self) -> None:
+        filler = {"type": "response_item", "payload": {"type": "message", "text": "task_complete " * 100}}
+        self.append(turn("task_started"), *[filler] * 3000, completed(self.agent))
+        result = self.wake(dataclasses.replace(self.job(), tail_bytes=4096))
+        self.assertEqual((result.outcome, result.reason), (waker.SKIPPED, "root is in a turn"))
+        self.append(turn("task_complete"), *[filler] * 3000, completed(self.agent))
+        self.assertEqual(self.wake(dataclasses.replace(self.job(), tail_bytes=4096)).outcome, waker.SENT)
+
     def test_a_root_that_took_a_turn_during_the_settle_delay_is_not_woken(self) -> None:
         self.append(completed(self.agent))
         self.time.actions[1] = [lambda: self.append(turn("task_started"), turn("task_complete"))]
