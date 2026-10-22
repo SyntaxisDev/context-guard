@@ -30,6 +30,7 @@ ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
 RUNTIMES = ("cursor", "codex", "claude")
 HOOK_SECONDS = 30
+WAKE_PARENT_ENV = "CONTEXT_GUARD_SUBAGENTS_WAKE_PARENT"
 VARINT_PAYLOAD = 0x7F
 STRING = {"type": "string"}
 COMMON_CLAUDE = {
@@ -338,12 +339,15 @@ def hook_env(home: Path, extra: dict | None = None) -> dict:
         extra: Variables added after the defaults.
 
     Returns:
-        The current environment without CONTEXT_GUARD_* variables or PYTHONPATH.
+        The current environment without CONTEXT_GUARD_* variables, PYTHONPATH or CODEX_HOME, with the
+        Codex root waker off unless `extra` turns it on, so no hook starts a detached process.
     """
     env = {
-        key: value for key, value in os.environ.items() if not key.startswith("CONTEXT_GUARD_") and key != "PYTHONPATH"
+        key: value
+        for key, value in os.environ.items()
+        if not key.startswith("CONTEXT_GUARD_") and key not in ("PYTHONPATH", "CODEX_HOME")
     }
-    env.update({"HOME": str(home), **(extra or {})})
+    env.update({"HOME": str(home), WAKE_PARENT_ENV: "0", **(extra or {})})
     return env
 
 

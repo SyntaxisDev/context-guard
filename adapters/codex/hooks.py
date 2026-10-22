@@ -1,7 +1,8 @@
 """Codex lifecycle hooks: `python hooks.py <event>` reads the hook payload on stdin and prints the response.
 
 Subagent hooks carry the parent's session_id and transcript_path, so leaf state is keyed by agent_id
-and tokens come from the subagent's own rollout. Every failure path prints `{}` (fail open).
+and tokens come from the subagent's own rollout. SubagentStop only starts the detached waker that
+wakes an idle root (`waker.py`). Every failure path prints `{}` (fail open).
 """
 
 import datetime as dt
@@ -15,7 +16,7 @@ KIT = Path(__file__).resolve().parents[2]
 if str(KIT) not in sys.path:
     sys.path.insert(0, str(KIT))
 
-from adapters.codex import mapping, rollout, runner, tools
+from adapters.codex import mapping, rollout, runner, tools, waker
 from core import config as config_mod, hook, install, render
 from core.observation import BLOCK, COMPACT, CONTEXT, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
 
@@ -270,6 +271,30 @@ def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
     return config_mod.load_config(config_mod.sources_for(RUNTIME, home, ADAPTER_CONFIG), environ)
 
 
+def subagent_stop(
+    payload: dict[str, object], config: dict, home: Path, environ: Mapping[str, str]
+) -> dict[str, object]:
+    """Start the root waker for a finished subagent and pass.
+
+    Invalid payload fields raise ValueError from `check_payload`; OSError from starting the waker
+    propagates. `run` turns both into a pass.
+
+    Args:
+        payload: Decoded SubagentStop payload object.
+        config: Loaded Codex adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Hook environment; it may set CODEX_HOME.
+
+    Returns:
+        `{}`: the stop itself is never held.
+    """
+    check_payload(mapping.SUBAGENT_STOP, payload)
+    agent = payload.get("agent_id")
+    if agent and AGENT_ID.fullmatch(agent):
+        waker.start(payload, agent, config, home, environ)
+    return {}
+
+
 def handle(
     event_name: str, payload: object, config: dict, home: Path, environ: Mapping[str, str] | None = None
 ) -> dict[str, object]:
@@ -285,9 +310,11 @@ def handle(
         environ: Environment that may set CODEX_HOME; None reads the process environment.
 
     Returns:
-        The native response; `{}` for unknown events, non-object payloads and Stop
+        The native response; `{}` for SubagentStop, unknown events, non-object payloads and Stop
         continuations already in progress.
     """
+    if event_name == mapping.SUBAGENT_STOP and isinstance(payload, dict):
+        return subagent_stop(payload, config, home, os.environ if environ is None else environ)
     if event_name not in EVENTS or not isinstance(payload, dict):
         return {}
     if event_name == STOP_EVENT and payload.get("stop_hook_active") is True:

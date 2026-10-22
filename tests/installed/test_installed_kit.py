@@ -206,7 +206,7 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(version, "True")
         expected = {
             "cursor": {"sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop"},
-            "codex": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"},
+            "codex": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SubagentStop"},
             "claude": {
                 "SessionStart",
                 "UserPromptSubmit",

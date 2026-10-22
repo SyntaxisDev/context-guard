@@ -150,7 +150,9 @@ note), `block`, `resend`,
 effort), `subagent_budget` (role, budget), `subagent_unreturned` (Cursor: role, agent, parent stop
 status, for a Task subagent whose result never reached the parent), `subagent_orphaned` (Cursor:
 role, agent, for a foreground subagent the parent moved on from), `subagent_silent` (Cursor and Claude
-Code: role, agent, minutes without activity; wording shared in `core/subagent_notes.py`).
+Code: role, agent, minutes without activity; wording shared in `core/subagent_notes.py`),
+`subagent_wake` (Codex: outcome `sent`, `skipped` or `failed`, reason, agent, name, matched, for
+the idle-root wake after a background subagent finished; session is the root thread).
 
 ## Configuration
 

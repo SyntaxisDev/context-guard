@@ -197,11 +197,11 @@ class HooksJsonTests(SpecCase):
         install.apply(install.plan_uninstall(self.spec, manifest), manifest_file, self.home / "backups")
         self.assertEqual(hooks_json.read_text(), original)
 
-    def test_reinstall_retires_a_subagent_stop_registration(self) -> None:
+    def test_reinstall_keeps_one_subagent_stop_registration(self) -> None:
         command = f"{self.python} {self.kit / mapping.HOOK_SCRIPT} SubagentStop"
         stale = {"hooks": [{"type": "command", "command": command}]}
         merged = self.merge.merge({"hooks": {"SubagentStop": [stale]}})
-        self.assertNotIn("SubagentStop", merged["hooks"])
+        self.assertEqual(self.commands(merged)["SubagentStop"], [command])
         self.assertEqual(set(merged["hooks"]), set(mapping.HOOK_EVENTS))
 
     def test_a_command_that_only_mentions_the_hook_script_is_not_ours(self) -> None:

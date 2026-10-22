@@ -149,7 +149,7 @@ COMPOSER_KEYS = (
     "isAgentic",
 )
 DEFAULT_TOOL_NAMESPACES = ("", "functions")
-CODEX_SCHEMAS = ("session-start", "user-prompt-submit", "post-tool-use", "stop")
+CODEX_SCHEMAS = ("session-start", "user-prompt-submit", "post-tool-use", "stop", "subagent-stop")
 SCHEMA_MARK = re.compile(rb"\.command\.(input|output)\{")
 PATCH = f"*** Begin Patch\n*** Update File: {PROJECT_TOKEN}/file.py\n@@\n-old\n+new\n*** End Patch\n"
 
@@ -595,7 +595,8 @@ def codex_pool(root: dict, child: dict) -> dict:
         child: The subagent rollout facts.
 
     Returns:
-        Payload field values, the spawn_agent arguments under `spawn` and the subagent fields under `child`.
+        Payload field values, the spawn_agent arguments under `spawn`, the subagent fields under `child`
+        and its rollout under `child_path`.
     """
     turn, meta = root["turn"], root["meta"]
     spawn_args = json.loads(root["spawn"].get("arguments") or "{}")
@@ -613,6 +614,7 @@ def codex_pool(root: dict, child: dict) -> dict:
         "tool_use_id": (root.get("call") or root["spawn"]).get("call_id", "call_0"),
         "spawn": spawn_args,
         "spawn_tool": hook_tool_name(root["spawn"]),
+        "child_path": child["path"],
         "child": {
             "agent_id": child["meta"]["id"],
             "agent_type": child["meta"].get("agent_role") or "default",
@@ -644,6 +646,7 @@ def codex_cases(pool: dict) -> dict[str, tuple[str, dict]]:
         "PostToolUse-spawn-agent": ("PostToolUse", {"tool_name": pool["spawn_tool"], "tool_input": pool["spawn"]}),
         "PostToolUse-subagent-bash": ("PostToolUse", {**bash, **agent}),
         "Stop-root": ("Stop", {}),
+        "SubagentStop-subagent": ("SubagentStop", {**agent, "agent_transcript_path": pool["child_path"]}),
     }
 
 

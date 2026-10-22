@@ -1,0 +1,18 @@
+{
+  "event": "SubagentStop",
+  "payload": {
+    "agent_id": "f80875e8-b7a1-857e-935c-1749ad41fd0f",
+    "agent_transcript_path": "{HOME}/.codex/sessions/2026/10/21/rollout-2026-10-21T23-17-31-f80875e8-b7a1-857e-935c-1749ad41fd0f.jsonl",
+    "agent_type": "implementer",
+    "cwd": "{PROJECT}",
+    "hook_event_name": "SubagentStop",
+    "last_assistant_message": "<scrubbed>",
+    "model": "gpt-6.1-sol",
+    "permission_mode": "default",
+    "session_id": "df7eedc4-b6b5-e6eb-2920-6e10d804c504",
+    "stop_hook_active": false,
+    "transcript_path": "{HOME}/.codex/sessions/2026/10/21/rollout-2026-10-21T20-57-43-df7eedc4-b6b5-e6eb-2920-6e10d804c504.jsonl",
+    "turn_id": "f9ac80e8-5a3a-ab80-f453-7b8c58f9113a"
+  },
+  "source": "Codex rollout values (session_meta, turn_context, spawn_agent call) shaped by the codex binary schema"
+}

@@ -26,6 +26,7 @@ EVENT_NAMES = frozenset(
         "subagent_unreturned",
         "subagent_orphaned",
         "subagent_silent",
+        "subagent_wake",
     }
 )
 
