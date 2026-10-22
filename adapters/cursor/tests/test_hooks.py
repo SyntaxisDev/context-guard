@@ -441,6 +441,18 @@ class SubagentTrackingTests(CursorHookCase):
         self.assertEqual(self.parent_tool_at(30), {})
         self.assertEqual(self.details("subagent_silent"), [])
 
+    def test_ended_transcript_retires_a_background_spawn_whose_task_payloads_name_no_transcript(self) -> None:
+        self.at(0, "preToolUse-task", transcript_path=None)
+        self.at(1, "postToolUse-subagent-read", transcript_path=None)
+        output = json.dumps({"status": "success", "agentId": self.agent, "durationMs": 144, "isBackground": True})
+        self.at(1, "postToolUse-task", tool_use_id=self.call, tool_output=output, transcript_path=None)
+        self.transcript().parent.mkdir(parents=True)
+        lines = [{"role": "assistant", "message": {"content": []}}, {"type": "turn_ended", "status": "success"}]
+        self.transcript().write_text("".join(json.dumps(line) + "\n" for line in lines))
+        self.assertEqual(self.parent_tool_at(13), {})
+        self.assertEqual(self.parent_tool_at(30), {})
+        self.assertEqual(self.details("subagent_silent"), [])
+
     def test_parent_moving_on_without_a_foreground_result_gets_one_orphan_note(self) -> None:
         self.at(0, "preToolUse-task")
         self.at(1, "postToolUse-subagent-read")

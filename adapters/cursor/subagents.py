@@ -5,6 +5,8 @@ until the parent's Task result arrives; a parent stop turns every foreground spa
 into an unreturned note. A background spawn, or a foreground one whose parent moved on without
 its result (orphaned, e.g. after Cursor retried a dropped parent request), is detached: it runs
 until the subagent's own stop hook completes or its transcript ends with a `turn_ended` record.
+Background subagents may finish without a stop hook, and Task payloads may report no transcript
+path, so the transcript directory is also taken from the parent's later hooks.
 Any spawn silent past the configured threshold raises a note once per silence period. Notes
 wait in the parent's state and reach it on its next tool result or session start.
 """
@@ -15,7 +17,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from adapters.cursor.mapping import RUNTIME
-from core import events, policy, state as state_mod
+from core import events, policy, state as state_mod, subagent_notes
 from core.config import valid_text
 from core.observation import CONTEXT, NOTE, SESSION, SPAWN, STOP, TOOL, Decision, Observation
 
@@ -27,7 +29,6 @@ ORPHAN_GRACE_SECONDS = 30
 SUBAGENT_DIR = "subagents"
 TAIL_BYTES = 4096
 TURN_ENDED = "turn_ended"
-RECOVERY = "It may have died or be stuck: check its progress file and transcript; cancel its jobs before re-spawning."
 
 
 def clock() -> float:
@@ -116,6 +117,26 @@ def transcript_dir(payload: dict[str, object]) -> str | None:
     """
     path = payload.get("transcript_path")
     return str(Path(path).parent / SUBAGENT_DIR) if valid_text(path) and path else None
+
+
+def located(record: dict, payload: dict[str, object]) -> dict:
+    """Fill in a spawn's transcript directory from a later parent hook when its spawn did not report one.
+
+    Task spawn and result payloads may carry a null `transcript_path` while the parent's other
+    hooks carry it.
+
+    Args:
+        record: The adapter section of the spawn record.
+        payload: The validated hook payload of the parent.
+
+    Returns:
+        The record, with `transcripts` added when it had none and the payload names one.
+    """
+    directory = record.get("transcripts")
+    if valid_text(directory) and directory:
+        return record
+    fallback = transcript_dir(payload)
+    return {**record, "transcripts": fallback} if fallback else record
 
 
 def remember_spawn(directory: Path, payload: dict[str, object], role: str | None) -> None:
@@ -276,9 +297,7 @@ def subject(record: dict) -> str:
     Returns:
         Text such as "Subagent `implementer` (agent <id>)".
     """
-    role, agent = record.get("role"), record.get("agent")
-    text = "Subagent" + (f" `{role}`" if valid_text(role) else "")
-    return text + (f" (agent {agent})" if valid_text(agent) else "")
+    return subagent_notes.subject(record.get("role"), record.get("agent"))
 
 
 def unreturned_note(record: dict) -> str:
@@ -328,9 +347,7 @@ def silent_note(record: dict, minutes: int) -> str:
     Returns:
         The note text.
     """
-    path = transcript(record)
-    where = f" Transcript: {path}." if path is not None else ""
-    return f"[context-guard] {subject(record)} has been silent for {minutes} minutes.{where} {RECOVERY}"
+    return subagent_notes.silent_note(record.get("role"), record.get("agent"), transcript(record), minutes)
 
 
 def detail(record: dict, **extra: object) -> dict[str, object]:
@@ -363,7 +380,7 @@ def close_spawns(config: dict, directory: Path, payload: dict[str, object]) -> N
     calls = listed(read_adapter(state_path(directory, parent)), OPEN_SPAWNS)
     if not calls:
         return
-    records = [read_record(directory, call) for call in calls]
+    records = [located(read_record(directory, call), payload) for call in calls]
     move_spawns(directory, parent, calls, detach=False, notes=list(map(unreturned_note, records)))
     obs, status = Observation(RUNTIME, parent, STOP), payload.get("status") or "completed"
     logged = [events.record("subagent_unreturned", obs, detail=detail(item, status=status)) for item in records]
@@ -409,7 +426,7 @@ def detect_orphans(config: dict, directory: Path, payload: dict[str, object], no
         return
     calls = listed(read_adapter(state_path(directory, parent)), OPEN_SPAWNS)
     started = now - duration / 1000
-    records = {call: read_record(directory, call) for call in calls}
+    records = {call: located(read_record(directory, call), payload) for call in calls}
     orphans = [
         call
         for call, record in records.items()
@@ -424,7 +441,7 @@ def detect_orphans(config: dict, directory: Path, payload: dict[str, object], no
 
 
 def silence_scan(
-    directory: Path, adapter: dict, threshold: float, now: float
+    directory: Path, adapter: dict, payload: dict[str, object], threshold: float, now: float
 ) -> tuple[list[str], list[tuple[str, dict, int]]]:
     """Find a parent's detached spawns that finished and spawns silent past the threshold.
 
@@ -434,6 +451,7 @@ def silence_scan(
     Args:
         directory: Cursor state directory.
         adapter: The adapter section of the parent's state.
+        payload: The validated hook payload of the parent, which may name the transcript directory.
         threshold: Seconds of silence that raise a note.
         now: Current time in epoch seconds.
 
@@ -443,7 +461,7 @@ def silence_scan(
     """
     detached, done, silent = listed(adapter, DETACHED), [], []
     for call in listed(adapter, OPEN_SPAWNS) + detached:
-        record = read_record(directory, call)
+        record = located(read_record(directory, call), payload)
         mark = record.get("active", record.get("spawned"))
         floor = min(threshold, ACTIVITY_SECONDS) if call in detached else threshold
         if not isinstance(mark, int) or now - mark < floor:
@@ -471,7 +489,7 @@ def check_silence(config: dict, directory: Path, payload: dict[str, object], now
     if not listed(adapter, OPEN_SPAWNS) and not listed(adapter, DETACHED):
         return
     threshold = config["subagents"]["silence_minutes"] * 60
-    done, silent = silence_scan(directory, adapter, threshold, now)
+    done, silent = silence_scan(directory, adapter, payload, threshold, now)
     if not done and not silent:
         return
     for call, _, mark in silent:
