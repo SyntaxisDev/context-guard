@@ -17,7 +17,7 @@ Long chats consume context and increase per-step cost. Keep the main chat focuse
 - Give every subagent a self-contained brief: goal, paths, constraints, and the expected output (at most ~30 lines; anything longer goes to a file whose path it returns).
 - For a subagent expected to run more than a few minutes, name a progress file under /tmp in the brief; it appends each finished step, plus any started job/run IDs with their check and cancel commands.
 - When `runner` reports several independent errors, fix them in parallel (one implementer per group) instead of one round trip each.
-- Spawn every subagent in the background where the runtime supports it, launching independent ones together in one message, since a user message stops the current turn's foreground subagents and a dropped connection can orphan a long one. Tell the user what is running, end your turn, and pick up each result as it arrives as a new turn. Use a foreground subagent only for a short lookup (under ~2 minutes) whose answer your very next step needs.
+- Spawn every subagent in the background where the runtime supports it, launching independent ones together in one message, since a user message stops the current turn's foreground subagents and a dropped connection can orphan a long one. Tell the user what is running, end your turn, and pick up each result as it arrives as a new turn; where the runtime does not start that turn itself, context-guard does with a short `[context-guard]` message. Do not poll or wait on running subagents. Use a foreground subagent only for a short lookup (under ~2 minutes) whose answer your very next step needs.
 
 ### Reporting delegated work
 

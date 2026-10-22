@@ -4,6 +4,16 @@ Context-guard provides context warnings, task handoffs and delegation support fo
 Cursor, Codex and Claude Code. Layout and contracts are in `docs/architecture.md`.
 Python is 3.14+ and standard library only; run everything through `uv`.
 
+## Runtime parity
+
+context-guard is universal. Every feature (warnings, handoffs, delegation policy, subagent
+tracking and delivery of subagent results) is designed for all three runtimes at once: shared
+behaviour in `content/` and `core/`, with an equivalent in each adapter. When a runtime lacks a
+native mechanism, build the closest equivalent in its adapter or document the gap and its reason
+in `docs/<runtime>.md`; never ship a feature or fix for one runtime only without that decision.
+Shared policy text must hold for every runtime; runtime-specific wording goes through adapter
+mapping placeholders.
+
 ## Code ownership
 
 - `content/` is the single source of shipped text: `policy/`, `roles/` (`roles.json` plus

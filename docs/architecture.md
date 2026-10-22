@@ -18,6 +18,10 @@ Data flows `content -> core.render -> adapter mapping -> native files`, and
 Python is 3.14+, standard library only. `core/` never imports an adapter and never names a
 runtime home; every home and path is passed in. An adapter never reads another runtime's home.
 
+Every feature has an equivalent in all three adapters. Where a runtime has no native mechanism,
+its adapter supplies the closest equivalent, or `docs/<runtime>.md` states the gap and why.
+Shared policy text holds for every runtime; runtime-specific wording comes from mapping placeholders.
+
 ## Adapter contract
 
 No dispatcher superclass. Each adapter supplies functions:
