@@ -248,7 +248,7 @@ smoke_hint() {
             elif grep -qE '"api_error_status": *401|authentication_failed|OAuth|[Tt]oken (has )?expired|/login' "$2"; then
                 echo "run claude, then /login"
             fi ;;
-        codex*) if grep -qiE '401 Unauthorized|"status": *401|not logged in|codex login' "$2"; then echo "run codex login"; fi ;;
+        codex*) if grep -v 'MCP server' "$2" | grep -qiE '401 Unauthorized|"status": *401|not logged in|codex login'; then echo "run codex login"; fi ;;
         cursor*) if grep -qiE 'not logged in|log ?in required|cursor-agent login' "$2"; then echo "run cursor-agent login"; fi ;;
     esac
 }
