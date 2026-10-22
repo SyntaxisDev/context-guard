@@ -64,7 +64,7 @@ def expected(rec: harness.Recorded, state: str = "armed") -> str:
     if rec.name == "stop-aborted" or rec.event not in registered_events(rec.runtime):
         return "pass"
     if rec.subagent:
-        return "pass" if rec.event == "preToolUse" else "budget"
+        return "pass" if rec.event in ("preToolUse", "SubagentStop") else "budget"
     return ROOT_EXPECTED[rec.event]
 
 

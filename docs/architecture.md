@@ -149,8 +149,8 @@ note), `block`, `resend`,
 `subagent_spawn` (role, tier, model,
 effort), `subagent_budget` (role, budget), `subagent_unreturned` (Cursor: role, agent, parent stop
 status, for a Task subagent whose result never reached the parent), `subagent_orphaned` (Cursor:
-role, agent, for a foreground subagent the parent moved on from), `subagent_silent` (Cursor: role,
-agent, minutes without activity).
+role, agent, for a foreground subagent the parent moved on from), `subagent_silent` (Cursor and Claude
+Code: role, agent, minutes without activity; wording shared in `core/subagent_notes.py`).
 
 ## Configuration
 

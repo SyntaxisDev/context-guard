@@ -12,5 +12,8 @@
   "hook_output": {
     "context_chars": 10000,
     "tool_note_chars": 2000
+  },
+  "subagents": {
+    "silence_minutes": 10
   }
 }

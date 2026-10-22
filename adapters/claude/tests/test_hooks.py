@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from adapters.claude import hooks, transcript
+from adapters.claude import hooks, subagents, transcript
 from core import policy
 from core.runner.provider import INTERNAL_ENV
 from tests import harness
@@ -17,9 +17,11 @@ RECORDED = {
     "Stop": "Stop-root",
     "PreCompact": "PreCompact-auto",
     "PostCompact": "PostCompact-auto",
+    "SubagentStop": "SubagentStop-subagent",
 }
 FUTURE = "2099-01-01T00:00:00Z"
 MODEL = "claude-sonnet-5-5"
+START = 1_800_000_000.0
 
 
 class HookTestCase(harness.RuntimeHookCase):
@@ -351,6 +353,70 @@ class LeafAndEventTests(HookTestCase):
             [entry["detail"] for entry in self.logged() if entry["event"] == "handoff_requested"],
             [{"source": "unwritten"}],
         )
+
+
+class SilentSubagentTests(HookTestCase):
+    """Background subagents silent past the threshold leave one note per silence period for the parent."""
+
+    agent = "a4b66ab873f0ba277"
+
+    def at(self, minutes: float, event: str, **extra: object) -> dict:
+        with patch.object(subagents, "clock", return_value=START + minutes * 60):
+            return self.hook(event, **extra)
+
+    def spawn(self, status: str = "async_launched") -> None:
+        response = {"isAsync": True, "status": status, "agentId": self.agent, "canContinueAgent": True}
+        data = {"subagent_type": "context-guard:investigator", "description": "audit", "prompt": "audit"}
+        self.at(0, "PostToolUse", tool_name="Agent", tool_input=data, tool_response=response)
+
+    def parent_tool(self, minutes: float) -> dict:
+        return self.at(minutes, "PostToolUse", tool_name="Bash", tool_input={"command": "true"})
+
+    def child_tool(self, minutes: float) -> dict:
+        return self.at(minutes, "PostToolUse", agent_id=self.agent, agent_type="investigator", tool_name="Read")
+
+    def silent(self) -> list[dict]:
+        return [entry["detail"] for entry in self.logged() if entry["event"] == "subagent_silent"]
+
+    def test_silent_background_subagent_gets_one_note_per_silence_period(self) -> None:
+        self.spawn()
+        self.child_tool(1)
+        self.assertEqual(self.parent_tool(10), {})
+        note = self.context(self.parent_tool(11.5), "PostToolUse")
+        transcript_path = self.transcript.with_suffix("") / "subagents" / f"agent-{self.agent}.jsonl"
+        self.assertIn(f"Subagent `investigator` (agent {self.agent}) has been silent for 10 minutes", note)
+        self.assertIn(f"Transcript: {transcript_path}.", note)
+        self.assertIn("cancel its jobs before re-spawning", note)
+        self.assertEqual(self.parent_tool(30), {})
+        self.child_tool(31)
+        self.assertEqual(self.parent_tool(40), {})
+        prompt = self.context(self.at(41, "UserPromptSubmit", prompt="any news?"), "UserPromptSubmit")
+        self.assertIn("silent for 10 minutes", prompt)
+        self.assertEqual(self.silent(), [{"role": "investigator", "agent": self.agent, "minutes": 10}] * 2)
+
+    def test_subagent_stop_ends_tracking(self) -> None:
+        self.spawn()
+        self.at(2, "SubagentStop", agent_id=self.agent, agent_type="investigator")
+        self.assertEqual(self.parent_tool(30), {})
+        self.assertEqual(self.silent(), [])
+
+    def test_foreground_result_is_not_tracked(self) -> None:
+        self.spawn(status="completed")
+        self.assertEqual(self.parent_tool(30), {})
+        self.assertEqual(self.silent(), [])
+
+    def test_silence_note_reaches_a_new_session_start_and_follows_the_user_config(self) -> None:
+        self.config["subagents"]["silence_minutes"] = 3
+        self.spawn()
+        context = self.context(self.at(4, "SessionStart", source="resume"), "SessionStart")
+        self.assertIn(f"Subagent `investigator` (agent {self.agent}) has been silent for 4 minutes", context)
+
+    def test_blocked_prompt_keeps_the_note_for_the_next_tool_result(self) -> None:
+        self.spawn()
+        self.usage(250_000)
+        blocked = self.at(11, "UserPromptSubmit", prompt="go")
+        self.assertNotIn("silent", blocked["reason"])
+        self.assertIn("silent for 12 minutes", self.context(self.parent_tool(12), "PostToolUse"))
 
 
 class EntryPointTests(harness.HookBoundaryChecks, HookTestCase):

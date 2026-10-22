@@ -207,7 +207,15 @@ class InstallTests(unittest.TestCase):
         expected = {
             "cursor": {"sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop"},
             "codex": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop"},
-            "claude": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "PreCompact", "PostCompact"},
+            "claude": {
+                "SessionStart",
+                "UserPromptSubmit",
+                "PostToolUse",
+                "Stop",
+                "PreCompact",
+                "PostCompact",
+                "SubagentStop",
+            },
         }
         for runtime, events in expected.items():
             with self.subTest(runtime=runtime):

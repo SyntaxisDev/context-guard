@@ -1,7 +1,8 @@
 """Claude Code hooks: `hooks.py <HookEvent>` reads the hook payload on stdin and prints the response.
 
 Payloads carrying agent_id come from subagents: they run in leaf mode on the subagent's own
-transcript and never touch the parent session. The context window is the learned
+transcript; of the parent session they only touch its background spawn bookkeeping
+(`subagents.py`). The context window is the learned
 auto-compaction point when known, else the configured window for the model.
 """
 
@@ -14,7 +15,7 @@ KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
 
-from adapters.claude import runner, transcript
+from adapters.claude import runner, subagents, transcript
 from core import config as config_mod, handoffs, hook, spawn, state as state_mod
 from core.observation import (
     BLOCK,
@@ -35,7 +36,8 @@ from core.observation import (
 RUNTIME = "claude"
 ADAPTER_CONFIG = Path(__file__).resolve().parent / "config.json"
 OBSERVED = {"SessionStart": SESSION, "UserPromptSubmit": PROMPT, "PostToolUse": TOOL, "Stop": STOP}
-BOOKKEEPING = ("PreCompact", "PostCompact")
+SUBAGENT_STOP = "SubagentStop"
+BOOKKEEPING = ("PreCompact", "PostCompact", SUBAGENT_STOP)
 HOOK_EVENTS = (*OBSERVED, *BOOKKEEPING)
 LEAF_EVENTS = ("UserPromptSubmit", "PostToolUse")
 COMPACT_SOURCE = "compact"
@@ -494,7 +496,7 @@ def observed(event: str, payload: dict[str, object], config: dict, home: Path) -
     """
     if payload.get("agent_id"):
         return observe_leaf(event, payload, config, home) if event in LEAF_EVENTS else None
-    if not payload.get("session_id"):
+    if not payload.get("session_id") or event == SUBAGENT_STOP:
         return None
     directory = config_mod.state_dir(config, home, RUNTIME)
     if event == "PreCompact":
@@ -522,6 +524,9 @@ def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, o
     """
     if event not in HOOK_EVENTS or not valid_payload(payload):
         return {}
+    directory = config_mod.state_dir(config, home, RUNTIME)
+    data = payload.get("tool_input")
+    subagents.track(event, payload, role_name(data.get("subagent_type")) if isinstance(data, dict) else None, directory)
     obs = observed(event, payload, config, home)
     if obs is None:
         return {}
@@ -533,6 +538,7 @@ def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, o
         lambda decision: respond(decision, event, config),
         lambda response: "hookSpecificOutput" in response,
         plugin_policy,
+        lambda decision: subagents.deliver(obs, decision, config, directory),
     )
 
 
