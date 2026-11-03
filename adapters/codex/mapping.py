@@ -160,6 +160,7 @@ def runtime_mapping(config: dict) -> RuntimeMapping:
         override_syntax=OVERRIDE_SYNTAX,
         transcripts=TRANSCRIPTS,
         channel="session_context",
+        parent_resume="adapter",
         describe_tier=describe_tier,
         render_agent=render_agent,
         skills_dir=SKILLS_DIR,

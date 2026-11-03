@@ -22,6 +22,7 @@ CODEX_WINDOW = 258_400
 ROOT_PROMPTS = {
     "cursor": "beforeSubmitPrompt-root",
     "codex": "UserPromptSubmit-root",
+    "genie": "UserPromptSubmit-root",
     "claude": "UserPromptSubmit-root",
 }
 USER_FILES = {
@@ -36,6 +37,12 @@ USER_FILES = {
     + "\n",
     ".codex/config.toml": 'model = "gpt-6.1-sol"\n\n[features]\nweb_search = true\n',
     ".codex/AGENTS.md": "# My global Codex notes\n",
+    ".genie/hooks.json": json.dumps(
+        {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "say done"}]}]}}, indent=2
+    )
+    + "\n",
+    ".genie/config.toml": 'model = "gpt-6.1-sol"\n\n[features]\nweb_search = true\n',
+    ".genie/AGENTS.md": "# My global Genie notes\n",
     ".claude/settings.json": json.dumps(
         {
             "model": "sonnet",
@@ -85,7 +92,11 @@ def registered(home: Path) -> dict[str, dict[str, str]]:
             if kit_command(entry.get("command", ""), home)
         }
     }
-    for runtime, path in (("codex", ".codex/hooks.json"), ("claude", ".claude/settings.json")):
+    for runtime, path in (
+        ("codex", ".codex/hooks.json"),
+        ("genie", ".genie/hooks.json"),
+        ("claude", ".claude/settings.json"),
+    ):
         hooks = json.loads((home / path).read_text())["hooks"]
         found[runtime] = {
             event: hook["command"]
@@ -181,7 +192,7 @@ class HomeResolutionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         override = Path(temporary.name) / "override"
-        passing = {"cursor": {"continue": True}, "codex": {}, "claude": {}}
+        passing = {"cursor": {"continue": True}, "codex": {}, "genie": {}, "claude": {}}
         for runtime in harness.RUNTIMES:
             with self.subTest(runtime=runtime):
                 session = str(uuid.uuid4())
@@ -208,6 +219,7 @@ class InstallTests(unittest.TestCase):
         expected = {
             "cursor": {"sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop"},
             "codex": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SubagentStop"},
+            "genie": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SubagentStop"},
             "claude": {
                 "SessionStart",
                 "UserPromptSubmit",
@@ -235,7 +247,10 @@ class InstallTests(unittest.TestCase):
         codex_config = (Kit.home / ".codex/config.toml").read_text()
         self.assertTrue(codex_config.startswith(USER_FILES[".codex/config.toml"]))
         self.assertEqual(tomllib.loads(codex_config)["sandbox_workspace_write"]["writable_roots"], [str(handoffs)])
-        for name in (".codex/AGENTS.md", ".claude/CLAUDE.md"):
+        genie_config = (Kit.home / ".genie/config.toml").read_text()
+        self.assertTrue(genie_config.startswith(USER_FILES[".genie/config.toml"]))
+        self.assertEqual(tomllib.loads(genie_config)["sandbox_workspace_write"]["writable_roots"], [str(handoffs)])
+        for name in (".codex/AGENTS.md", ".genie/AGENTS.md", ".claude/CLAUDE.md"):
             self.assertEqual((Kit.home / name).read_text(), USER_FILES[name])
 
     def test_doctor_is_clean(self) -> None:
@@ -314,6 +329,41 @@ class CodexInstalledTests(InstalledCase):
         self.assertEqual(self.walked(), ["note", "note_delivered", "handoff_requested", "block", "resend"])
 
 
+class GenieInstalledTests(InstalledCase):
+    """The installed Genie hooks walk note, refresh, block and resend."""
+
+    runtime = "genie"
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.rollout = self.home / f".genie/sessions/2026/10/18/rollout-2026-10-18T09-00-00-{self.session}.jsonl"
+
+    def ids(self) -> dict:
+        return {"session_id": self.session, "transcript_path": str(self.rollout)}
+
+    def tokens(self, count: int) -> None:
+        harness.write_rollout(self.rollout, count, CODEX_WINDOW)
+
+    def context(self, response: dict) -> str:
+        return response["hookSpecificOutput"]["additionalContext"]
+
+    def test_registered_commands_list_note_refresh_block_and_resend(self) -> None:
+        handoff = self.handoff_file()
+        context = self.context(self.fire("SessionStart-startup"))
+        self.assertIn(str(handoff), context)
+        self.assertIn("spawn_agent", context)
+        self.tokens(160_000)
+        self.assertTrue(self.context(self.fire("UserPromptSubmit-root", prompt="Ship it")).startswith("Context check"))
+        self.assertEqual(self.fire("PostToolUse-exec", tool_input="text('done')"), {})
+        self.assertTrue(self.fire("Stop-root")["reason"].startswith("[context-guard]"))
+        self.tokens(250_000)
+        blocked = self.fire("UserPromptSubmit-root", prompt="Next step")
+        self.assertEqual(blocked["decision"], "block")
+        self.assertIn("250k", blocked["reason"])
+        self.assertEqual(self.fire("UserPromptSubmit-root", prompt="Next step"), {})
+        self.assertEqual(self.walked(), ["note", "note_delivered", "handoff_requested", "block", "resend"])
+
+
 class ClaudeInstalledTests(InstalledCase):
     """The installed Claude Code hooks walk note, refresh, block and resend."""
 
@@ -362,6 +412,7 @@ class UninstallTests(unittest.TestCase):
         for runtime, fixture in (
             ("cursor", "sessionStart-root"),
             ("codex", "SessionStart-startup"),
+            ("genie", "SessionStart-startup"),
             ("claude", "SessionStart-startup"),
         ):
             data = harness.payload(runtime, fixture, home, project)
@@ -378,7 +429,7 @@ class UninstallTests(unittest.TestCase):
         self.assertFalse((home / ".context-guard/kit").exists())
         leftovers = [
             str(p.relative_to(home))
-            for runtime in (".cursor", ".codex", ".claude")
+            for runtime in (".cursor", ".codex", ".genie", ".claude")
             for p in (home / runtime).rglob("*")
             if p.is_file() and p.relative_to(home).as_posix() not in files
         ]
@@ -392,6 +443,7 @@ class UninstallTests(unittest.TestCase):
             ".cursor/hooks.json": '{"version": 1,\n    "hooks": {"stop": [{"command": "say done"}]}}',
             ".claude/settings.json": '{\n    "model": "opus"\n}',
             ".codex/config.toml": 'model = "gpt-6.1-sol"',
+            ".genie/config.toml": 'model = "gpt-6.1-sol"',
         }
         self.assert_restored(self.install_then_uninstall(files), files)
 

@@ -18,12 +18,18 @@ from pathlib import Path
 from adapters.claude import mapping as claude_mapping
 from adapters.codex import mapping as codex_mapping
 from adapters.cursor import mapping as cursor_mapping
+from adapters.genie import mapping as genie_mapping
 from core import deadline
 from tests import harness
 
 PROMPT_EVENTS = ("beforeSubmitPrompt", "UserPromptSubmit")
 STOP_EVENTS = ("stop", "Stop")
-HUNG_EVENTS = {"cursor": "beforeSubmitPrompt", "codex": "UserPromptSubmit", "claude": "UserPromptSubmit"}
+HUNG_EVENTS = {
+    "cursor": "beforeSubmitPrompt",
+    "codex": "UserPromptSubmit",
+    "genie": "UserPromptSubmit",
+    "claude": "UserPromptSubmit",
+}
 ROOT_EXPECTED = {
     "sessionStart": "context",
     "SessionStart": "context",
@@ -42,7 +48,7 @@ CODEX_TOKENS, CODEX_WINDOW = 250_000, 258_400
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
 
-MAPPINGS = {"cursor": cursor_mapping, "codex": codex_mapping, "claude": claude_mapping}
+MAPPINGS = {"cursor": cursor_mapping, "codex": codex_mapping, "genie": genie_mapping, "claude": claude_mapping}
 
 
 def registered_events(runtime: str) -> set[str]:
@@ -59,7 +65,7 @@ def expected(rec: harness.Recorded, state: str = "armed") -> str:
         pass, block, note, budget, refresh or context.
     """
     if state != "armed":
-        bare_context = {("codex", "SessionStart"), ("cursor", "sessionStart")}
+        bare_context = {("codex", "SessionStart"), ("genie", "SessionStart"), ("cursor", "sessionStart")}
         return "context" if state == "bare" and (rec.runtime, rec.event) in bare_context else "pass"
     if rec.name == "stop-aborted" or rec.event not in registered_events(rec.runtime):
         return "pass"
@@ -108,7 +114,7 @@ def arm_claude(payload: dict, _home: Path, *, subagent: bool) -> None:
         harness.append_transcript(Path(child), harness.assistant_usage(LEAF_TOKENS))
 
 
-ARM = {"cursor": arm_cursor, "codex": arm_codex, "claude": arm_claude}
+ARM = {"cursor": arm_cursor, "codex": arm_codex, "genie": arm_codex, "claude": arm_claude}
 
 
 def corrupt(payload: dict) -> dict:
@@ -224,6 +230,12 @@ class FixtureHygieneTests(unittest.TestCase):
         for rec in harness.recorded("codex"):
             with self.subTest(fixture=rec.name):
                 schema = harness.codex_schema(rec.event, "input")
+                self.assertEqual(harness.schema_problems(rec.payload, schema, schema), [])
+
+    def test_genie_payloads_match_the_binary_input_schemas(self) -> None:
+        for rec in harness.recorded("genie"):
+            with self.subTest(fixture=rec.name):
+                schema = harness.compatible_schema("genie", rec.event, "input")
                 self.assertEqual(harness.schema_problems(rec.payload, schema, schema), [])
 
     def test_fixtures_hold_no_prompts_paths_or_identities(self) -> None:

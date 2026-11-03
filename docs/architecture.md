@@ -1,8 +1,8 @@
 # Architecture
 
 context-guard warns about growing chat context, keeps task handoffs, and routes work to
-role-based subagents. One runtime-neutral core and one content source serve Cursor, Codex
-and Claude Code through thin adapters.
+role-based subagents. One runtime-neutral core and one content source serve Cursor, Codex,
+Genie and Claude Code through thin adapters.
 
 ```text
 content/   policy, roles.json + role bodies, skills, defaults.json   (what users receive)
@@ -18,7 +18,7 @@ Data flows `content -> core.render -> adapter mapping -> native files`, and
 Python is 3.14+, standard library only. `core/` never imports an adapter and never names a
 runtime home; every home and path is passed in. An adapter never reads another runtime's home.
 
-Every feature has an equivalent in all three adapters. Where a runtime has no native mechanism,
+Every feature has an equivalent in all four adapters. Where a runtime has no native mechanism,
 its adapter supplies the closest equivalent, or `docs/<runtime>.md` states the gap and why.
 Shared policy text holds for every runtime; runtime-specific wording comes from mapping placeholders.
 
@@ -30,7 +30,7 @@ No dispatcher superclass. Each adapter supplies functions:
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `observe(payload) -> Observation`                                | native payload to `Observation` (tokens, window, model, `is_subagent`, `compacted`, cwd, prompt, `ToolUse`). `ValueError` means fail open. |
 | `respond(decision) -> payload`                                   | `Decision` to the runtime's response shape; any error means pass.                                                                          |
-| `mapping.runtime_mapping`/render                                 | tier profiles, override syntax, capability to native permissions, channel, skills dir.                                                     |
+| `mapping.runtime_mapping`/render                                 | tier profiles, override syntax, native permissions, channel, parent-resume capability, skills dir.                                        |
 | `mapping.install_spec(home, kit, python, config) -> InstallSpec` | kit-owned files, JSON merges (hook events and matchers, `deadline.HOOK_TIMEOUT_SECONDS`), text edits, kit signatures.                      |
 | `config.json`                                                    | tiers plus runtime-specific telemetry and hook settings.                                                                                   |
 | `runner.py`                                                      | provider for the optional runner.                                                                                                          |
@@ -64,7 +64,7 @@ unknown tokens fail open.
 - **Handoff writes.** Any write into the handoff store, requested or not, credits the session:
   it records the turn and the current tokens as the last handoff, adopts that file as the
   session's handoff path and acknowledges a pending request. Writes are Cursor's write tools
-  and `Shell`, Codex `apply_patch` and shell or code-mode commands, and Claude `Write`/`Edit`/`MultiEdit`/
+  and `Shell`, Codex and Genie `apply_patch` and shell or code-mode commands, and Claude `Write`/`Edit`/`MultiEdit`/
   `NotebookEdit` and `Bash`; a shell command writes when the handoff is a `>` or `>>` target,
   any `tee` operand (options such as `-a` allowed), or the destination (last operand) of `cp`,
   `mv` or `install`; a write wins over a read in the same command. Notes ask for the write in the same turn and forbid claiming an update not written.
@@ -78,7 +78,7 @@ unwritten`). Otherwise the stop hook asks for an update when tokens grew by `ref
   subagent's budget one advisory note (never a block): report what is done and what is left,
   say explicitly if the remainder cannot be split, then stop unless finishing is a few steps
   away. The budget is the role's optional `budget_tokens` in `roles.json` when the adapter
-  knows the role (`Observation.role`: Codex and Claude `agent_type`, Cursor the `subagent_type`
+  knows the role (`Observation.role`: Codex, Genie and Claude `agent_type`, Cursor the `subagent_type`
   its Task spawn recorded under the `tool_use_id` that subagent tool hooks carry as
   `parent_tool_call_id`), else `subagent_budget.tokens` (80k). The policy text tells the parent
   how to continue: re-spawn from the summary, step up a tier or variant, split, or finish it.
@@ -129,12 +129,20 @@ can enforce them (see each runtime doc); the rest is stated in the agent text, a
 table has a column of the limits this runtime does not enforce (the adapter's
 `enforced_limits`), so it never claims enforcement that does not exist.
 
+The mapping also declares `parent_resume`: `native` when the runtime starts a new parent turn
+after background completion, `adapter` when context-guard supplies that wake, and `none` when
+neither can. Shared rendering uses only this capability. With `native` or `adapter`, the parent
+may end its turn and handle each result in a new turn. With `none`, required delegated work keeps
+the parent active through one long event wait; only fire-and-forget work may outlive the turn,
+with delayed delivery stated explicitly.
+
 ## Delivery channels
 
 | runtime | policy                                              | handoff list and notes                                    |
 | ------- | --------------------------------------------------- | --------------------------------------------------------- |
 | Cursor  | `~/.cursor/rules/context-guard.mdc` (`alwaysApply`) | `sessionStart` additional context; notes via tool results |
 | Codex   | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
+| Genie   | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
 | Claude  | `~/.claude/rules/context-guard.md`                  | SessionStart additionalContext                            |
 
 User `CLAUDE.md` and `AGENTS.md` are never edited. Skills (`handoff`,
@@ -150,7 +158,7 @@ Formats, layout and CoWork limits are in [distribution.md](distribution.md).
 (appends fail open):
 `{ts, runtime, session, event, tokens, window, tier?, detail{}}` with `event` in `prompt`,
 `note`, `note_delivered` (a note's text was handed to the model in a native response: the same
-hook in Claude Code and Codex, a later tool result or session start for a held Cursor prompt
+hook in Claude Code, Codex and Genie, a later tool result or session start for a held Cursor prompt
 note), `block`, `resend`,
 `handoff_requested` (source `user`, `refresh` or `unwritten`), `handoff_written`, `handoff_read`,
 `subagent_spawn` (role, tier, model,
@@ -174,7 +182,7 @@ value of the wrong type, so a typo fails instead of being silently ignored.
 
 `handoff_access.enabled` (default `true`) lets the agent write handoffs without a runtime
 approval: handoffs live in `paths.handoff_dir`, outside the workspace, where sandboxes and
-permission modes ask before writing. Codex gets the directory in
+permission modes ask before writing. Codex and Genie get the directory in
 `[sandbox_workspace_write].writable_roots` of `config.toml`, Claude Code an `Edit(//<dir>/**)`
 allow rule in `settings.json`; the script install includes it, and plugin users get a one-time
 SessionStart offer of `adapters/<rt>/access.py install`. Only the handoff directory is granted,
@@ -199,8 +207,8 @@ run would otherwise also get duplicate events from the user's own installation.
 
 `core/install.py` plans, then applies; adapters only describe their `InstallSpec`.
 
-Runtime configuration directories are resolved in their adapters: `CLAUDE_CONFIG_DIR`
-and `CODEX_HOME` select native profile roots. The default profile uses
+Runtime configuration directories are resolved in their adapters: `CLAUDE_CONFIG_DIR`,
+`CODEX_HOME` and `GENIE_HOME` select native profile roots. The default profile uses
 `state/<rt>/install-manifest.json`; an alternate root uses
 `state/<rt>-<32-character path hash>/install-manifest.json`. Plugin setup manifests and
 offer markers use the same profile identity. The CLI selects the current profile for
@@ -213,7 +221,7 @@ with each profile's environment to refresh all installed policy and agent files.
    JSON merges (unrelated hooks and settings preserved) and text edits. `core/hookfile.py` holds
    the hook command (`shlex`-joined python, script, event), hook ownership (the kit's hook script
    is one token of the command, so a wrapper or `hooks.py.bak` is not ours) and the grouped
-   `{"hooks": {event: [{matcher?, hooks: [...]}]}}` merge used by Codex and Claude Code. A hook
+   `{"hooks": {event: [{matcher?, hooks: [...]}]}}` merge used by Codex, Genie and Claude Code. A hook
    event that is not a list is a conflict; user groups and events are kept even when empty, and
    only what removing our handlers emptied goes.
 2. **Conflicts.** A kit-owned file whose hash differs from the manifest (user edited) is
@@ -224,7 +232,7 @@ with each profile's environment to refresh all installed policy and agent files.
    manifest was lost) is replaced without `--force`, with a backup and its diff in the plan.
    The rule is deterministic: the adapter's `InstallSpec.kit_signatures` maps a path to lines
    that must all appear (whitespace-trimmed). For agent files, Cursor and Claude Code use
-   `name: <role>` plus the first line of the role body; Codex, whose role body is one TOML string,
+   `name: <role>` plus the first line of the role body; Codex and Genie, whose role body is one TOML string,
    uses the `name` and `description` lines. Anything else stays a conflict.
    **Notes.** A text edit may leave out a part it cannot apply safely and say so through
    `TextEdit.notice`; the plan prints it as `[<rt>] note: <path>: <message>`, which is not a
@@ -270,6 +278,10 @@ neither get notes nor write events or handoffs.
 ## Optional runner
 
 `core/runner/`, off by default. Each switch works on its own:
+
+Genie 0.2.1 cannot run this optional subsystem because `genie exec` has no isolated model or
+configuration override; its provider fails open. Core warnings, handoffs and delegation remain
+active. See [genie.md](genie.md#unsupported).
 
 - `runner.enabled`: hand mechanical prompts to the runner. It turns on the classifier routing it
   needs; `classifier.enabled` is not required.
@@ -321,26 +333,26 @@ Entry points of each adapter's `hooks.py`: `--worker <job.json>` plans and execu
 job; `--calibrate` runs calibration now; `--calibrate --dry-run` prints the result from existing
 labels without model calls or writes.
 
-| key | default | meaning |
-| --- | --- | --- |
-| `runner.model`, `classifier.model` | `""` | planner and classifier model; empty means the adapter's cheap tier |
-| `runner.commands` | `[]` | exact argv lists the planner may use, e.g. `[["make", "test"]]`; `argv[0]` is a program name on `PATH`, not a path |
-| `runner.max_commands` | 8 | commands per plan (at most 8) |
-| `runner.timeout_seconds` | 300 | execution time per job (at most 1800) |
-| `runner.plan_timeout_seconds` | 60 | planner call |
-| `runner.cooldown_seconds` | 60 | minimum gap between scheduled jobs |
-| `classifier.timeout_seconds` | 20 | classifier call, further bounded by the hook deadline |
-| `classifier.cache_entries` | 5000 | cached labels |
-| `classifier.max_chars`, `max_question_words`, `polite_words`, `keywords`, `short_keywords`, `short_max_words` | see `content/defaults.json` | prefilter rules (`prefilter.py`) |
-| `calibration.mode` | `propose` | `propose` or `auto` |
-| `calibration.first_run_prompts` | 1000 | logged decisions before the first run |
-| `calibration.interval_days` | 30 | days between runs |
-| `calibration.window` | 10000 | decision lines kept and read |
-| `calibration.sample_rejected` | 2000 | prefilter-rejected prompts sampled for labelling |
-| `calibration.batch_size` | 50 | prompts per labelling call |
-| `calibration.max_fp_per_tp` | 3 | extra classifier calls accepted per extra chore caught |
-| `calibration.min_mechanical` | 20 | labelled mechanical prompts needed to tune |
-| `calibration.model` | `""` | labelling model; empty means `classifier.model`, then the cheap tier |
+| key                                                                                                           | default                     | meaning                                                                                                            |
+| ------------------------------------------------------------------------------------------------------------- | --------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| `runner.model`, `classifier.model`                                                                            | `""`                        | planner and classifier model; empty means the adapter's cheap tier                                                 |
+| `runner.commands`                                                                                             | `[]`                        | exact argv lists the planner may use, e.g. `[["make", "test"]]`; `argv[0]` is a program name on `PATH`, not a path |
+| `runner.max_commands`                                                                                         | 8                           | commands per plan (at most 8)                                                                                      |
+| `runner.timeout_seconds`                                                                                      | 300                         | execution time per job (at most 1800)                                                                              |
+| `runner.plan_timeout_seconds`                                                                                 | 60                          | planner call                                                                                                       |
+| `runner.cooldown_seconds`                                                                                     | 60                          | minimum gap between scheduled jobs                                                                                 |
+| `classifier.timeout_seconds`                                                                                  | 20                          | classifier call, further bounded by the hook deadline                                                              |
+| `classifier.cache_entries`                                                                                    | 5000                        | cached labels                                                                                                      |
+| `classifier.max_chars`, `max_question_words`, `polite_words`, `keywords`, `short_keywords`, `short_max_words` | see `content/defaults.json` | prefilter rules (`prefilter.py`)                                                                                   |
+| `calibration.mode`                                                                                            | `propose`                   | `propose` or `auto`                                                                                                |
+| `calibration.first_run_prompts`                                                                               | 1000                        | logged decisions before the first run                                                                              |
+| `calibration.interval_days`                                                                                   | 30                          | days between runs                                                                                                  |
+| `calibration.window`                                                                                          | 10000                       | decision lines kept and read                                                                                       |
+| `calibration.sample_rejected`                                                                                 | 2000                        | prefilter-rejected prompts sampled for labelling                                                                   |
+| `calibration.batch_size`                                                                                      | 50                          | prompts per labelling call                                                                                         |
+| `calibration.max_fp_per_tp`                                                                                   | 3                           | extra classifier calls accepted per extra chore caught                                                             |
+| `calibration.min_mechanical`                                                                                  | 20                          | labelled mechanical prompts needed to tune                                                                         |
+| `calibration.model`                                                                                           | `""`                        | labelling model; empty means `classifier.model`, then the cheap tier                                               |
 
 State lives in `paths.state_dir/<runtime>/`: `decisions.jsonl`, `classifier_cache.json`,
 `calibration/` (`proposal.json`, `report.md`, `last_run.json`, `run.log`, locks) and `runner/`

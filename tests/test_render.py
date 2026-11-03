@@ -7,11 +7,17 @@ from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 
+from adapters.claude import mapping as claude_mapping
+from adapters.codex import mapping as codex_mapping
+from adapters.cursor import mapping as cursor_mapping
+from adapters.genie import mapping as genie_mapping
 from core import render
 from core.render import Agent, RenderedFile, RenderError, RuntimeMapping
 
 
-def fake_mapping(name: str, channel: str = "rule_file") -> RuntimeMapping:
+def fake_mapping(
+    name: str, channel: str = "rule_file", parent_resume: render.ParentResume = "native"
+) -> RuntimeMapping:
     def describe(profile: Mapping[str, str]) -> str:
         return f"`{profile['model']}`"
 
@@ -27,6 +33,7 @@ def fake_mapping(name: str, channel: str = "rule_file") -> RuntimeMapping:
         override_syntax=f"the `{name}` spawn argument",
         transcripts=f"{name} keeps transcripts somewhere.",
         channel=channel,
+        parent_resume=parent_resume,
         describe_tier=describe,
         render_agent=agent_file,
         skills_dir=f".{name}/skills",
@@ -121,6 +128,34 @@ class ParityTests(unittest.TestCase):
         self.assertIn(".alpha/agents/runner.md", alpha)
         self.assertFalse(any("rules" in path for path in gamma))
 
+    def test_parent_resume_capability_controls_completion_delivery(self) -> None:
+        wake_policy = render.render_policy(fake_mapping("wake", parent_resume="adapter"))
+        no_wake_policy = render.render_policy(fake_mapping("idle", parent_resume="none"))
+        self.assertIn("end your turn, and pick up each result", wake_policy)
+        self.assertIn("context-guard does with a short", wake_policy)
+        self.assertIn("keep the parent turn active", no_wake_policy)
+        self.assertIn("one long `wait_agent` or equivalent event wait", no_wake_policy)
+        self.assertIn("Fire-and-forget work may run in the background", no_wake_policy)
+        self.assertNotIn("end your turn, and pick up each result", no_wake_policy)
+
+    def test_every_adapter_declares_its_parent_resume_capability(self) -> None:
+        tiers = {tier: {"model": tier, "effort": "low", "call": tier} for tier in ("cheap", "standard", "deep")}
+        config = {"paths": {"handoff_dir": "/handoffs"}, "tiers": tiers}
+        declared = {
+            "cursor": cursor_mapping.runtime_mapping(config).parent_resume,
+            "codex": codex_mapping.runtime_mapping(config).parent_resume,
+            "claude": claude_mapping.runtime_mapping(config).parent_resume,
+            "genie": genie_mapping.runtime_mapping(config).parent_resume,
+        }
+        self.assertEqual(declared, {"cursor": "native", "codex": "adapter", "claude": "native", "genie": "none"})
+        self.assertTrue(set(declared.values()) <= render.PARENT_RESUMES)
+        genie_policy = genie_mapping.policy_text(config)
+        self.assertIn("keep the parent turn active", genie_policy)
+        self.assertNotIn("Tell the user what is running, end your turn", genie_policy)
+        for adapter in (cursor_mapping, codex_mapping, claude_mapping):
+            policy = render.render_policy(adapter.runtime_mapping(config))
+            self.assertIn("end your turn, and pick up each result", policy)
+
 
 class FailureTests(unittest.TestCase):
     """Unfilled tokens, missing tier profiles and invalid roles raise RenderError."""
@@ -134,6 +169,12 @@ class FailureTests(unittest.TestCase):
         mapping = fake_mapping("alpha")
         broken = RuntimeMapping(**{**mapping.__dict__, "tiers": {"cheap": {"model": "m"}}})
         with self.assertRaisesRegex(RenderError, "no native profile"):
+            render.render_policy(broken)
+
+    def test_unknown_parent_resume_capability_raises(self) -> None:
+        mapping = fake_mapping("alpha")
+        broken = RuntimeMapping(**{**mapping.__dict__, "parent_resume": "later"})
+        with self.assertRaisesRegex(RenderError, "unknown parent resume capability"):
             render.render_policy(broken)
 
     def test_invalid_roles_and_variants_raise(self) -> None:

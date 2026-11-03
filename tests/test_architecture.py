@@ -8,7 +8,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FUNCTION_LINES = 80
-RUNTIME_HOMES = re.compile(r"\.(cursor|codex|claude)\b")
+RUNTIME_HOMES = re.compile(r"\.(cursor|codex|genie|claude)\b")
 
 
 def production_paths() -> Iterator[Path]:

@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
-# Install the context-guard plugins into your REAL home and test them in Claude Code, Codex and Cursor.
+# Install the context-guard plugins into your REAL home and test them in Claude Code, Codex, Genie and Cursor.
 #
 # Unlike scripts/sandbox_smoke.sh this changes your real home. `install` packages every plugin
 # into $PLUGIN_DIST, removes the script install of the selected runtimes with `cli.py uninstall`
 # (handoffs, state and ~/.context-guard/config.json stay; the kit goes once no runtime uses it),
-# then installs each plugin: Claude and Codex from a local marketplace named context-guard, Cursor
+# then installs each plugin: Claude, Codex and Genie from a local marketplace named context-guard, Cursor
 # as a copy in ~/.cursor/plugins/local/context-guard whose hooks adapters/cursor/hooks_install.py
 # registers in ~/.cursor/hooks.json (the plugin ships none). Plugins are reinstalled, not updated: the
 # version stays the same and the runtimes cache per version. `check` reports what is installed,
 # leftover script-install files and the events each runtime logged; `check --run` spends cheap
-# model calls (Claude 2, Codex 2, Cursor 2) in a temporary work dir with tiny thresholds and
+# model calls (Claude 2, Codex 2, Genie 2, Cursor 2) in a temporary work dir with tiny thresholds and
 # passes a runtime when a note fired and was delivered. Hooks keep the real CONTEXT_GUARD_HOME.
-# Then a wake case per runtime (scripts/wake_check.py, a few more calls): the parent spawns a
+# Then a wake case per runtime except Genie (whose missing queue API is documented; scripts/wake_check.py, a few more calls): the parent spawns a
 # background subagent that sleeps 20 s and answers a token, ends its turn, and passes when it
 # starts a new turn by itself that quotes the token (Codex: through an app server it starts, so the
 # context-guard waker's `codex queue` reaches it). Handoffs the run wrote for its work dir are deleted.
 #
-# Usage: scripts/plugin_live.sh install|check|checklist|uninstall [--only claude|codex|cursor] [--run] [--dry-run] [-v]
+# Usage: scripts/plugin_live.sh install|check|checklist|uninstall [--only claude|codex|genie|cursor] [--run] [--dry-run] [-v]
 #   --dry-run       print every command without changing anything or calling a model
-#   --run           check: one live smoke and one wake case per runtime
+#   --run           check: one live smoke and one wake case per runtime (none for Genie)
 #   -v, --verbose   also print each command and its output (VERBOSE=1); they always go to the run log
 #   PLUGIN_DIST=<dir>    package output (default: ~/.context-guard/plugins)
 #   KEEP=1          keep the temporary work dir of `check --run` (kept anyway on failure)
@@ -58,7 +58,7 @@ while (($#)); do
     esac
 done
 [[ -n $COMMAND ]] || { echo "usage: $0 install|check|checklist|uninstall [--only RUNTIME] [--run] [--dry-run] [-v]" >&2; exit 2; }
-case $ONLY in ""|claude|codex|cursor) ;; *) echo "--only takes claude, codex or cursor" >&2; exit 2 ;; esac
+case $ONLY in ""|claude|codex|genie|cursor) ;; *) echo "--only takes claude, codex, genie or cursor" >&2; exit 2 ;; esac
 
 unset VIRTUAL_ENV
 if [[ -n ${SMOKE_PYTHON:-} ]]; then PY=("$SMOKE_PYTHON"); else PY=(uv run --python 3.14 python); fi
@@ -66,7 +66,9 @@ DIST=${PLUGIN_DIST:-$HOME/.context-guard/plugins}
 STORE=$HOME/.context-guard/handoffs
 CURSOR_PLUGIN=$HOME/.cursor/plugins/local/$NAME
 CODEX_AGENTS=${CODEX_HOME:-$HOME/.codex}/agents
+GENIE_AGENTS=${GENIE_HOME:-$HOME/.genie}/agents
 LAUNCHER=$DIST/codex/plugins/$NAME/hooks/context-guard-hook
+GENIE_LAUNCHER=$DIST/genie/plugins/$NAME/hooks/context-guard-hook
 SELF=scripts/plugin_live.sh
 TMP=${TMPDIR:-/tmp}
 TMP=${TMP%/}
@@ -82,7 +84,12 @@ present() { command -v "$1" >/dev/null; }
 events_of() { echo "$HOME/.context-guard/state/$1/events.jsonl"; }
 line_count() { if [[ -f $1 ]]; then wc -l <"$1" | tr -d ' '; else echo 0; fi; }
 manifest_version() { sed -n 's/.*"version": *"\([^"]*\)".*/\1/p' "$1" 2>/dev/null | head -n 1; }
-dist_version() { manifest_version "$DIST/$1/plugins/$NAME/.$1-plugin/plugin.json"; }
+dist_version() {
+    case $1 in
+        codex|genie) manifest_version "$DIST/$1/plugins/$NAME/.codex-plugin/plugin.json" ;;
+        *) manifest_version "$DIST/$1/plugins/$NAME/.$1-plugin/plugin.json" ;;
+    esac
+}
 
 claude_listed() { [[ $(ui_query claude plugin marketplace list --json) == *"\"name\": \"$NAME\""* ]]; }
 claude_installed() { [[ $(ui_query claude plugin list --json) == *"\"$PLUGIN\""* ]]; }
@@ -92,10 +99,13 @@ codex_plugin_line() {
     ui_query codex plugin list --marketplace "$NAME" | grep -E "^${PLUGIN}[[:space:]]" || true
 }
 codex_installed() { [[ $(codex_plugin_line) =~ ^${PLUGIN}[[:space:]]+installed ]]; }
+genie_marketplace() { ui_query genie plugin marketplace list | grep -E "^${NAME}[[:space:]]" || true; }
+genie_plugin_line() { ui_query genie plugin list | grep -E "^${PLUGIN}[[:space:]]" || true; }
+genie_installed() { [[ $(genie_plugin_line) =~ ^${PLUGIN}[[:space:]]+installed ]]; }
 
 script_installed() {
     ui_query "${PY[@]}" "$ROOT/cli.py" status --runtime all --home "$HOME" \
-        | sed -nE 's/^\[(claude|codex|cursor)\] installed.*/\1/p' || true
+        | sed -nE 's/^\[(claude|codex|genie|cursor)\] installed.*/\1/p' || true
 }
 
 package_plugins() {
@@ -144,6 +154,21 @@ install_codex() {
     ui_done ok "plugin installed ($(dist_version codex))${UI_SEP}role agents installed in $CODEX_AGENTS"
 }
 
+install_genie() {
+    if ! present genie; then ui_step skip Genie "genie not on PATH"; return 0; fi
+    ui_start Genie "installing the plugin and role agents"
+    local listed
+    listed=$(genie_marketplace)
+    if [[ -z $listed || $listed != *"$DIST/genie"* ]]; then
+        if [[ -n $listed ]]; then ui_run genie plugin marketplace remove "$NAME" || return 1; fi
+        ui_run genie plugin marketplace add "$DIST/genie" || return 1
+    fi
+    if genie_installed; then ui_run genie plugin remove "$PLUGIN" || return 1; fi
+    ui_run genie plugin add "$PLUGIN" || return 1
+    ui_run sh "$GENIE_LAUNCHER" adapters/genie/agents.py install || return 1
+    ui_done ok "plugin installed ($(dist_version genie))${UI_SEP}role agents installed in $GENIE_AGENTS"
+}
+
 install_cursor() {
     ui_start Cursor "copying the plugin and registering its hooks"
     ui_run rm -rf "$CURSOR_PLUGIN" || return 1
@@ -158,6 +183,7 @@ next_steps() {
     ui_section "Next steps"
     if wanted cursor; then step=$((step + 1)); ui_say "$step. Cursor: reload the window (Developer: Reload Window), then check Output > Hooks (Third-Party Imports can stay off)"; fi
     if wanted codex; then step=$((step + 1)); ui_say "$step. Codex: open codex, run /hooks and trust the context-guard hooks (again after hook changes)"; fi
+    if wanted genie; then step=$((step + 1)); ui_say "$step. Genie: open a new thread, run /hooks and trust the context-guard hooks"; fi
     if wanted claude; then step=$((step + 1)); ui_say "$step. Claude Code: start a new session"; fi
     ui_say "$((step + 1)). Verify: $SELF check --run, then work through $SELF checklist"
     ui_say "Undo: $SELF uninstall, then uv run --python 3.14 python cli.py install --runtime all"
@@ -169,6 +195,7 @@ cmd_install() {
     remove_script_install || FAILED=1
     if wanted claude; then install_claude || FAILED=1; fi
     if wanted codex; then install_codex || FAILED=1; fi
+    if wanted genie; then install_genie || FAILED=1; fi
     if wanted cursor; then install_cursor || FAILED=1; fi
     next_steps
     ui_footer
@@ -228,6 +255,17 @@ status_row() {
                 if [[ -f $CODEX_AGENTS/$role.toml ]]; then agents=$((agents + 1)); fi
             done
             extras="agents $agents/$roles" ;;
+        genie)
+            if ! present genie; then plugin="$UI_SKIP genie not on PATH"
+            else
+                line=$(genie_plugin_line | sed -E 's/[[:space:]]{2,}/|/g')
+                if [[ $line == *"|installed"* ]]; then IFS='|' read -r _ _ line _ <<<"$line"; plugin="$UI_OK ${line:-?}"; fi
+            fi
+            for role in $("${PY[@]}" -c 'import json, sys; print(*json.load(open(sys.argv[1]))["roles"])' "$ROOT/content/roles/roles.json"); do
+                roles=$((roles + 1))
+                if [[ -f $GENIE_AGENTS/$role.toml ]]; then agents=$((agents + 1)); fi
+            done
+            extras="agents $agents/$roles" ;;
         cursor)
             line=$CURSOR_PLUGIN/.cursor-plugin/plugin.json
             if [[ -f $line ]]; then plugin="$UI_OK $(manifest_version "$line"), ~/.cursor/plugins/local"; fi
@@ -244,10 +282,11 @@ show_status() {
     ui_section Status
     if wanted claude; then rows+=("$(status_row Claude claude "$leftovers")"); fi
     if wanted codex; then rows+=("$(status_row Codex codex "$leftovers")"); fi
+    if wanted genie; then rows+=("$(status_row Genie genie "$leftovers")"); fi
     if wanted cursor; then rows+=("$(status_row Cursor cursor "$leftovers")"); fi
     ui_table "${rows[@]}"
     for row in "${rows[@]}"; do [[ $row != *"$UI_FAIL not installed"* ]] || missing=1; done
-    for runtime in claude codex cursor; do
+    for runtime in claude codex genie cursor; do
         if wanted "$runtime" && [[ $leftovers == *" $runtime "* ]]; then left+="${left:+, }$runtime"; fi
     done
     if ((missing)); then ui_hint "install the plugins: $SELF install"; fi
@@ -255,6 +294,7 @@ show_status() {
 }
 
 codex_trust_hint="trust the hooks: open codex, run /hooks, trust context-guard, then rerun $SELF check --run"
+genie_trust_hint="open a new Genie thread, run /hooks, trust context-guard, then rerun $SELF check --run"
 
 claude_auth() {
     CLAUDE_AUTH=(env -u ANTHROPIC_API_KEY)
@@ -301,6 +341,26 @@ smoke_codex() {
     fi
     if [[ $status == ran && $(smoke_count "$(events_of codex)" "$offset" prompt) == 0 ]]; then hint=$codex_trust_hint; fi
     smoke_report codex "$status" "$(events_of codex)" "$offset" "$log" "$hint"
+}
+
+smoke_genie() {
+    READY=0
+    if ! present genie; then smoke_skip Genie "genie not on PATH"; return; fi
+    if ((!DRY_RUN)) && ! genie_installed; then smoke_skip Genie "plugin not installed" "$SELF install --only genie"; return; fi
+    READY=1
+    local offset status=ran code=0 hint="" log=$LOGS/genie-1.jsonl
+    offset=$(line_count "$(events_of genie)")
+    local flags=(--json --skip-git-repo-check --sandbox workspace-write --add-dir "$STORE")
+    local resume_flags=(--json --skip-git-repo-check)
+    ui_start Genie "running the smoke (2 prompts)" long
+    ui_model "$WORK" "$log" genie exec "${flags[@]}" -C "$WORK" "$FIRST_PROMPT" || code=$?
+    if ((code)); then status="fail:genie exec exited $code"; else
+        log=$LOGS/genie-2.jsonl
+        ui_model "$WORK" "$log" genie exec resume --last "${resume_flags[@]}" "$NEXT_PROMPT" || code=$?
+        ((code == 0)) || status="fail:genie exec resume exited $code"
+    fi
+    if [[ $status == ran && $(smoke_count "$(events_of genie)" "$offset" prompt) == 0 ]]; then hint=$genie_trust_hint; fi
+    smoke_report genie "$status" "$(events_of genie)" "$offset" "$log" "$hint"
 }
 
 smoke_cursor() {
@@ -410,11 +470,17 @@ live_smoke() {
     ui_show export "CONTEXT_GUARD_THRESHOLDS_NOTE_CAP=$NOTE_CAP" "CONTEXT_GUARD_HANDOFF_REFRESH_REFRESH_TOKENS=$REFRESH_TOKENS" \
         CONTEXT_GUARD_HANDOFF_REFRESH_MIN_SECONDS=0 "CONTEXT_GUARD_TELEMETRY_CLI_CHATS=$HOME/.cursor/chats"
     local tool runtime
-    for runtime in claude codex cursor; do
+    for runtime in claude codex genie cursor; do
         wanted "$runtime" || continue
         tool=$(tr '[:lower:]' '[:upper:]' <<<"${runtime:0:1}")${runtime:1}
         "smoke_$runtime"
-        if ((READY)); then "wake_$runtime"; else smoke_skip "$tool wake" "the smoke could not start"; fi
+        if [[ $runtime == genie ]]; then
+            smoke_skip "Genie wake" "unsupported: Genie has no public idle-thread queue command"
+        elif ((READY)); then
+            "wake_$runtime"
+        else
+            smoke_skip "$tool wake" "the smoke could not start"
+        fi
     done
     clean_handoffs
     smoke_summary
@@ -454,6 +520,10 @@ cmd_checklist() {
         "/hooks lists the context-guard hooks; trust them (again after every hook change)" \
         "after sh $LAUNCHER adapters/codex/agents.py install, a new session spawns a named role (e.g. scout)" \
         "note and handoff work as in Cursor"
+    checklist_tool "Genie" \
+        "the plugin is enabled and the context-guard hooks are trusted" \
+        "after sh $GENIE_LAUNCHER adapters/genie/agents.py install, a new thread spawns a named role" \
+        "note and handoff work; idle-parent wake is unsupported and check --run reports it as skipped"
     checklist_tool "Cross-runtime" \
         "write a handoff in one runtime and resume it in another (\"continue from the handoff\")" \
         "$SELF check shows new events for every runtime you used"
@@ -476,6 +546,15 @@ uninstall_codex() {
     ui_done ok "plugin, marketplace and role agents removed"
 }
 
+uninstall_genie() {
+    if ! present genie; then ui_step skip Genie "genie not on PATH"; return 0; fi
+    ui_start Genie "removing the plugin and role agents"
+    ui_run "${PY[@]}" "$ROOT/adapters/genie/agents.py" uninstall --home "$HOME" || return 1
+    if genie_installed; then ui_run genie plugin remove "$PLUGIN" || return 1; fi
+    if [[ -n $(genie_marketplace) ]]; then ui_run genie plugin marketplace remove "$NAME" || return 1; fi
+    ui_done ok "plugin, marketplace and role agents removed"
+}
+
 uninstall_cursor() {
     ui_start Cursor "removing the plugin and its hooks"
     ui_run "${PY[@]}" "$ROOT/adapters/cursor/hooks_install.py" uninstall --home "$HOME" || return 1
@@ -487,6 +566,7 @@ cmd_uninstall() {
     ui_title "plugin uninstall"
     if wanted claude; then uninstall_claude || FAILED=1; fi
     if wanted codex; then uninstall_codex || FAILED=1; fi
+    if wanted genie; then uninstall_genie || FAILED=1; fi
     if wanted cursor; then uninstall_cursor || FAILED=1; fi
     ui_section "Next steps"
     ui_say "Packages stay in $DIST. Restore the script install with:"

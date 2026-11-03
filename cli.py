@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""context-guard install|uninstall|doctor|status|package for Cursor, Codex and Claude Code.
+"""context-guard install|uninstall|doctor|status|package for Cursor, Codex, Genie and Claude Code.
 
 Exit codes: 0 success, 1 conflicts were skipped or doctor found problems, 2 the command
 could not run (bad arguments, missing adapter mapping, no usable interpreter, I/O error).
@@ -25,7 +25,7 @@ from core.install_spec import InstallSpec
 from core.state import read_json
 
 ROOT = Path(__file__).resolve().parent
-RUNTIMES = ("cursor", "codex", "claude")
+RUNTIMES = ("cursor", "codex", "genie", "claude")
 COMMANDS = ("install", "uninstall", "doctor", "status", "package")
 EXIT_OK, EXIT_ISSUES, EXIT_ERROR = 0, 1, 2
 

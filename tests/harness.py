@@ -28,7 +28,7 @@ from core import deadline
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-RUNTIMES = ("cursor", "codex", "claude")
+RUNTIMES = ("cursor", "codex", "genie", "claude")
 HOOK_SECONDS = 30
 WAKE_PARENT_ENV = "CONTEXT_GUARD_SUBAGENTS_WAKE_PARENT"
 VARINT_PAYLOAD = 0x7F
@@ -287,10 +287,11 @@ def type_matches(value: object, expected: str | list) -> bool:
     return False
 
 
-def codex_schema(event: str, side: str) -> dict:
-    """A Codex hook schema recorded from the codex binary.
+def compatible_schema(runtime: str, event: str, side: str) -> dict:
+    """A Codex-compatible hook schema recorded from a runtime binary.
 
     Args:
+        runtime: `codex` or `genie`.
         event: The hook event name, e.g. `UserPromptSubmit`.
         side: `input` or `output`.
 
@@ -298,7 +299,20 @@ def codex_schema(event: str, side: str) -> dict:
         The JSON schema.
     """
     name = re.sub(r"(?<!^)([A-Z])", r"-\1", event).lower()
-    return read_fixture("codex", f"schemas/{name}.command.{side}")
+    return read_fixture(runtime, f"schemas/{name}.command.{side}")
+
+
+def codex_schema(event: str, side: str) -> dict:
+    """Return a recorded Codex hook schema.
+
+    Args:
+        event: The hook event name.
+        side: `input` or `output`.
+
+    Returns:
+        The recorded JSON schema.
+    """
+    return compatible_schema("codex", event, side)
 
 
 def response_schema(runtime: str, event: str) -> dict:
@@ -311,8 +325,8 @@ def response_schema(runtime: str, event: str) -> dict:
     Returns:
         The JSON schema the hook's stdout must satisfy.
     """
-    if runtime == "codex":
-        return codex_schema(event, "output")
+    if runtime in ("codex", "genie"):
+        return compatible_schema(runtime, event, "output")
     return (CURSOR_RESPONSES if runtime == "cursor" else CLAUDE_RESPONSES)[event]
 
 
@@ -346,7 +360,7 @@ def hook_env(home: Path, extra: dict | None = None) -> dict:
         key: value
         for key, value in os.environ.items()
         if not key.startswith("CONTEXT_GUARD_")
-        and key not in ("PYTHONPATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR")
+        and key not in ("PYTHONPATH", "CODEX_HOME", "GENIE_HOME", "CLAUDE_CONFIG_DIR")
     }
     env.update({"HOME": str(home), WAKE_PARENT_ENV: "0", **(extra or {})})
     return env

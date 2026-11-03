@@ -1,0 +1,14 @@
+{
+  "event": "UserPromptSubmit",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-5.6-sol",
+    "permission_mode": "default",
+    "prompt": "recorded prompt (scrubbed)",
+    "session_id": "da561a82-57b5-497c-f190-fdea1e5f3f18",
+    "transcript_path": "{HOME}/dir/sessions/2026/10/27/rollout-2026-10-27T18-35-39-da561a82-57b5-497c-f190-fdea1e5f3f18.jsonl",
+    "turn_id": "577124b9-519b-9574-dcfe-6e1de3c4c49f"
+  },
+  "source": "Genie rollout values (session_meta, turn_context, tool call) shaped by the Genie binary schema"
+}

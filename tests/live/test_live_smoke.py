@@ -29,7 +29,7 @@ class DryRunTests(unittest.TestCase):
         root = Path(temporary.name).resolve()
         for name in ("bin", "home", "tmp"):
             (root / name).mkdir()
-        for runtime in ("claude", "codex", "cursor-agent"):
+        for runtime in ("claude", "codex", "genie", "cursor-agent"):
             stub = root / "bin" / runtime
             stub.write_text("#!/bin/sh\nexit 1\n")
             stub.chmod(0o755)
@@ -53,11 +53,13 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for expected in (
             "install --runtime claude --home",
-            "env -u CODEX_HOME -u CLAUDE_CONFIG_DIR",
+            "env -u CODEX_HOME -u GENIE_HOME -u CLAUDE_CONFIG_DIR",
             "--setting-sources project",
             "--plugin-dir",
             "codex exec resume --last",
             "CODEX_HOME=",
+            "genie exec resume --last",
+            "GENIE_HOME=",
             "cursor_interactive.exp",
             "-- cursor-agent --trust --workspace",
             "--set thresholds.note_cap=1000",
@@ -66,7 +68,7 @@ class DryRunTests(unittest.TestCase):
             "dry run: nothing was changed and no model was called",
         ):
             self.assertIn(expected, result.stdout)
-        for tool in ("Setup", "Claude", "Claude plugin", "Codex", "Cursor"):
+        for tool in ("Setup", "Claude", "Claude plugin", "Codex", "Genie", "Cursor"):
             self.assertRegex(result.stdout, rf"\[dry\] +{tool} ")
         self.assertNotIn("\x1b", result.stdout)
         self.assertNotIn(str(root), result.stdout)
@@ -78,6 +80,7 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertNotIn("claude -p", result.stdout)
         self.assertNotIn("cursor-agent", result.stdout)
+        self.assertNotIn("genie exec", result.stdout)
         self.assertEqual(self.dry_run("--only", "vim")[0].returncode, 2)
 
 

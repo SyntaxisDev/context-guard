@@ -7,6 +7,8 @@
 - Codex: hook stdin is not logged, so payloads are built from real rollout values (session,
   turn, model, spawn_agent arguments, subagent ids) and must validate against the hook
   input schemas embedded in the codex binary; those schemas (input and output) are stored too.
+- Genie: payloads are shaped from real Genie root and subagent rollouts and validated against
+  the hook schemas embedded in the Genie binary.
 - Claude Code: hook stdin is not logged, so payloads are built from real transcript values
   (session, model, tool inputs and results, subagent ids) with the documented hook fields.
 
@@ -572,6 +574,92 @@ def codex_rollouts(home: Path) -> tuple[dict, dict]:
     raise SystemExit(msg)
 
 
+def genie_rollouts(home: Path) -> tuple[dict, dict]:
+    """Find the newest Genie root rollout with a spawn and newest subagent rollout.
+
+    Args:
+        home: The home directory to read from.
+
+    Returns:
+        The root and subagent rollout facts.
+
+    Raises:
+        SystemExit: When either rollout is missing.
+    """
+    paths = sorted(home.glob(".genie/sessions/*/*/*/rollout-*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True)
+    root = child = None
+    for path in paths[:200]:
+        facts = rollout_facts(path)
+        source = facts.get("meta", {}).get("thread_source")
+        if root is None and source == "user" and {"call", "turn", "token_count"} <= facts.keys():
+            root = facts
+        elif child is None and source == "subagent" and {"meta", "turn"} <= facts.keys():
+            child = facts
+        if root and child:
+            return root, child
+    msg = "no Genie root rollout with a tool call and no subagent rollout found"
+    raise SystemExit(msg)
+
+
+def genie_pool(root: dict, child: dict) -> dict:
+    """Gather values used to shape Genie hook payload fixtures.
+
+    Args:
+        root: The root rollout facts.
+        child: The subagent rollout facts.
+
+    Returns:
+        Root fields and the subagent fields under `child`.
+    """
+    turn, meta, call = root["turn"], root["meta"], root["call"]
+    return {
+        "session_id": meta["id"],
+        "transcript_path": root["path"],
+        "cwd": meta.get("cwd") or turn.get("cwd"),
+        "model": turn.get("model"),
+        "turn_id": turn.get("turn_id"),
+        "permission_mode": "bypassPermissions" if turn.get("approval_policy") == "never" else "default",
+        "prompt": PROMPT_TEXT,
+        "stop_hook_active": False,
+        "last_assistant_message": SCRUBBED,
+        "tool_response": SCRUBBED,
+        "tool_use_id": call.get("call_id", "call_0"),
+        "tool_name": call.get("name") or "exec",
+        "tool_input": call.get("input") or SCRUBBED,
+        "child_path": child["path"],
+        "child": {
+            "agent_id": child["meta"]["id"],
+            "agent_type": child["meta"].get("agent_role") or "default",
+            "turn_id": child["turn"].get("turn_id"),
+            "model": child["turn"].get("model") or turn.get("model"),
+        },
+    }
+
+
+def genie_cases(pool: dict) -> dict[str, tuple[str, dict]]:
+    """List fixture cases observed through Genie's hooks.
+
+    Args:
+        pool: Values from `genie_pool`.
+
+    Returns:
+        Case names mapped to hook events and field overrides.
+    """
+    agent = pool["child"]
+    tool = {"tool_name": pool["tool_name"], "tool_input": pool["tool_input"]}
+    return {
+        "SessionStart-startup": ("SessionStart", {"source": "startup"}),
+        "SessionStart-resume": ("SessionStart", {"source": "resume"}),
+        "SessionStart-compact": ("SessionStart", {"source": "compact"}),
+        "UserPromptSubmit-root": ("UserPromptSubmit", {}),
+        "UserPromptSubmit-subagent": ("UserPromptSubmit", agent),
+        "PostToolUse-exec": ("PostToolUse", tool),
+        "PostToolUse-subagent-exec": ("PostToolUse", {**tool, **agent}),
+        "Stop-root": ("Stop", {}),
+        "SubagentStop-subagent": ("SubagentStop", {**agent, "agent_transcript_path": pool["child_path"]}),
+    }
+
+
 def hook_tool_name(call: dict) -> str:
     """Name a rollout function call the way Codex names it in hook payloads.
 
@@ -706,6 +794,41 @@ def record_codex(home: Path, binary: Path | None, scrub: Scrubber) -> dict[str, 
         found[f"schemas/{name}"] = schemas[name]
     found["rollout-token-count"] = {
         "source": "Codex rollout event_msg token_count, numbers kept",
+        "record": token_count_record(root["token_count"]),
+    }
+    return found
+
+
+def record_genie(home: Path, binary: Path | None, scrub: Scrubber) -> dict[str, dict]:
+    """Record Genie payloads, schemas and token telemetry from local artifacts.
+
+    Args:
+        home: The home directory to read from.
+        binary: The Genie executable whose embedded schemas shape the payloads.
+        scrub: The recording's scrubber.
+
+    Returns:
+        Fixture names mapped to their content.
+
+    Raises:
+        SystemExit: When the Genie binary is missing.
+    """
+    if binary is None or not binary.is_file():
+        msg = "genie binary not found; pass --genie-binary"
+        raise SystemExit(msg)
+    schemas = codex_schemas(binary)
+    root, child = genie_rollouts(home)
+    pool = genie_pool(root, child)
+    source = "Genie rollout values (session_meta, turn_context, tool call) shaped by the Genie binary schema"
+    found = {}
+    for case, (event, extra) in genie_cases(pool).items():
+        schema = schemas[f"{kebab(event)}.command.input"]
+        payload = scrub.payload(schema_payload(schema, event, pool, extra), [pool["cwd"]])
+        found[case] = entry(source, event, payload)
+    for name in (f"{event}.command.{side}" for event in CODEX_SCHEMAS for side in ("input", "output")):
+        found[f"schemas/{name}"] = schemas[name]
+    found["rollout-token-count"] = {
+        "source": "Genie rollout event_msg token_count, numbers kept",
         "record": token_count_record(root["token_count"]),
     }
     return found
@@ -975,6 +1098,16 @@ def default_codex_binary() -> Path | None:
     return Path(os.path.realpath(found)) if found else None
 
 
+def default_genie_binary() -> Path | None:
+    """Locate the Genie binary on PATH.
+
+    Returns:
+        Its resolved path, or None when it is not on PATH.
+    """
+    found = shutil.which("genie")
+    return Path(os.path.realpath(found)) if found else None
+
+
 def main(argv: list[str] | None = None) -> int:
     """Record the selected runtimes' fixtures.
 
@@ -985,19 +1118,22 @@ def main(argv: list[str] | None = None) -> int:
         0; recording problems exit through SystemExit.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--runtime", choices=("cursor", "codex", "claude", "all"), default="all")
+    parser.add_argument("--runtime", choices=("cursor", "codex", "genie", "claude", "all"), default="all")
     parser.add_argument("--home", type=Path, default=Path.home(), help="home to read artifacts from (read only)")
     parser.add_argument("--codex-binary", type=Path, default=None)
+    parser.add_argument("--genie-binary", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=FIXTURES)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    runtimes = ("cursor", "codex", "claude") if args.runtime == "all" else (args.runtime,)
+    runtimes = ("cursor", "codex", "genie", "claude") if args.runtime == "all" else (args.runtime,)
     for runtime in runtimes:
         scrub = Scrubber(args.home)
         if runtime == "cursor":
             found = record_cursor(args.home, scrub)
         elif runtime == "codex":
             found = record_codex(args.home, args.codex_binary or default_codex_binary(), scrub)
+        elif runtime == "genie":
+            found = record_genie(args.home, args.genie_binary or default_genie_binary(), scrub)
         else:
             found = record_claude(args.home, scrub)
         write(found, runtime, args.out, dry_run=args.dry_run, scrub=scrub)

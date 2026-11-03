@@ -1,0 +1,16 @@
+{
+  "event": "UserPromptSubmit",
+  "payload": {
+    "agent_id": "5460038b-7fdd-3556-7d79-41b695d1c490",
+    "agent_type": "default",
+    "cwd": "{PROJECT}",
+    "hook_event_name": "UserPromptSubmit",
+    "model": "gpt-5.6-luna",
+    "permission_mode": "default",
+    "prompt": "recorded prompt (scrubbed)",
+    "session_id": "da561a82-57b5-497c-f190-fdea1e5f3f18",
+    "transcript_path": "{HOME}/dir/sessions/2026/10/27/rollout-2026-10-27T18-35-39-da561a82-57b5-497c-f190-fdea1e5f3f18.jsonl",
+    "turn_id": "cf17ab93-9378-ebe1-9103-015d902828e7"
+  },
+  "source": "Genie rollout values (session_meta, turn_context, tool call) shaped by the Genie binary schema"
+}

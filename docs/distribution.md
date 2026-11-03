@@ -7,19 +7,19 @@ plugins to the GitHub release; no built plugin is committed to the repository.
 
 | path                                      | for                                                                     | what it writes                                                                                                                                                   |
 | ----------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cli.py install --runtime <rt>`           | Cursor, Codex, Claude Code CLI                                          | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
-| `cli.py package --runtime <rt> --out DIR` | Runtimes with a plugin spec: Claude Code and CoWork, Cursor, Codex      | `DIR/<rt>/plugins/context-guard/`: vendored code, `LICENSE`, `NOTICE`, launcher, plugin manifest, hooks (not Cursor), agents, skills, policy. Nothing outside `DIR`. |
+| `cli.py install --runtime <rt>`           | Cursor, Codex, Genie, Claude Code CLI                                   | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
+| `cli.py package --runtime <rt> --out DIR` | Runtimes with a plugin spec: Claude Code and CoWork, Cursor, Codex, Genie | `DIR/<rt>/plugins/context-guard/`: vendored code, `LICENSE`, `NOTICE`, launcher, plugin manifest, hooks (not Cursor), agents, skills, policy. Nothing outside `DIR`. |
 | `... --marketplace NAME`                  | Sharing through a marketplace repo                                      | Also the runtime's marketplace listing under `DIR/<rt>/` (Claude: `.claude-plugin/marketplace.json`) listing the plugin at `./plugins/context-guard`.           |
 | GitHub release assets                     | Users who do not clone the repository                                   | Per runtime a plugin zip (plugin root at the zip root) and a marketplace zip (listing + `plugins/`), plus `SHA256SUMS`. See Releases.                            |
 
 Use one path per runtime: the installed hooks and the plugin hooks would both fire.
 
 Some plugin features need one extra command, run by the user through the packaged launcher,
-because the runtime cannot load them from a plugin: Codex role agents
-(`adapters/codex/agents.py`, see [codex.md](codex.md#installing-the-plugin)),
-handoff write access for Codex and Claude Code
+because the runtime cannot load them from a plugin: Codex and Genie role agents
+(`adapters/<rt>/agents.py`, see [codex.md](codex.md#installing-the-plugin) and
+[genie.md](genie.md#plugin)), handoff write access for Codex, Genie and Claude Code
 (`adapters/<rt>/access.py`, see [codex.md](codex.md#handoff-write-access),
-and [claude.md](claude.md#handoff-write-access)) and Cursor hooks
+[genie.md](genie.md#handoff-write-access) and [claude.md](claude.md#handoff-write-access)) and Cursor hooks
 (`adapters/cursor/hooks_install.py`, see [cursor.md](cursor.md#registering-the-hooks); the Cursor
 app runs plugin hooks only with Third-Party Imports on, so the Cursor plugin ships none). Each
 keeps its own install manifest and reverses cleanly. Install, verification, update and removal
@@ -75,7 +75,8 @@ uv run --python 3.14 python scripts/build_release.py --out dist [--tag v<version
   `claude --plugin-dir` and Cursor's local plugin directory.
 - `context-guard-<rt>-marketplace-<version>.zip`: the whole `dist/<rt>/` tree, the marketplace
   listing plus `plugins/context-guard`, for `claude plugin marketplace add <dir>` and
-  `codex plugin marketplace add <dir>`. Codex cannot install a bare plugin directory.
+  `codex plugin marketplace add <dir>` or `genie plugin marketplace add <dir>`. Codex and Genie
+  cannot install a bare plugin directory.
 
 A tree packaged without `--marketplace` is rejected before anything is written. Entries are
 sorted with a fixed timestamp, so the same tree zips to identical bytes. The same commands build
@@ -140,5 +141,7 @@ root_token, files)`: the native manifest and its path, the hooks file content an
 
 - Cursor: `adapters/cursor/plugin.py`; layout and install in [cursor.md](cursor.md).
 - Codex: `adapters/codex/plugin.py`; layout and install in [codex.md](codex.md).
+- Genie: `adapters/genie/plugin.py`; layout, install and unsupported wake behavior in
+  [genie.md](genie.md).
 - Organisation marketplaces that serve Claude-format plugins (`.claude-plugin/plugin.json` +
   `skills/`) to several runtimes can take the Claude package as is.

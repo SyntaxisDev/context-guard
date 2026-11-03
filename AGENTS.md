@@ -1,13 +1,13 @@
 # Developing context-guard
 
 Context-guard provides context warnings, task handoffs and delegation support for
-Cursor, Codex and Claude Code. Layout and contracts are in `docs/architecture.md`.
+Cursor, Codex, Genie and Claude Code. Layout and contracts are in `docs/architecture.md`.
 Python is 3.14+ and standard library only; run everything through `uv`.
 
 ## Runtime parity
 
 context-guard is universal. Every feature (warnings, handoffs, delegation policy, subagent
-tracking and delivery of subagent results) is designed for all three runtimes at once: shared
+tracking and delivery of subagent results) is designed for all four runtimes at once: shared
 behaviour in `content/` and `core/`, with an equivalent in each adapter. When a runtime lacks a
 native mechanism, build the closest equivalent in its adapter or document the gap and its reason
 in `docs/<runtime>.md`; never ship a feature or fix for one runtime only without that decision.
@@ -67,7 +67,7 @@ findings rather than extending it, and keep any `noqa` targeted to one rule.
 - Never write or bypass runtime hook trust.
 - Precedence is defaults, adapter config, user config, environment override.
 - No backward-compatibility layers; only user-owned files and handoff data are preserved.
-- Never touch live homes (`~/.cursor`, `~/.codex`, `~/.claude`, `~/.context-guard`) in tests or
+- Never touch live homes (`~/.cursor`, `~/.codex`, `~/.genie`, `~/.claude`, `~/.context-guard`) in tests or
   verification; use `--home` with a temporary directory.
 
 ## Validation
@@ -78,6 +78,7 @@ Run from the repository root.
 uv run --python 3.14 python -m unittest discover -s tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/cursor/tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/codex/tests -t .
+uv run --python 3.14 python -m unittest discover -s adapters/genie/tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/claude/tests -t .
 uv run --python 3.14 python scripts/gen_docs.py --check
 uvx ruff check .
@@ -107,7 +108,7 @@ payloads; add a hand-written payload only for a case no runtime has produced.
 
 ```sh
 uv run --python 3.14 python scripts/record_payloads.py --runtime all
-scripts/sandbox_smoke.sh [--only claude|codex|cursor] [--dry-run]
+scripts/sandbox_smoke.sh [--only claude|codex|genie|cursor] [--dry-run]
 scripts/plugin_live.sh install|check [--run]|checklist|uninstall [--only <rt>] [--dry-run]  # real-home plugin install and smoke; run only when asked
 ```
 

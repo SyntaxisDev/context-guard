@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Live smoke of context-guard in Claude Code, Codex and Cursor with your real logins.
+# Live smoke of context-guard in Claude Code, Codex, Genie and Cursor with your real logins.
 #
 # Only the hook and config wiring is sandboxed: each runtime is installed with
 # `cli.py install --home "$SANDBOX"` and its hooks run with CONTEXT_GUARD_HOME="$SANDBOX", so
@@ -13,7 +13,7 @@
 # scripts/cursor_interactive.exp (needs expect); `cursor-agent -p` fires no beforeSubmitPrompt or stop.
 # The terminal shows one line per step; every command and its output go to a run log in $TMPDIR.
 #
-# Usage: scripts/sandbox_smoke.sh [--only claude|codex|cursor] [--dry-run] [-v]
+# Usage: scripts/sandbox_smoke.sh [--only claude|codex|genie|cursor] [--dry-run] [-v]
 #   --dry-run       print every command without installing or calling a model
 #   -v, --verbose   also print every command and its output (or VERBOSE=1)
 #   KEEP=1          keep the temporary sandbox after the run
@@ -49,11 +49,11 @@ while (($#)); do
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
-case $ONLY in ""|claude|codex|cursor) ;; *) echo "--only takes claude, codex or cursor" >&2; exit 2 ;; esac
+case $ONLY in ""|claude|codex|genie|cursor) ;; *) echo "--only takes claude, codex, genie or cursor" >&2; exit 2 ;; esac
 
 if [[ -n ${SMOKE_PYTHON:-} ]]; then PY=("$SMOKE_PYTHON"); else PY=(uv run --python 3.14 python); fi
 if ((DRY_RUN)); then RUN_LOG=/dev/null; else RUN_LOG=$(mktemp "${TMPDIR:-/tmp}/context-guard-smoke.log.XXXXXX"); fi
-ui_init "$RUN_LOG" 13
+ui_init "$RUN_LOG" 14
 if [[ -n ${SANDBOX:-} ]]; then
     OWNED=0
     mkdir -p "$SANDBOX"
@@ -103,7 +103,7 @@ prepare() {
 }
 
 install_runtime() {
-    ui_run env -u CODEX_HOME -u CLAUDE_CONFIG_DIR \
+    ui_run env -u CODEX_HOME -u GENIE_HOME -u CLAUDE_CONFIG_DIR \
         "${PY[@]}" "$ROOT/cli.py" install --runtime "$1" --home "$SANDBOX" "${SETTINGS[@]}"
 }
 
@@ -184,11 +184,34 @@ smoke_codex() {
             || status="fail:codex exec resume exited $?"
     fi
     if [[ $status == ran ]] && ! ((DRY_RUN)) && [[ $(smoke_count "$events" 0 prompt) == 0 ]]; then
-        KEEP=1 TRUST=1
+        KEEP=1 TRUST=$((TRUST | 1))
         status="warn:needs hook trust${UI_SEP}no hook events logged"
         hint="trust the hooks: open codex on the sandbox, run /hooks, then rerun (see Next steps)"
     fi
     smoke_report codex "$status" "$events" 0 "$log" "$hint"
+}
+
+smoke_genie() {
+    if ! present genie; then smoke_skip Genie "genie not on PATH"; return; fi
+    local flags=(--json --skip-git-repo-check --sandbox workspace-write --add-dir "$STORE")
+    local status=ran log=$LOGS/genie-1.jsonl events hint=""
+    events=$(events_of "$SANDBOX" genie)
+    ui_start Genie "running smoke (2 prompts)" long
+    ui_run mkdir -p "$SANDBOX/.genie"
+    install_runtime genie
+    ui_model "$WORK" "$log" env GENIE_HOME="$SANDBOX/.genie" genie exec "${flags[@]}" -C "$WORK" "$FIRST_PROMPT" \
+        || status="fail:genie exec exited $?"
+    if [[ $status == ran ]]; then
+        log=$LOGS/genie-2.jsonl
+        ui_model "$WORK" "$log" env GENIE_HOME="$SANDBOX/.genie" genie exec resume --last "${flags[@]}" "$NEXT_PROMPT" \
+            || status="fail:genie exec resume exited $?"
+    fi
+    if [[ $status == ran ]] && ! ((DRY_RUN)) && [[ $(smoke_count "$events" 0 prompt) == 0 ]]; then
+        KEEP=1 TRUST=$((TRUST | 2))
+        status="warn:needs hook trust${UI_SEP}no hook events logged"
+        hint="trust the hooks in Genie, then rerun (see Next steps)"
+    fi
+    smoke_report genie "$status" "$events" 0 "$log" "$hint"
 }
 
 smoke_cursor() {
@@ -210,10 +233,12 @@ smoke_cursor() {
 
 trust_steps() {
     ui_section "Next steps"
-    printf '  1. Review the sandbox hooks once (the trust is stored in %s only):\n' "$SANDBOX/.codex"
-    printf '       CODEX_HOME="%s" codex -C "%s"\n' "$SANDBOX/.codex" "$WORK"
-    printf '     choose "Trust all and continue" when Codex lists the context-guard hooks, then quit\n'
-    printf '  2. Rerun: SANDBOX="%s" %s --only codex\n' "$SANDBOX" "$0"
+    if ((TRUST & 1)); then
+        printf '  - Codex: CODEX_HOME="%s" codex -C "%s"; trust the hooks, quit, then rerun with --only codex\n' "$SANDBOX/.codex" "$WORK"
+    fi
+    if ((TRUST & 2)); then
+        printf '  - Genie: GENIE_HOME="%s" genie -C "%s"; trust the hooks, quit, then rerun with --only genie\n' "$SANDBOX/.genie" "$WORK"
+    fi
 }
 
 ui_title "sandbox smoke"
@@ -221,6 +246,7 @@ ui_section "Live smoke (2 cheap prompts per tool)"
 prepare
 if wanted claude; then smoke_claude; fi
 if wanted codex; then smoke_codex; fi
+if wanted genie; then smoke_genie; fi
 if wanted cursor; then smoke_cursor; fi
 smoke_summary
 if ((TRUST)); then trust_steps; fi

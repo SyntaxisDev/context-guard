@@ -1,7 +1,7 @@
 # context-guard
 
 Context warnings, task handoffs and delegation support for AI coding runtimes: Cursor,
-Codex and Claude Code. One core and one content source; thin per-runtime adapters.
+Codex, Genie and Claude Code. One core and one content source; thin per-runtime adapters.
 
 - Warns once per tier as chat context grows and blocks just before compaction (identical resend continues).
 - Keeps handoff files so a new chat can resume a task.
@@ -9,7 +9,8 @@ Codex and Claude Code. One core and one content source; thin per-runtime adapter
 - Keeps the orchestrator responsible for explaining the combined result, verification and remaining steps.
 
 See [docs/architecture.md](docs/architecture.md) and the runtime pages
-[Cursor](docs/cursor.md), [Codex](docs/codex.md), [Claude Code](docs/claude.md).
+[Cursor](docs/cursor.md), [Codex](docs/codex.md), [Genie](docs/genie.md),
+[Claude Code](docs/claude.md).
 
 ## Install
 
@@ -23,20 +24,20 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.14+. From the repository 
 
 ```sh
 uv run --python 3.14 python cli.py install --runtime all --dry-run   # preview, writes nothing
-uv run --python 3.14 python cli.py install --runtime cursor          # or codex, claude, all
+uv run --python 3.14 python cli.py install --runtime cursor          # or codex, genie, claude, all
 uv run --python 3.14 python cli.py status --runtime all
 uv run --python 3.14 python cli.py doctor --runtime all
 uv run --python 3.14 python cli.py uninstall --runtime all
 ```
 
-Options: `--runtime` (repeatable; `cursor`, `codex`, `claude` or `all`), `--home DIR` (install into
+Options: `--runtime` (repeatable; `cursor`, `codex`, `genie`, `claude` or `all`), `--home DIR` (install into
 another home, for testing), `--dry-run`, `--force` (replace conflicting kit files, keeping
 backups), `--set section.key=value` (write the user config; the key must exist in
 `content/defaults.json` or an adapter `config.json`).
 Exit codes: 0 ok, 1 conflicts, doctor problems or (doctor) nothing installed, 2 the command could not run.
 
-Claude Code uses `CLAUDE_CONFIG_DIR` (default `~/.claude`) and Codex uses `CODEX_HOME`
-(default `~/.codex`). Set the same variable
+Claude Code uses `CLAUDE_CONFIG_DIR` (default `~/.claude`), Codex uses `CODEX_HOME`
+(default `~/.codex`), and Genie uses `GENIE_HOME` (default `~/.genie`). Set the same variable
 when installing, updating, checking or uninstalling a profile. Each profile has its own
 install record; handoffs and the kit remain shared under `~/.context-guard`.
 
@@ -51,14 +52,14 @@ Cursor's CLI config-directory override is not applied to hooks or agents; see
 
 Installation copies one kit to `~/.context-guard/kit` with a pinned Python 3.14 venv; hooks
 call that interpreter. Start a new session afterwards (reload the window in Cursor) and, in
-Codex, trust the new hooks in `/hooks`: context-guard never writes hook trust. `doctor` checks
+Codex and Genie, trust the new hooks in `/hooks`: context-guard never writes hook trust. `doctor` checks
 the install; after a prompt, `~/.context-guard/state/<runtime>/events.jsonl` ends with a `prompt`
 record. Unrelated hooks and settings are preserved; see
-[docs/architecture.md](docs/architecture.md#install-engine). For Codex and Claude Code the install
+[docs/architecture.md](docs/architecture.md#install-engine). For Codex, Genie and Claude Code the install
 also lets the agent write handoffs without an approval prompt: the handoff directory (only that
-directory) goes into Codex's sandbox `writable_roots` and a Claude Code `Edit` allow rule. Opt out
+directory) goes into Codex and Genie's sandbox `writable_roots` and a Claude Code `Edit` allow rule. Opt out
 with `--set handoff_access.enabled=false`, then reinstall; details in
-[docs/codex.md](docs/codex.md#handoff-write-access)
+[docs/codex.md](docs/codex.md#handoff-write-access), [docs/genie.md](docs/genie.md#handoff-write-access)
 and [docs/claude.md](docs/claude.md#handoff-write-access).
 
 ### Updating
@@ -91,6 +92,12 @@ zip `context-guard-<runtime>-<version>.zip` (plugin at the zip root), a marketpl
   subagents, run the agents command, and for handoff writes without sandbox approval the access
   command (the first session offers each once); plugin root, verification, updates and removal:
   [docs/codex.md](docs/codex.md#installing-the-plugin).
+- Genie: unzip the Genie marketplace zip, then `genie plugin marketplace add <dir>` and
+  `genie plugin add context-guard@context-guard`; trust the hooks. The first session offers the
+  optional named-agent and handoff-access commands. From a checkout,
+  `scripts/plugin_live.sh install --only genie` packages and installs the plugin and named agents
+  automatically. Full behavior and the idle-parent wake gap:
+  [docs/genie.md](docs/genie.md#plugin).
 
 To build the same packages from a checkout, with settings baked in through `--set`:
 

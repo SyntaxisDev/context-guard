@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNTIMES = ("cursor", "codex", "claude")
+RUNTIMES = ("cursor", "codex", "genie", "claude")
 BEGIN = "<!-- BEGIN generated: tiers -->"
 END = "<!-- END generated: tiers -->"
 BLOCK = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.DOTALL)

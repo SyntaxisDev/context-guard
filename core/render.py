@@ -5,11 +5,21 @@ import re
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Literal
 
 CONTENT_DIR = Path(__file__).resolve().parent.parent / "content"
 TOKEN = re.compile(r"\{\{\s*([a-z_]+)\s*\}\}")
 RUNTIME_SLOTS = frozenset(
-    {"runtime_name", "handoff_dir", "role_table", "tier_table", "override_syntax", "transcripts", "handoff_rules"}
+    {
+        "runtime_name",
+        "handoff_dir",
+        "role_table",
+        "tier_table",
+        "override_syntax",
+        "transcripts",
+        "handoff_rules",
+        "subagent_delivery",
+    }
 )
 CAPABILITY_LABELS = {
     "shell": "shell",
@@ -19,6 +29,8 @@ CAPABILITY_LABELS = {
     "git_push": "git push / PRs",
 }
 CHANNELS = ("rule_file", "session_context")
+ParentResume = Literal["native", "adapter", "none"]
+PARENT_RESUMES = frozenset({"native", "adapter", "none"})
 
 
 class RenderError(ValueError):
@@ -100,6 +112,7 @@ class RuntimeMapping:
         override_syntax: How the runtime overrides a tier for one spawn.
         transcripts: Where the runtime keeps past chats, as shown in the content.
         channel: How the policy reaches the model, one of CHANNELS.
+        parent_resume: How completed background work resumes an idle parent.
         describe_tier: Render a native profile for the tier table.
         render_agent: Render one agent with its tier's native profile.
         skills_dir: Directory the skills are rendered into.
@@ -115,6 +128,7 @@ class RuntimeMapping:
     override_syntax: str
     transcripts: str
     channel: str
+    parent_resume: ParentResume
     describe_tier: Callable[[Mapping[str, str]], str]
     render_agent: Callable[[Agent, Mapping[str, str]], RenderedFile]
     skills_dir: str
@@ -303,6 +317,40 @@ def tier_table(tiers: tuple[str, ...], mapping: RuntimeMapping) -> str:
     return "\n".join(rows)
 
 
+def subagent_delivery(mapping: RuntimeMapping) -> str:
+    """Render completion-delivery policy from the runtime's parent-resume capability.
+
+    Args:
+        mapping: The runtime mapping.
+
+    Returns:
+        Instructions for spawning and receiving delegated work.
+
+    Raises:
+        RenderError: The mapping declares an unknown parent-resume capability.
+    """
+    if mapping.parent_resume not in PARENT_RESUMES:
+        msg = f"{mapping.runtime}: unknown parent resume capability {mapping.parent_resume!r}"
+        raise RenderError(msg)
+    if mapping.parent_resume == "none":
+        return (
+            "Spawn independent subagents together. When their results are required to complete the current task, "
+            "keep the parent turn active: after doing any useful local work, use one long `wait_agent` or equivalent "
+            "event wait that covers the running subagents. Do not end the turn, poll, or issue repeated short waits "
+            "while required work is outstanding. Fire-and-forget work may run in the background, but tell the user "
+            "explicitly that delivery is delayed until their next turn because an idle parent cannot be resumed. Use "
+            "a foreground subagent only for a short lookup (under ~2 minutes) whose answer your very next step needs."
+        )
+    return (
+        "Spawn every subagent in the background where the runtime supports it, launching independent ones together "
+        "in one message, since a user message stops the current turn's foreground subagents and a dropped connection "
+        "can orphan a long one. Tell the user what is running, end your turn, and pick up each result as it arrives as "
+        "a new turn; where the runtime does not start that turn itself, context-guard does with a short "
+        "`[context-guard]` message. Do not poll or wait on running subagents. Use a foreground subagent only for a "
+        "short lookup (under ~2 minutes) whose answer your very next step needs."
+    )
+
+
 def slot_values(mapping: RuntimeMapping, content: Path = CONTENT_DIR) -> dict[str, str]:
     """Compute the value of every runtime slot, including the rendered handoff rules.
 
@@ -320,6 +368,7 @@ def slot_values(mapping: RuntimeMapping, content: Path = CONTENT_DIR) -> dict[st
         "transcripts": mapping.transcripts,
         "role_table": role_table(load_roles(content), mapping),
         "tier_table": tier_table(load_tiers(content), mapping),
+        "subagent_delivery": subagent_delivery(mapping),
     }
     fragment = read_text(content / "policy" / "handoff.md")
     values["handoff_rules"] = render(fragment, values).strip()

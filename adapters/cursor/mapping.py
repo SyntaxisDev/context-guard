@@ -152,6 +152,7 @@ def runtime_mapping(config: dict) -> render.RuntimeMapping:
         override_syntax=OVERRIDE_SYNTAX,
         transcripts=TRANSCRIPTS,
         channel="rule_file",
+        parent_resume="native",
         describe_tier=describe_tier,
         render_agent=render_agent,
         skills_dir=SKILLS_DIR,
