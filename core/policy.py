@@ -380,7 +380,8 @@ def on_prompt(obs: Observation, state: dict, ctx: Context) -> Decision:
     """Decide a main-session prompt.
 
     Bookkeeping prompts pass untouched; a resend of the blocked prompt and an explicit handoff request
-    pass; otherwise a tier above the one already fired fires.
+    pass; otherwise a tier above the one already fired fires. A subagent hand-back never blocks: the
+    block tier fires as firm, as for tool calls.
 
     Args:
         obs: A prompt observation.
@@ -407,6 +408,8 @@ def on_prompt(obs: Observation, state: dict, ctx: Context) -> Decision:
         )
     limits = thresholds(ctx.config, obs.window)
     tier = limits.reached(obs.tokens)
+    if tier == "block" and handoffs.SUBAGENT_RESULT.match(prompt):
+        tier = "firm"
     if RANK[tier] <= RANK[state.get("tier")]:
         return Decision(PASS, events=logged)
     decision = fire_tier(obs, state, ctx, tier, limits)

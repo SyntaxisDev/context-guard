@@ -52,7 +52,9 @@ unknown tokens fail open.
 - **Block** happens only on prompt events. The message states tokens and limit. An identical
   (stripped) resend passes, is logged as `resend`, and is followed by silence until a higher tier.
   Session state keeps a sha256 of the blocked prompt and only the slug of the first prompt
-  (the handoff name), never prompt text.
+  (the handoff name), never prompt text. A prompt a host injects to hand back a subagent's report
+  (`[Subagent hand-back]`, `<task-notification>`) is never blocked, since nobody resends it; the
+  block tier fires as firm instead, as for tool calls.
 - **Re-arm.** Compaction (`compacted` or the `compact` event), or live context back under the
   note threshold, resets fired tiers. A zero token reading is unknown telemetry and never re-arms.
 - **Pass-through prompts.** `[context-guard]` prompts pass silently; handoff requests

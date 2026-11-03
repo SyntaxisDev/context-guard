@@ -15,6 +15,9 @@ from core.observation import READ, WRITE
 
 PLACEHOLDER_LABELS = {"new chat", "new conversation", "untitled", "untitled chat", "untitled conversation"}
 BOOKKEEPING_PREFIX = "[context-guard]"
+# Prompts a host injects to hand a subagent's report back (T3 Code, Claude Code). Nobody resends
+# them, so blocking one would drop the report.
+SUBAGENT_RESULT = re.compile(r"^(?:\[Subagent hand-back\]|<task-notification>)")
 HANDOFF_REQUEST = re.compile(
     r"^\W*hand-?off\b"
     r"|\b(?:write|save|update|create|make|prepare|refresh|do)\s+(?:(?:a|an|the|my|our|this)\s+)?hand-?off\b"

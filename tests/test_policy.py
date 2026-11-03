@@ -135,6 +135,14 @@ class TierTests(PolicyFixture):
         self.assertEqual((decision.kind, decision.tier), ("note", "firm"))
         self.assertEqual(self.prompt("next", 300_000).kind, "block")
 
+    def test_subagent_hand_backs_note_but_never_block(self) -> None:
+        for frame in ("[Subagent hand-back] The text below is the final report", "<task-notification>"):
+            with self.subTest(frame=frame):
+                self.state.clear()
+                decision = self.prompt(f"{frame} all findings fixed", 300_000)
+                self.assertEqual((decision.kind, decision.tier), ("note", "firm"))
+                self.assertEqual(self.prompt("next", 300_000).kind, "block")
+
     def test_compaction_resets_fired_tiers(self) -> None:
         self.prompt("a", 160_000)
         self.assertEqual(self.prompt("b", 165_000).kind, "pass")
