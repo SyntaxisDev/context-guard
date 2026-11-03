@@ -82,6 +82,11 @@ unwritten`). Otherwise the stop hook asks for an update when tokens grew by `ref
   its Task spawn recorded under the `tool_use_id` that subagent tool hooks carry as
   `parent_tool_call_id`), else `subagent_budget.tokens` (80k). The policy text tells the parent
   how to continue: re-spawn from the summary, step up a tier or variant, split, or finish it.
+- **Result synthesis.** The shared orchestrator policy makes the parent responsible for a
+  self-contained explanation after substantial work or an agreed milestone: the outcome,
+  important decisions and reasons, verification and limitations, and remaining actions.
+  Progress updates and subagent reports do not replace this explanation. The rule specifies
+  information to convey, leaving personality, tone, structure and detail to the agent and task.
 
 | event                | decisions         | meaning                                                     |
 | -------------------- | ----------------- | ----------------------------------------------------------- |

@@ -6,6 +6,7 @@ Codex and Claude Code. One core and one content source; thin per-runtime adapter
 - Warns once per tier as chat context grows and blocks just before compaction (identical resend continues).
 - Keeps handoff files so a new chat can resume a task.
 - Installs role-based subagents (scout, investigator, reviewer, implementer, runner) with model tiers.
+- Keeps the orchestrator responsible for explaining the combined result, verification and remaining steps.
 
 See [docs/architecture.md](docs/architecture.md) and the runtime pages
 [Cursor](docs/cursor.md), [Codex](docs/codex.md), [Claude Code](docs/claude.md).

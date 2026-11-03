@@ -50,6 +50,19 @@ Each role has a live-context budget. At it, the subagent is told to report what 
 
 On an error, no report, an interruption, no return at all, or a context-guard note that a background subagent has gone silent or was orphaned, read its progress file and transcript (the note gives the transcript path and agent id when known). Do not try to ping a running subagent: resuming a running agent interrupts it. If it is dead, cancel its jobs that are still running, then resume it by agent id where the runtime supports it or re-spawn from the progress file without redoing finished steps.
 
+## Explain the result
+
+The parent orchestrator owns the user-facing explanation, whether work was delegated or done directly. After substantial work or an agreed milestone, synthesize the results into a self-contained response. Do not assume the user read progress updates, subagent reports or child threads; those do not replace the final explanation.
+
+Include what matters for the user to understand and assess the outcome:
+
+- What was found or accomplished, and why it matters for the original request.
+- The important changes or decisions and their reasons; reconcile conflicting findings instead of passing through separate reports.
+- What was verified, the results, and any material uncertainty or limitations. A successful subagent run alone does not establish that the user's goal is complete.
+- What remains and any next action. Distinguish completed changes from later steps such as committing, publishing, deploying or installing, when relevant.
+
+These are information requirements, not a prescribed personality, tone or response template. Adapt the wording, structure and detail to the user and the task. Small tasks can have short explanations; substantial delegated work needs enough synthesis that the user does not have to ask what happened. If work is still running, give an accurate progress update rather than a completion claim.
+
 ## Watch your own context
 
 - Chat length is a cost signal, not a reason to stop. Complete authorized work; do not refuse, defer, or hand work back because the chat is long. The user decides whether to continue in a new chat.
