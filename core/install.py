@@ -88,6 +88,7 @@ class Plan:
         conflicts: Paths skipped, reported to the user.
         manifest: The manifest to write, or None to delete it.
         prune: Directories to remove after applying when they are empty.
+        notes: Parts of an edit left out for the user to finish; they are not conflicts.
     """
 
     runtime: str
@@ -95,6 +96,7 @@ class Plan:
     conflicts: list[Conflict] = field(default_factory=list)
     manifest: dict | None = None
     prune: list[str] = field(default_factory=list)
+    notes: list[Conflict] = field(default_factory=list)
 
 
 def digest(text: str) -> str:
@@ -120,6 +122,24 @@ def manifest_path(home: Path, runtime: str) -> Path:
         The manifest file path.
     """
     return kit_root(home) / "state" / runtime / MANIFEST_NAME
+
+
+def profile_name(name: str, root: Path, default: Path) -> str:
+    """Scope an installation or setup marker to its configuration directory.
+
+    Args:
+        name: The installation or optional setup step name.
+        root: The selected configuration directory.
+        default: The default configuration directory.
+
+    Returns:
+        The unchanged name for the default directory, otherwise a name with a stable path hash.
+    """
+    resolved = root.resolve()
+    if resolved == default.resolve():
+        return name
+    suffix = hashlib.sha256(str(resolved).encode()).hexdigest()[:32]
+    return f"{name}-{suffix}"
 
 
 def backup_dir(home: Path) -> Path:
@@ -479,6 +499,9 @@ class InstallPlanner(Planner):
             except ValueError as exc:
                 self.conflict(item.path, str(exc), "edits")
                 continue
+            note = item.notice(new) if item.notice else ""
+            if note:
+                self.plan.notes.append(Conflict(item.path, note))
             if text is None and not new:
                 continue
             if new != text:
@@ -803,7 +826,7 @@ def describe(plan: Plan, *, dry_run: bool) -> list[str]:
         dry_run: Whether to phrase changes as what would happen.
 
     Returns:
-        One line per change (with its diff) and per conflict, or an "up to date" line.
+        One line per change (with its diff) and per conflict, or an "up to date" line, then one per note.
     """
     prefix = f"[{plan.runtime}]"
     verb = "would " if dry_run else ""
@@ -813,7 +836,7 @@ def describe(plan: Plan, *, dry_run: bool) -> list[str]:
         for c in plan.changes
     ]
     lines += [f"{prefix} conflict: {c.path}: {c.message}" for c in plan.conflicts]
-    return lines or [f"{prefix} up to date"]
+    return (lines or [f"{prefix} up to date"]) + [f"{prefix} note: {n.path}: {n.message}" for n in plan.notes]
 
 
 def file_problems(spec: InstallSpec, manifest: dict) -> list[str]:

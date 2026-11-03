@@ -6,11 +6,12 @@ import re
 import shlex
 import sys
 import tempfile
+import tomllib
 import unittest
 from pathlib import Path
 
 import cli
-from adapters.codex import agents, hooks, mapping, plugin
+from adapters.codex import access, agents, hooks, mapping, plugin
 from core import install, kit, package, render
 from tests import harness
 
@@ -170,8 +171,8 @@ class LayoutTests(PluginTestCase):
                 self.assertIn(f"- {limit}", brief)
 
 
-class SessionStartTests(PluginTestCase):
-    """The packaged SessionStart hook picks the policy from the agent TOMLs in the Codex home."""
+class PackagedSessionCase(PluginTestCase):
+    """A built plugin whose packaged SessionStart hook runs with a temporary home and Codex home."""
 
     def setUp(self) -> None:
         super().setUp()
@@ -194,6 +195,10 @@ class SessionStartTests(PluginTestCase):
         response = result.response()
         self.assertEqual(harness.response_problems("codex", mapping.SESSION_START, response), [])
         return response["hookSpecificOutput"]["additionalContext"]
+
+
+class SessionStartTests(PackagedSessionCase):
+    """The packaged SessionStart hook picks the policy from the agent TOMLs in the Codex home."""
 
     def test_without_agent_tomls_the_roleless_policy_names_the_absolute_install_command(self) -> None:
         context = self.session_context()
@@ -221,16 +226,26 @@ class SessionStartTests(PluginTestCase):
         self.assertIn("Named subagents", self.session_context())
 
     def test_without_agents_the_first_main_session_offers_them_once_and_records_the_offer(self) -> None:
-        marker = install.offer_marker(self.home, mapping.PLUGIN_AGENTS)
+        marker = install.offer_marker(
+            self.home, mapping.install_identity(self.home, mapping.PLUGIN_AGENTS, {"CODEX_HOME": str(self.codex_home)})
+        )
         self.assertIn(hooks.AGENTS_OFFER, self.session_context())
         self.assertTrue(marker.is_file())
         self.assertNotIn(hooks.AGENTS_OFFER, self.session_context())
 
     def test_an_existing_offer_marker_or_install_manifest_suppresses_the_offer(self) -> None:
         for path in (
-            install.offer_marker(self.home, mapping.PLUGIN_AGENTS),
-            install.manifest_path(self.home, mapping.RUNTIME),
-            install.manifest_path(self.home, mapping.PLUGIN_AGENTS),
+            install.offer_marker(
+                self.home,
+                mapping.install_identity(self.home, mapping.PLUGIN_AGENTS, {"CODEX_HOME": str(self.codex_home)}),
+            ),
+            install.manifest_path(
+                self.home, mapping.install_identity(self.home, mapping.RUNTIME, {"CODEX_HOME": str(self.codex_home)})
+            ),
+            install.manifest_path(
+                self.home,
+                mapping.install_identity(self.home, mapping.PLUGIN_AGENTS, {"CODEX_HOME": str(self.codex_home)}),
+            ),
         ):
             with self.subTest(path=path.relative_to(self.home)):
                 path.parent.mkdir(parents=True, exist_ok=True)
@@ -242,6 +257,81 @@ class SessionStartTests(PluginTestCase):
         environ = {"CODEX_HOME": str(self.codex_home)}
         self.assertEqual(agents.main(["install", "--home", str(self.home)], environ, io.StringIO()), agents.EXIT_OK)
         self.assertNotIn(hooks.AGENTS_OFFER, self.session_context())
+
+
+class HandoffAccessTests(PackagedSessionCase):
+    """The packaged SessionStart offers the handoff writable root once; access.py adds and removes it."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.marker = install.offer_marker(
+            self.home, mapping.install_identity(self.home, mapping.PLUGIN_ACCESS, {"CODEX_HOME": str(self.codex_home)})
+        )
+        self.config_toml = self.codex_home / "config.toml"
+        self.root_dir = self.home / ".context-guard" / "handoffs"
+
+    def offered(self) -> bool:
+        return "adapters/codex/access.py install" in self.session_context()
+
+    def access_cli(self, *argv: str) -> tuple[int, str]:
+        out = io.StringIO()
+        return access.main([*argv, "--home", str(self.home)], {"CODEX_HOME": str(self.codex_home)}, out), out.getvalue()
+
+    def test_first_main_session_offers_the_absolute_command_once_and_records_the_offer(self) -> None:
+        context = self.session_context()
+        self.assertIn(f'`sh "{self.root}/{package.LAUNCHER}" adapters/codex/access.py install`', context)
+        self.assertTrue(self.marker.is_file())
+        self.assertFalse(self.offered())
+
+    def test_install_manifests_marker_disabled_setting_or_present_root_suppress_the_offer(self) -> None:
+        cases = {
+            "script install": (
+                install.manifest_path(
+                    self.home,
+                    mapping.install_identity(self.home, mapping.RUNTIME, {"CODEX_HOME": str(self.codex_home)}),
+                ),
+                "{}",
+            ),
+            "access install": (
+                install.manifest_path(
+                    self.home,
+                    mapping.install_identity(self.home, mapping.PLUGIN_ACCESS, {"CODEX_HOME": str(self.codex_home)}),
+                ),
+                "{}",
+            ),
+            "marker": (self.marker, ""),
+            "disabled": (self.home / ".context-guard" / "config.json", '{"handoff_access": {"enabled": false}}'),
+            "root present": (self.config_toml, mapping.access_block(self.root_dir)),
+            "unparsable config.toml": (self.config_toml, "model = \n"),
+        }
+        for name, (path, text) in cases.items():
+            with self.subTest(case=name):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+                self.assertFalse(self.offered())
+                path.unlink()
+                self.marker.unlink(missing_ok=True)
+
+    def test_access_command_adds_the_root_and_uninstall_restores_config_toml(self) -> None:
+        original = 'model = "mine"'
+        self.config_toml.write_text(original)
+        code, text = self.access_cli("install", "--dry-run")
+        self.assertEqual(code, access.EXIT_OK)
+        self.assertIn("would write", text)
+        self.assertEqual((self.config_toml.read_text(), self.marker.exists()), (original, False))
+        self.assertEqual(self.access_cli("install")[0], access.EXIT_OK)
+        self.assertTrue(mapping.has_root(tomllib.loads(self.config_toml.read_text()), self.root_dir))
+        self.assertTrue(self.marker.is_file())
+        self.assertEqual(self.access_cli("uninstall")[0], access.EXIT_OK)
+        self.assertEqual(self.config_toml.read_text(), original)
+
+    def test_foreign_writable_roots_are_reported_and_left_alone(self) -> None:
+        original = '[sandbox_workspace_write]\nwritable_roots = ["/srv"]\n'
+        self.config_toml.write_text(original)
+        code, text = self.access_cli("install")
+        self.assertEqual(code, access.EXIT_OK)
+        self.assertIn(f"note: {self.config_toml}: ", text)
+        self.assertEqual(self.config_toml.read_text(), original)
 
 
 class AgentsCommandTests(PluginTestCase):

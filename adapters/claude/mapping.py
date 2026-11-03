@@ -1,12 +1,13 @@
 """Claude Code rendering and install spec: agents, skills, the policy rule and hook registration."""
 
 import json
+import os
 from collections.abc import Callable, Mapping
 from functools import partial
 from pathlib import Path
 
-from core import deadline, hookfile, render
-from core.install_spec import InstallSpec, frontmatter_signatures
+from core import config as config_mod, deadline, hookfile, install, render
+from core.install_spec import InstallSpec, JsonMerge, frontmatter_signatures
 
 RUNTIME = "claude"
 CLAUDE_DIR = ".claude"
@@ -14,6 +15,7 @@ POLICY_FILE = f"{CLAUDE_DIR}/rules/context-guard.md"
 SKILLS_DIR = f"{CLAUDE_DIR}/skills"
 AGENTS_DIR = f"{CLAUDE_DIR}/agents"
 SETTINGS_FILE = f"{CLAUDE_DIR}/settings.json"
+PLUGIN_ACCESS = "claude-handoff-access"
 HOOK_SCRIPT = Path("adapters", RUNTIME, "hooks.py")
 HOOK_EVENTS = ("SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "PreCompact", "PostCompact", "SubagentStop")
 MATCHED_EVENTS = {"PostToolUse": "*"}
@@ -22,8 +24,45 @@ EDIT_TOOLS = ("Edit", "Write", "NotebookEdit")
 NETWORK_TOOLS = ("WebFetch", "WebSearch")
 PROFILE_KEYS = ("model", "effort", "call")
 TRANSCRIPTS = (
-    "Claude Code keeps chat transcripts as JSONL files under `~/.claude/projects/<project-slug>/<session-id>.jsonl`."
+    "Claude Code keeps chat transcripts as JSONL files under `$CLAUDE_CONFIG_DIR/projects/` "
+    "(default `~/.claude/projects/`). Use the hook payload's `transcript_path` for the active session."
 )
+
+
+def claude_home(home: Path, environ: Mapping[str, str] | None = None) -> Path:
+    """Resolve the selected Claude Code configuration directory.
+
+    Args:
+        home: User home for the default and leading `~/` expansion.
+        environ: Environment to read; None reads the process environment.
+
+    Returns:
+        The absolute profile directory, defaulting to `<home>/.claude`.
+
+    Raises:
+        ValueError: CLAUDE_CONFIG_DIR names a relative path.
+    """
+    environment = os.environ if environ is None else environ
+    value = environment.get("CLAUDE_CONFIG_DIR", "")
+    root = home / CLAUDE_DIR if not value else home / value[2:] if value.startswith("~/") else Path(value)
+    if not root.is_absolute():
+        msg = "CLAUDE_CONFIG_DIR must be absolute or start with ~/"
+        raise ValueError(msg)
+    return root.resolve()
+
+
+def install_identity(home: Path, name: str, environ: Mapping[str, str] | None = None) -> str:
+    """Name an install manifest or offer marker for the selected profile.
+
+    Args:
+        home: User home holding context-guard state.
+        name: Base manifest or offer name.
+        environ: Environment to read; None reads the process environment.
+
+    Returns:
+        The base name for the default profile, otherwise a profile-specific name.
+    """
+    return install.profile_name(name, claude_home(home, environ), home / CLAUDE_DIR)
 
 
 def valid_tiers(tiers: object) -> dict[str, dict[str, str]]:
@@ -176,27 +215,122 @@ def hook_groups(command: Callable[[str], str]) -> dict[str, dict]:
     return groups
 
 
-def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSpec:
-    """Plan the Claude Code install: rendered files under ~/.claude and the settings.json hook merge.
+def access_rule(root: Path) -> str:
+    """Build the permission rule that lets Edit, Write and MultiEdit change files in the handoff directory.
+
+    Args:
+        root: The absolute handoff directory.
+
+    Returns:
+        `Edit(//<root>/**)`; the leading `//` marks an absolute path.
+    """
+    return f"Edit(/{root.as_posix()}/**)"
+
+
+def grant_access(data: dict, rule: str) -> dict:
+    """Add the rule to `permissions.allow`, creating either when absent.
+
+    A `permissions` that is not an object or an `allow` that is not a list is left alone.
+
+    Args:
+        data: Parsed settings.json; it is changed in place.
+        rule: The permission rule from `access_rule`.
+
+    Returns:
+        `data`.
+    """
+    permissions = data.setdefault("permissions", {})
+    allow = permissions.setdefault("allow", []) if isinstance(permissions, dict) else None
+    if isinstance(allow, list) and rule not in allow:
+        allow.append(rule)
+    return data
+
+
+def withdraw_access(data: dict, rule: str) -> dict:
+    """Remove the rule from `permissions.allow`, and `allow` and `permissions` when that empties them.
+
+    Args:
+        data: Parsed settings.json; it is changed in place.
+        rule: The permission rule from `access_rule`.
+
+    Returns:
+        `data`.
+    """
+    permissions = data.get("permissions")
+    allow = permissions.get("allow") if isinstance(permissions, dict) else None
+    if not isinstance(allow, list) or rule not in allow:
+        return data
+    allow.remove(rule)
+    if not allow:
+        del permissions["allow"]
+    if not permissions:
+        del data["permissions"]
+    return data
+
+
+def access_merge(path: Path, root: Path, *, enabled: bool) -> JsonMerge:
+    """Build the settings.json merge that grants (or, when disabled, withdraws) handoff write access.
+
+    Args:
+        path: The settings.json file.
+        root: The absolute handoff directory.
+        enabled: The `handoff_access.enabled` setting.
+
+    Returns:
+        The merge; unmerging always removes the rule.
+    """
+    rule = access_rule(root)
+    withdraw = partial(withdraw_access, rule=rule)
+    return JsonMerge(path, partial(grant_access, rule=rule) if enabled else withdraw, withdraw)
+
+
+def settings_merge(hooks: JsonMerge, access: JsonMerge) -> JsonMerge:
+    """Combine the hook registration and the handoff access into the one settings.json merge.
+
+    Args:
+        hooks: The hook group merge.
+        access: The handoff access merge from `access_merge`.
+
+    Returns:
+        One merge applying the hooks then the access, unmerging them in the opposite order.
+    """
+    return JsonMerge(
+        hooks.path,
+        lambda data: access.merge(hooks.merge(data)),
+        lambda data: hooks.unmerge(access.unmerge(data)),
+    )
+
+
+def install_spec(
+    home: Path, kit: Path, python: Path, config: dict, environ: Mapping[str, str] | None = None
+) -> InstallSpec:
+    """Plan the Claude Code files and settings merge in the selected profile.
+
+    The merge registers the hooks and, with `handoff_access.enabled`, allows edits in the handoff directory.
 
     Args:
         home: Home directory to install into.
         kit: Installed kit root.
         python: Interpreter that runs the hook script.
         config: Loaded Claude Code adapter configuration.
+        environ: Environment to read; None reads the process environment.
 
     Returns:
         The install spec for the shared installer.
     """
     mapping = runtime_mapping(config)
-    files = {home / item.path: item.text for item in render.rendered_files(mapping)}
+    root = claude_home(home, environ)
+    files = {root / Path(item.path).relative_to(CLAUDE_DIR): item.text for item in render.rendered_files(mapping)}
     script = kit / HOOK_SCRIPT
-    settings = hookfile.group_merge(
-        home / SETTINGS_FILE, hook_groups(partial(hookfile.hook_command, python, script)), script
+    hooks = hookfile.group_merge(
+        root / "settings.json", hook_groups(partial(hookfile.hook_command, python, script)), script
+    )
+    access = access_merge(
+        root / "settings.json", config_mod.handoff_dir(config, home), enabled=config["handoff_access"]["enabled"]
     )
     return InstallSpec(
         runtime=RUNTIME,
         files=files,
-        json_merges=[settings],
-        kit_signatures=frontmatter_signatures(home / AGENTS_DIR, render.agents(mapping)),
+        json_merges=[settings_merge(hooks, access)],
+        kit_signatures=frontmatter_signatures(root / "agents", render.agents(mapping)),
     )

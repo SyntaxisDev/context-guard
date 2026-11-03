@@ -60,7 +60,7 @@ class HookTestCase(harness.RuntimeHookCase):
             "transcript_path": str(path or self.transcript),
             **extra,
         }
-        return hooks.handle(event, payload, self.config, self.home)
+        return hooks.handle(event, payload, self.config, self.home, environ={})
 
     def context(self, response: dict, event: str) -> str:
         self.assertEqual(set(response), {"hookSpecificOutput"})
@@ -193,7 +193,7 @@ class PromptAndToolTests(HookTestCase):
                 "transcript_path": str(self.transcript)
             }
             with self.subTest(event=event):
-                self.assertEqual(hooks.handle(event, payload, self.config, self.home), {})
+                self.assertEqual(hooks.handle(event, payload, self.config, self.home, environ={}), {})
         self.assertEqual(list(self.home.rglob("events.jsonl")), [])
 
 

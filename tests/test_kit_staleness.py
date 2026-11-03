@@ -63,6 +63,15 @@ class KitStalenessTests(RepoCase):
         self.assertIn(f"install --runtime cursor --home {home}`", message)
         self.assertNotIn("--runtime all", message)
 
+    def test_update_hint_uses_runtime_names_and_deduplicates_profiles(self) -> None:
+        home = self.root / "sandbox"
+        for name in ("claude", "claude-" + "a" * 32):
+            path = install.manifest_path(home, name)
+            path.parent.mkdir(parents=True)
+            path.write_text(json.dumps({"runtime": "claude"}))
+        self.assertEqual(kit.installed_runtimes(home), ["claude"])
+        self.assertIn("--runtime claude --home", kit.update_command(home, self.repo))
+
     def test_unchanged_missing_or_non_git_sources_stay_silent(self) -> None:
         self.assertIsNone(kit.staleness(self.root, self.manifest()))
         self.assertIsNone(kit.staleness(self.root, {}))

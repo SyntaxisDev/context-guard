@@ -103,7 +103,8 @@ prepare() {
 }
 
 install_runtime() {
-    ui_run "${PY[@]}" "$ROOT/cli.py" install --runtime "$1" --home "$SANDBOX" "${SETTINGS[@]}"
+    ui_run env -u CODEX_HOME -u CLAUDE_CONFIG_DIR \
+        "${PY[@]}" "$ROOT/cli.py" install --runtime "$1" --home "$SANDBOX" "${SETTINGS[@]}"
 }
 
 claude_agents() {

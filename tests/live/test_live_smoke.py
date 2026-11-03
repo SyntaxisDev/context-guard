@@ -53,6 +53,7 @@ class DryRunTests(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         for expected in (
             "install --runtime claude --home",
+            "env -u CODEX_HOME -u CLAUDE_CONFIG_DIR",
             "--setting-sources project",
             "--plugin-dir",
             "codex exec resume --last",

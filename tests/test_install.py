@@ -128,6 +128,16 @@ class PlanTests(EngineCase):
         self.assertEqual(snapshot(self.home), before)
         self.assertEqual(install.describe(plan, dry_run=False), ["[fake] up to date"])
 
+    def test_an_edit_notice_is_reported_as_a_note_without_a_conflict(self) -> None:
+        config = self.base / "config.toml"
+        edit = TextEdit(config, append_marker, remove_marker, lambda text: "finish it" if "on" in text else "")
+        self.install()
+        plan = self.install(self.spec(text_edits=[edit]))
+        self.assertEqual((plan.changes, plan.conflicts), ([], []))
+        self.assertEqual(
+            install.describe(plan, dry_run=False), ["[fake] up to date", f"[fake] note: {config}: finish it"]
+        )
+
     def test_manifest_records_hashes_merges_and_edits(self) -> None:
         self.install()
         manifest = self.manifest()

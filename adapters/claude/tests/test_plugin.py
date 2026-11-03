@@ -11,8 +11,8 @@ import unittest
 from pathlib import Path
 
 import cli
-from adapters.claude import hooks, mapping, plugin
-from core import kit, package, render
+from adapters.claude import access, hooks, mapping, plugin
+from core import install, kit, package, render
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -259,6 +259,69 @@ class LauncherTests(PluginTestCase):
         self.assertGreater(context.find("Packaged task"), context.find("## Handoffs"))
         self.assertLessEqual(len(context), mapping_limit())
         self.assertTrue((self.home / ".context-guard" / "state" / "claude").is_dir())
+
+
+class HandoffAccessTests(PluginTestCase):
+    """The packaged SessionStart offers the handoff allow rule once; access.py adds and removes it."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.root = self.build()
+        bin_dir = self.base / "bin"
+        bin_dir.mkdir()
+        (bin_dir / "python3").symlink_to(sys.executable)
+        self.env = {"HOME": str(self.home), "PATH": f"{bin_dir}:/bin", "CONTEXT_GUARD_SEARCH_PATH": ""}
+        self.settings = self.home / mapping.SETTINGS_FILE
+        self.marker = install.offer_marker(self.home, mapping.PLUGIN_ACCESS)
+
+    def session_context(self) -> str:
+        payload = {"session_id": "s1", "cwd": str(self.base), "source": "startup", "model": "claude-haiku-5-5"}
+        result = self.launch(self.root, ["adapters/claude/hooks.py", "SessionStart"], payload, self.env)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+
+    def offered(self) -> bool:
+        return "adapters/claude/access.py install" in self.session_context()
+
+    def test_first_main_session_offers_the_absolute_command_once_and_records_the_offer(self) -> None:
+        context = self.session_context()
+        self.assertIn(f'`sh "{self.root}/{package.LAUNCHER}" adapters/claude/access.py install`', context)
+        self.assertTrue(self.marker.is_file())
+        self.assertFalse(self.offered())
+
+    def test_install_manifests_marker_disabled_setting_or_present_rule_suppress_the_offer(self) -> None:
+        rule = mapping.access_rule(self.home / ".context-guard" / "handoffs")
+        cases = {
+            "script install": (install.manifest_path(self.home, mapping.RUNTIME), "{}"),
+            "access install": (install.manifest_path(self.home, mapping.PLUGIN_ACCESS), "{}"),
+            "marker": (self.marker, ""),
+            "disabled": (self.home / ".context-guard" / "config.json", '{"handoff_access": {"enabled": false}}'),
+            "rule present": (self.settings, json.dumps({"permissions": {"allow": [rule]}})),
+            "unparsable settings": (self.settings, "{not json"),
+        }
+        for name, (path, text) in cases.items():
+            with self.subTest(case=name):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(text)
+                self.assertFalse(self.offered())
+                path.unlink()
+                self.marker.unlink(missing_ok=True)
+
+    def test_access_command_adds_the_rule_and_uninstall_restores_the_settings(self) -> None:
+        self.settings.parent.mkdir(parents=True)
+        original = '{"model": "opus"}'
+        self.settings.write_text(original)
+        environ = {"HOME": str(self.home)}
+        dry = io.StringIO()
+        self.assertEqual(access.main(["install", "--dry-run", "--home", str(self.home)], environ, dry), access.EXIT_OK)
+        self.assertIn("would write", dry.getvalue())
+        self.assertEqual((self.settings.read_text(), self.marker.exists()), (original, False))
+        self.assertEqual(access.main(["install", "--home", str(self.home)], environ, io.StringIO()), access.EXIT_OK)
+        rule = mapping.access_rule(self.home / ".context-guard" / "handoffs")
+        self.assertEqual(json.loads(self.settings.read_text())["permissions"], {"allow": [rule]})
+        self.assertTrue(self.marker.is_file())
+        self.assertEqual(access.main(["uninstall", "--home", str(self.home)], environ, io.StringIO()), access.EXIT_OK)
+        self.assertEqual(self.settings.read_text(), original)
 
 
 def mapping_limit() -> int:

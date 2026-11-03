@@ -30,11 +30,14 @@ class TextEdit:
         path: The text file to change.
         apply: Return the text with the kit's edit in place; must be idempotent.
         revert: Return the text with only the kit's edit removed.
+        notice: Given the text after `apply`, return a note for the user about a part of the
+            edit it left out, or an empty string; None for no notes.
     """
 
     path: Path
     apply: Callable[[str], str]
     revert: Callable[[str], str]
+    notice: Callable[[str], str] | None = None
 
 
 @dataclass(frozen=True)

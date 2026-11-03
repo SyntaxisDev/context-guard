@@ -15,6 +15,9 @@
     "enabled": true,
     "limit": 5
   },
+  "handoff_access": {
+    "enabled": true
+  },
   "kit_check": {
     "enabled": true,
     "auto_update": false

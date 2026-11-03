@@ -339,13 +339,14 @@ def hook_env(home: Path, extra: dict | None = None) -> dict:
         extra: Variables added after the defaults.
 
     Returns:
-        The current environment without CONTEXT_GUARD_* variables, PYTHONPATH or CODEX_HOME, with the
+        The current environment without context-guard variables, PYTHONPATH or runtime home overrides, with the
         Codex root waker off unless `extra` turns it on, so no hook starts a detached process.
     """
     env = {
         key: value
         for key, value in os.environ.items()
-        if not key.startswith("CONTEXT_GUARD_") and key not in ("PYTHONPATH", "CODEX_HOME")
+        if not key.startswith("CONTEXT_GUARD_")
+        and key not in ("PYTHONPATH", "CODEX_HOME", "CLAUDE_CONFIG_DIR")
     }
     env.update({"HOME": str(home), WAKE_PARENT_ENV: "0", **(extra or {})})
     return env

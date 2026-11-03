@@ -12,6 +12,7 @@ import argparse
 import datetime as dt
 import importlib
 import json
+import re
 import sys
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -99,8 +100,20 @@ class Context:
 
         Returns:
             The manifest path.
+
+        Raises:
+            CliError: The selected profile directory is invalid.
         """
-        return install.manifest_path(self.home, runtime)
+        name = runtime
+        if runtime in RUNTIMES:
+            identity = getattr(self.load_mapping(runtime), "install_identity", None)
+            if identity is not None:
+                try:
+                    name = identity(self.home, runtime)
+                except ValueError as exc:
+                    msg = f"{runtime}: cannot resolve the install profile: {exc}"
+                    raise CliError(msg) from exc
+        return install.manifest_path(self.home, name)
 
     def manifest(self, runtime: str) -> dict:
         """Read a runtime's validated install manifest.
@@ -295,8 +308,28 @@ def uninstall_plans(ctx: Context, runtimes: tuple[str, ...], *, force: bool) -> 
             ctx.say(f"[{runtime}] not installed")
     removed = {plan.runtime for plan in plans if plan.manifest is None}
     remaining = [rt for rt in RUNTIMES if rt not in removed and ctx.manifest(rt)]
-    kit_plan = None if remaining else kit_removal(ctx, force=force)
+    kit_plan = None if remaining or other_profile_installs(ctx, removed) else kit_removal(ctx, force=force)
     return plans + ([kit_plan] if kit_plan else [])
+
+
+def other_profile_installs(ctx: Context, removed: set[str]) -> bool:
+    """Tell whether another profile still needs the shared kit after an uninstall.
+
+    Args:
+        ctx: The command context.
+        removed: Runtimes whose selected profile will be fully removed.
+
+    Returns:
+        True when a runtime install manifest survives outside the removed profiles.
+    """
+    removed_files = {ctx.manifest_file(runtime) for runtime in removed}
+    pattern = "(?:" + "|".join(RUNTIMES) + r")(?:-[0-9a-f]{32})?"
+    state = config.kit_root(ctx.home) / "state"
+    return any(
+        path not in removed_files and re.fullmatch(pattern, path.parent.name)
+        for path in state.glob(f"*/{install.MANIFEST_NAME}")
+        if path.is_file()
+    )
 
 
 def cmd_uninstall(ctx: Context, runtimes: tuple[str, ...], *, dry_run: bool, force: bool) -> int:

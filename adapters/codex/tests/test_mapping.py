@@ -26,11 +26,11 @@ class SpecCase(unittest.TestCase):
     def setUp(self) -> None:
         tmp = tempfile.TemporaryDirectory()
         self.addCleanup(tmp.cleanup)
-        self.home = Path(tmp.name)
+        self.home = Path(tmp.name).resolve()
         self.kit = self.home / ".context-guard" / "kit"
         self.python = self.kit / ".venv" / "bin" / "python"
         self.config = config_mod.load_config(config_mod.sources_for("codex", self.home, hooks.ADAPTER_CONFIG))
-        self.spec = mapping.install_spec(self.home, self.kit, self.python, self.config)
+        self.spec = mapping.install_spec(self.home, self.kit, self.python, self.config, {})
         self.codex = self.home / ".codex"
 
 
@@ -142,6 +142,93 @@ class ConfigTomlTests(SpecCase):
         reverted = self.registrations.revert(rewritten)
         self.assertNotIn("context-guard", reverted)
         self.assertEqual(tomllib.loads(reverted), tomllib.loads(USER_CONFIG + trust))
+
+
+class HandoffAccessTests(SpecCase):
+    """The config.toml edit adds the handoff directory to the sandbox writable roots and reverses exactly."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.root = str(self.home / ".context-guard" / "handoffs")
+        self.edit = self.spec.text_edits[0]
+
+    def roots(self, text: str) -> object:
+        return tomllib.loads(text).get(mapping.SANDBOX_TABLE, {}).get(mapping.ROOTS_KEY)
+
+    def assert_round_trip(self, original: str) -> str:
+        applied = self.edit.apply(original)
+        self.assertEqual(self.edit.apply(applied), applied)
+        self.assertEqual(self.edit.revert(applied), original)
+        return applied
+
+    def test_without_the_table_a_marked_block_is_added_before_the_agents_section(self) -> None:
+        for original in ("", USER_CONFIG, USER_CONFIG.rstrip("\n")):
+            with self.subTest(original=original[:20]):
+                applied = self.assert_round_trip(original)
+                self.assertEqual(self.roots(applied), [self.root])
+                self.assertLess(applied.index(mapping.ACCESS_END), applied.index(mapping.SECTION_BEGIN))
+                self.assertEqual(self.edit.notice(applied), "")
+
+    def test_a_table_without_writable_roots_gets_one_owned_line(self) -> None:
+        original = USER_CONFIG + "\n[sandbox_workspace_write]\nnetwork_access = true\n"
+        applied = self.assert_round_trip(original)
+        self.assertIn(f"[sandbox_workspace_write]\n{mapping.owned_line(Path(self.root))}\n", applied)
+        self.assertEqual(tomllib.loads(applied)[mapping.SANDBOX_TABLE]["network_access"], True)
+        self.assertNotIn(mapping.ACCESS_BEGIN, applied)
+
+    def test_a_directory_already_present_is_left_alone(self) -> None:
+        original = f'[sandbox_workspace_write]\nwritable_roots = [{json.dumps(self.root)}, "/srv"]\n'
+        applied = self.assert_round_trip(original)
+        self.assertNotIn("handoff access", applied)
+        self.assertEqual(self.edit.notice(applied), "")
+
+    def test_foreign_shapes_are_left_alone_and_reported(self) -> None:
+        for original in (
+            '[sandbox_workspace_write]\nwritable_roots = ["/srv"]\n',
+            "sandbox_workspace_write = { network_access = true }\n",
+            "sandbox_workspace_write.network_access = true\n",
+        ):
+            with self.subTest(original=original):
+                applied = self.assert_round_trip(original)
+                self.assertNotIn("handoff access", applied)
+                self.assertIn(self.root, self.edit.notice(applied))
+
+    def test_foreign_shape_is_a_note_not_a_conflict_and_the_agents_still_register(self) -> None:
+        config = self.codex / "config.toml"
+        config.parent.mkdir(parents=True)
+        config.write_text('[sandbox_workspace_write]\nwritable_roots = ["/srv"]\n')
+        plan = install.plan(self.spec, {})
+        self.assertEqual(plan.conflicts, [])
+        self.assertEqual([note.path for note in plan.notes], [config])
+        self.assertIn(f"[codex] note: {config}: ", "\n".join(install.describe(plan, dry_run=True)))
+        self.assertIn(mapping.SECTION_BEGIN, next(c.text for c in plan.changes if c.path == config))
+
+    def test_an_edited_block_or_line_is_kept_and_reported_on_uninstall(self) -> None:
+        for original in ("", "[sandbox_workspace_write]\n"):
+            with self.subTest(original=original):
+                edited = self.edit.apply(original).replace(json.dumps(self.root), f'{json.dumps(self.root)}, "/srv"')
+                with self.assertRaisesRegex(ValueError, "handoff access was edited"):
+                    self.edit.revert(edited)
+
+    def test_tables_codex_writes_inside_a_trailing_block_move_after_it(self) -> None:
+        access = mapping.access_edit(self.codex / "config.toml", Path(self.root), enabled=True)
+        installed = access.apply(USER_CONFIG)
+        trust = '[projects."/work"]\ntrust_level = "trusted"\n'
+        rewritten = installed.replace(mapping.ACCESS_END, trust + mapping.ACCESS_END)
+        reapplied = access.apply(rewritten)
+        self.assertTrue(reapplied.startswith(installed))
+        self.assertEqual(tomllib.loads(reapplied), tomllib.loads(rewritten))
+        self.assertEqual(tomllib.loads(access.revert(rewritten)), tomllib.loads(USER_CONFIG + "\n" + trust))
+
+    def test_disabled_setting_adds_nothing_and_withdraws_an_unedited_edit(self) -> None:
+        installed = self.edit.apply(USER_CONFIG)
+        self.config["handoff_access"]["enabled"] = False
+        disabled = mapping.install_spec(self.home, self.kit, self.python, self.config, {}).text_edits[0]
+        self.assertIsNone(disabled.notice)
+        self.assertIsNone(self.roots(disabled.apply(USER_CONFIG)))
+        withdrawn = disabled.apply(installed)
+        self.assertNotIn("handoff access", withdrawn)
+        self.assertEqual(disabled.revert(withdrawn), USER_CONFIG)
 
 
 class HooksJsonTests(SpecCase):

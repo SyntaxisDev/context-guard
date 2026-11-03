@@ -9,6 +9,7 @@ import datetime as dt
 import os
 import re
 import sys
+import tomllib
 from collections.abc import Mapping
 from pathlib import Path
 
@@ -19,6 +20,7 @@ if str(KIT) not in sys.path:
 from adapters.codex import mapping, rollout, runner, tools, waker
 from core import config as config_mod, hook, install, render
 from core.observation import BLOCK, COMPACT, CONTEXT, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
+from core.package import LAUNCHER
 
 RUNTIME = mapping.RUNTIME
 ADAPTER_CONFIG = Path(__file__).resolve().parent / "config.json"
@@ -48,6 +50,13 @@ PLUGIN_ROOT_TOKEN = "${PLUGIN_ROOT}"  # noqa: S105
 AGENTS_OFFER = (
     "context-guard: in your reply, offer the user once to install the named subagents with the "
     "command under Named subagents above. This note is not shown again."
+)
+ACCESS_COMMAND = f'sh "{PLUGIN_ROOT_TOKEN}/{LAUNCHER}" adapters/codex/access.py install'
+ACCESS_OFFER = (
+    "context-guard: handoffs are written outside the workspace, so the Codex sandbox asks before each "
+    "handoff write. In your reply, offer the user once to run `{command}`, which adds only the handoff "
+    "directory to the sandbox's writable roots in config.toml so handoff writes skip that approval; a "
+    "new session loads it. This note is not shown again."
 )
 
 
@@ -181,18 +190,20 @@ def plugin_policy(config: dict, home: Path, environ: Mapping[str, str]) -> str:
 
     Returns:
         The named-agent policy, or the role-less one with the plugin root filled in and, once ever,
-        the agents offer from `agents_offer`.
+        the agents offer from `agents_offer`; either may end with the offer from `access_offer`.
     """
     agents = mapping.agents_dir(home, environ)
     names = [agent.name for agent in render.agents(mapping.runtime_mapping(config))]
     if all((agents / f"{name}.toml").is_file() for name in names):
-        return (KIT / PLUGIN_POLICY_FILE).read_text()
-    policy = (KIT / PLUGIN_ROLELESS_POLICY_FILE).read_text().replace(PLUGIN_ROOT_TOKEN, str(KIT))
-    offer = agents_offer(home)
-    return f"{policy.rstrip()}\n\n{offer}\n" if offer else policy
+        policy, offers = (KIT / PLUGIN_POLICY_FILE).read_text(), []
+    else:
+        policy = (KIT / PLUGIN_ROLELESS_POLICY_FILE).read_text().replace(PLUGIN_ROOT_TOKEN, str(KIT))
+        offers = [agents_offer(home, environ)]
+    notes = "\n\n".join(offer for offer in [*offers, access_offer(config, home, environ)] if offer)
+    return f"{policy.rstrip()}\n\n{notes}\n" if notes else policy
 
 
-def agents_offer(home: Path) -> str:
+def agents_offer(home: Path, environ: Mapping[str, str] | None = None) -> str:
     """Offer the named role agents once ever, recording the offer before it is made.
 
     No offer is made when an install manifest shows the agents were installed (by agents.py or the
@@ -200,18 +211,80 @@ def agents_offer(home: Path) -> str:
 
     Args:
         home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
 
     Returns:
         The one-time offer note, or an empty string.
     """
-    installed = (install.manifest_path(home, name).is_file() for name in (RUNTIME, mapping.PLUGIN_AGENTS))
-    if any(installed) or install.offer_marker(home, mapping.PLUGIN_AGENTS).exists():
+    identity = mapping.install_identity(home, mapping.PLUGIN_AGENTS, environ)
+    installed = (
+        install.manifest_path(home, mapping.install_identity(home, name, environ)).is_file()
+        for name in (RUNTIME, mapping.PLUGIN_AGENTS)
+    )
+    if any(installed) or install.offer_marker(home, identity).exists():
         return ""
     try:
-        install.record_offer(home, mapping.PLUGIN_AGENTS)
+        install.record_offer(home, identity)
     except OSError:
         return ""
     return AGENTS_OFFER
+
+
+def lacks_access(config: dict, home: Path, environ: Mapping[str, str]) -> bool:
+    """Tell whether Codex's config.toml lacks the handoff directory in its sandbox writable roots.
+
+    Args:
+        config: Loaded Codex adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME.
+
+    Returns:
+        True when config.toml is missing or parses without the directory; False when it holds
+        it or cannot be read or parsed.
+    """
+    try:
+        text = (mapping.codex_home(home, environ) / "config.toml").read_text()
+    except FileNotFoundError:
+        return True
+    except OSError, UnicodeDecodeError:
+        return False
+    try:
+        return not mapping.has_root(tomllib.loads(text), config_mod.handoff_dir(config, home))
+    except tomllib.TOMLDecodeError:
+        return False
+
+
+def access_offer(config: dict, home: Path, environ: Mapping[str, str]) -> str:
+    """Offer the handoff write access once ever, recording the offer before it is made.
+
+    No offer is made when `handoff_access.enabled` is false, an install manifest shows the access
+    was installed (by access.py or the script install), the offer marker exists, config.toml
+    already grants it or cannot be read, or the marker cannot be written.
+
+    Args:
+        config: Loaded Codex adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment that may set CODEX_HOME.
+
+    Returns:
+        The one-time offer note naming the absolute command, or an empty string.
+    """
+    if not config["handoff_access"]["enabled"]:
+        return ""
+    identity = mapping.install_identity(home, mapping.PLUGIN_ACCESS, environ)
+    installed = (
+        install.manifest_path(home, mapping.install_identity(home, name, environ)).is_file()
+        for name in (RUNTIME, mapping.PLUGIN_ACCESS)
+    )
+    if any(installed) or install.offer_marker(home, identity).exists():
+        return ""
+    if not lacks_access(config, home, environ):
+        return ""
+    try:
+        install.record_offer(home, identity)
+    except OSError:
+        return ""
+    return ACCESS_OFFER.format(command=ACCESS_COMMAND.replace(PLUGIN_ROOT_TOKEN, str(KIT)))
 
 
 def session_policy(config: dict, home: Path, environ: Mapping[str, str] | None = None) -> str:

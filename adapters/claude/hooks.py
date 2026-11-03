@@ -6,6 +6,7 @@ transcript; of the parent session they only touch its background spawn bookkeepi
 auto-compaction point when known, else the configured window for the model.
 """
 
+import json
 import sys
 import time
 from collections.abc import Mapping
@@ -15,8 +16,8 @@ KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
 
-from adapters.claude import runner, subagents, transcript
-from core import config as config_mod, handoffs, hook, spawn, state as state_mod
+from adapters.claude import mapping, runner, subagents, transcript
+from core import config as config_mod, handoffs, hook, install, spawn, state as state_mod
 from core.observation import (
     BLOCK,
     COMPACT,
@@ -32,6 +33,7 @@ from core.observation import (
     Observation,
     ToolUse,
 )
+from core.package import LAUNCHER
 
 RUNTIME = "claude"
 ADAPTER_CONFIG = Path(__file__).resolve().parent / "config.json"
@@ -63,6 +65,13 @@ WINDOW_ENTRY_SIZE = 2
 LEARNED_FILE = Path("learned", "windows.json")
 PLUGIN_NAME = "context-guard"
 PLUGIN_POLICY_FILE = "policy/context-guard.md"
+ACCESS_SCRIPT = "adapters/claude/access.py install"
+ACCESS_OFFER = (
+    "context-guard: handoffs are written outside the project, so Claude Code asks before each handoff "
+    "write. In your reply, offer the user once to run `{command}`, which allows edits in the handoff "
+    "directory only (an `Edit` allow rule in {settings}) so handoff writes skip that prompt; "
+    "a new session loads it. This note is not shown again."
+)
 
 
 def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
@@ -468,18 +477,85 @@ def respond(decision: Decision, event: str, config: dict) -> dict[str, object]:
     return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": clip(decision.message, limit)}}
 
 
-def plugin_policy() -> str:
+def lacks_access(config: dict, home: Path, environ: Mapping[str, str] | None = None) -> bool:
+    """Tell whether settings.json lacks the handoff allow rule where it could be added.
+
+    Args:
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment to read; None reads the process environment.
+
+    Returns:
+        True when settings.json is missing or has no rule and no foreign `permissions.allow`;
+        False when it holds the rule or cannot be read or parsed.
+    """
+    try:
+        data = json.loads((mapping.claude_home(home, environ) / "settings.json").read_text())
+    except FileNotFoundError:
+        return True
+    except OSError, ValueError:
+        return False
+    permissions = data.get("permissions", {}) if isinstance(data, dict) else None
+    allow = permissions.get("allow", []) if isinstance(permissions, dict) else None
+    return isinstance(allow, list) and mapping.access_rule(config_mod.handoff_dir(config, home)) not in allow
+
+
+def access_offer(config: dict, home: Path, environ: Mapping[str, str] | None = None) -> str:
+    """Offer the handoff write access once ever, recording the offer before it is made.
+
+    No offer is made when `handoff_access.enabled` is false, an install manifest shows the access
+    was installed (by access.py or the script install), the offer marker exists, settings.json
+    already allows it or cannot be read, or the marker cannot be written.
+
+    Args:
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment to read; None reads the process environment.
+
+    Returns:
+        The one-time offer note naming the absolute command, or an empty string.
+    """
+    if not config["handoff_access"]["enabled"]:
+        return ""
+    installed = (
+        install.manifest_path(home, mapping.install_identity(home, name, environ)).is_file()
+        for name in (RUNTIME, mapping.PLUGIN_ACCESS)
+    )
+    identity = mapping.install_identity(home, mapping.PLUGIN_ACCESS, environ)
+    if any(installed) or install.offer_marker(home, identity).exists():
+        return ""
+    if not lacks_access(config, home, environ):
+        return ""
+    try:
+        install.record_offer(home, identity)
+    except OSError:
+        return ""
+    return ACCESS_OFFER.format(
+        command=f'sh "{KIT_ROOT}/{LAUNCHER}" {ACCESS_SCRIPT}',
+        settings=mapping.claude_home(home, environ) / "settings.json",
+    )
+
+
+def plugin_policy(config: dict, home: Path, environ: Mapping[str, str] | None = None) -> str:
     """Read the packaged policy that a plugin puts into the session context.
 
     Only a packaged plugin ships the rendered policy; an installed kit uses the rules file.
 
+    Args:
+        config: Loaded Claude Code adapter configuration.
+        home: Home directory of the context-guard install.
+        environ: Environment to read; None reads the process environment.
+
     Returns:
-        The policy text, or an empty string outside a plugin.
+        The policy text, followed once ever by the offer from `access_offer`, or an empty string
+        outside a plugin.
     """
     try:
-        return (KIT_ROOT / PLUGIN_POLICY_FILE).read_text()
+        policy = (KIT_ROOT / PLUGIN_POLICY_FILE).read_text()
     except FileNotFoundError:
         return ""
+    offer = access_offer(config, home, environ)
+    return f"{policy.rstrip()}\n\n{offer}\n" if offer else policy
 
 
 def observed(event: str, payload: dict[str, object], config: dict, home: Path) -> Observation | None:
@@ -510,7 +586,9 @@ def observed(event: str, payload: dict[str, object], config: dict, home: Path) -
     return observe_main(event, payload, config, directory, home)
 
 
-def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, object]:
+def handle(
+    event: str, payload: object, config: dict, home: Path, environ: Mapping[str, str] | None = None
+) -> dict[str, object]:
     """Observe, evaluate and answer one Claude Code hook call.
 
     Args:
@@ -518,12 +596,14 @@ def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, o
         payload: Decoded stdin JSON of the hook call.
         config: Loaded Claude Code adapter configuration.
         home: Home directory of the context-guard install.
+        environ: Environment to read; None reads the process environment.
 
     Returns:
         The native response; `{}` for unknown events, invalid payloads and bookkeeping events.
     """
     if event not in HOOK_EVENTS or not valid_payload(payload):
         return {}
+    mapping.claude_home(home, environ)
     directory = config_mod.state_dir(config, home, RUNTIME)
     data = payload.get("tool_input")
     subagents.track(event, payload, role_name(data.get("subagent_type")) if isinstance(data, dict) else None, directory)
@@ -537,7 +617,7 @@ def handle(event: str, payload: object, config: dict, home: Path) -> dict[str, o
         lambda: runner.services(home),
         lambda decision: respond(decision, event, config),
         lambda response: "hookSpecificOutput" in response,
-        plugin_policy,
+        lambda: plugin_policy(config, home, environ),
         lambda decision: subagents.deliver(obs, decision, config, directory),
     )
 
@@ -555,7 +635,9 @@ def run(event: str, payload: object, home: Path, environ: Mapping[str, str] | No
         The native response, or `{}` for internal runs, foreign homes and unreadable
         configuration, state or telemetry.
     """
-    return hook.guarded(KIT_ROOT, lambda: handle(event, payload, load_config(home, environ), home), {}, environ)
+    return hook.guarded(
+        KIT_ROOT, lambda: handle(event, payload, load_config(home, environ), home, environ), {}, environ
+    )
 
 
 def main() -> None:

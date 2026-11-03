@@ -4,7 +4,7 @@ Codex plugins cannot ship agents, so a plugin user who wants the named roles run
 packaged launcher. It writes only the role agent TOMLs, rendered as the script installer renders
 them, into `$CODEX_HOME/agents` (else `~/.codex/agents`), and records them in its own install
 manifest so uninstall removes only what it wrote. Edited files conflict and are kept unless forced.
-Install also creates the `~/.context-guard/state/offers/codex-agents` marker, so the SessionStart
+Install also creates the profile-specific offer marker, so the SessionStart
 hook never offers the step again.
 """
 
@@ -63,7 +63,9 @@ def plan(command: str, home: Path, environ: Mapping[str, str], *, force: bool) -
         The plan.
     """
     spec = agents_spec(home, hooks.load_config(home, environ), environ)
-    manifest = install.read_manifest(install.manifest_path(home, MANIFEST_RUNTIME))
+    manifest = install.read_manifest(
+        install.manifest_path(home, mapping.install_identity(home, MANIFEST_RUNTIME, environ))
+    )
     if command == "install":
         return install.plan(spec, manifest, force=force)
     return install.plan_uninstall(spec, manifest, force=force)
@@ -100,9 +102,10 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
     try:
         result = plan(args.command, home, environment, force=args.force)
         if not args.dry_run:
-            install.apply(result, install.manifest_path(home, MANIFEST_RUNTIME), install.backup_dir(home))
+            identity = mapping.install_identity(home, MANIFEST_RUNTIME, environment)
+            install.apply(result, install.manifest_path(home, identity), install.backup_dir(home))
             if args.command == "install":
-                install.record_offer(home, MANIFEST_RUNTIME)
+                install.record_offer(home, identity)
     except (ValueError, OSError) as exc:
         print(f"context-guard: {exc}", file=sys.stderr)
         return EXIT_ERROR

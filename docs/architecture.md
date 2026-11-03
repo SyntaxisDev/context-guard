@@ -172,6 +172,16 @@ written by `cli.py ... --set section.key=value`, which rejects a `section.key` a
 defaults and every adapter config (except a new object entry in a section of objects) and a
 value of the wrong type, so a typo fails instead of being silently ignored.
 
+`handoff_access.enabled` (default `true`) lets the agent write handoffs without a runtime
+approval: handoffs live in `paths.handoff_dir`, outside the workspace, where sandboxes and
+permission modes ask before writing. Codex gets the directory in
+`[sandbox_workspace_write].writable_roots` of `config.toml`, Claude Code an `Edit(//<dir>/**)`
+allow rule in `settings.json`; the script install includes it, and plugin users get a one-time
+SessionStart offer of `adapters/<rt>/access.py install`. Only the handoff directory is granted,
+never `~/.context-guard` (which also holds the kit and hook code). Cursor has no file-based
+setting for it ([cursor.md](cursor.md#handoff-writes-outside-the-workspace)). With `false`,
+install adds nothing, no offer is made, and a reinstall or uninstall removes an unedited grant.
+
 Hooks delete session state files in `paths.state_dir/<runtime>/` untouched for
 `paths.prune_days` (30) days; each state file's lock goes with its json, and an orphaned lock
 of the same age goes too.
@@ -188,6 +198,16 @@ run would otherwise also get duplicate events from the user's own installation.
 ## Install engine
 
 `core/install.py` plans, then applies; adapters only describe their `InstallSpec`.
+
+Runtime configuration directories are resolved in their adapters: `CLAUDE_CONFIG_DIR`
+and `CODEX_HOME` select native profile roots. The default profile uses
+`state/<rt>/install-manifest.json`; an alternate root uses
+`state/<rt>-<32-character path hash>/install-manifest.json`. Plugin setup manifests and
+offer markers use the same profile identity. The CLI selects the current profile for
+install, status, doctor and uninstall, and retains the shared kit while any profile's
+runtime manifest remains. Handoffs and telemetry state remain shared. Updating refreshes
+the shared kit and the profiles selected by the command's environment; rerun installation
+with each profile's environment to refresh all installed policy and agent files.
 
 1. **Plan** compares the rendered spec with disk and the manifest: create, update, remove,
    JSON merges (unrelated hooks and settings preserved) and text edits. `core/hookfile.py` holds
@@ -206,6 +226,9 @@ run would otherwise also get duplicate events from the user's own installation.
    that must all appear (whitespace-trimmed). For agent files, Cursor and Claude Code use
    `name: <role>` plus the first line of the role body; Codex, whose role body is one TOML string,
    uses the `name` and `description` lines. Anything else stays a conflict.
+   **Notes.** A text edit may leave out a part it cannot apply safely and say so through
+   `TextEdit.notice`; the plan prints it as `[<rt>] note: <path>: <message>`, which is not a
+   conflict and does not change the exit code.
 3. **Apply** writes each file to a temporary file beside it and renames it into place (through a
    symlink to its target, keeping the existing mode), so a hook importing a kit module during an
    install reads the old or the new file, never a partial one. It then records `state/<rt>/install-manifest.json` (sha256 of

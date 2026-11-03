@@ -16,7 +16,10 @@ Use one path per runtime: the installed hooks and the plugin hooks would both fi
 
 Some plugin features need one extra command, run by the user through the packaged launcher,
 because the runtime cannot load them from a plugin: Codex role agents
-(`adapters/codex/agents.py`, see [codex.md](codex.md#installing-the-plugin)) and Cursor hooks
+(`adapters/codex/agents.py`, see [codex.md](codex.md#installing-the-plugin)),
+handoff write access for Codex and Claude Code
+(`adapters/<rt>/access.py`, see [codex.md](codex.md#handoff-write-access),
+and [claude.md](claude.md#handoff-write-access)) and Cursor hooks
 (`adapters/cursor/hooks_install.py`, see [cursor.md](cursor.md#registering-the-hooks); the Cursor
 app runs plugin hooks only with Third-Party Imports on, so the Cursor plugin ships none). Each
 keeps its own install manifest and reverses cleanly. Install, verification, update and removal

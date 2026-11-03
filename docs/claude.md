@@ -2,6 +2,22 @@
 
 Shared behaviour is in [architecture.md](architecture.md). This page lists only what differs.
 
+## Configuration directory
+
+Every `~/.claude` path below uses `CLAUDE_CONFIG_DIR` when set. The adapter accepts an
+absolute path or expands a leading `~/` against the selected user home; an empty value
+uses `<home>/.claude`. Other relative paths are rejected by installation commands, and
+hooks fail open. The script installer, plugin handoff permission helper and permission
+checks all use this directory. Transcript reads use the paths supplied in hook payloads.
+
+Use the same environment when installing, checking, updating or uninstalling each profile.
+Default profiles keep their existing manifest and offer names; alternate profiles append
+a stable 32-character hash of the resolved config-directory path. Each profile therefore
+gets its own installation ownership and setup offers. Handoffs, hook state and the kit
+remain shared under `~/.context-guard`; removing one profile keeps the kit while another
+profile is installed. `--home` selects the user home, not the Claude configuration directory.
+For isolated checks, unset `CLAUDE_CONFIG_DIR` or set it to a temporary directory.
+
 | item | Claude Code |
 | --- | --- |
 | Telemetry | Tail of the session transcript JSONL: latest main-context assistant input usage (cache tokens included, output excluded). The window comes from `context_windows` patterns (model id to window), replaced by the learned compaction point (tokens before an auto compaction, recorded via `PreCompact`/`PostCompact`) once known. |
@@ -23,6 +39,37 @@ Claude Code wakes the parent natively. When a background subagent stops, it queu
 
 context-guard adds the silent-subagent note above, the closest equivalent of Cursor's notes: a hung or killed subagent never notifies, and the note reaches the parent on its next tool result, prompt or session start. Cursor's unreturned and orphaned notes have no Claude Code counterpart: a foreground `Agent` call holds the parent's tool call until the result is its tool result, and no recorded transcript shows a parent moving on while a foreground subagent still runs.
 
+## Handoff write access
+
+Handoffs live in `~/.context-guard/handoffs` (`paths.handoff_dir`), outside the project. In the
+`default` permission mode Claude Code asks before every write outside the project, so each
+handoff write is a prompt. With `handoff_access.enabled` (default `true`) the install adds one
+allow rule to `permissions.allow` in `~/.claude/settings.json` (creating `permissions` and `allow`
+when absent): `Edit(//<absolute handoff dir>/**)`, where `//` marks an absolute path and an `Edit`
+rule covers Edit, Write and MultiEdit. It covers only the handoff directory, not `~/.context-guard`,
+which also holds the kit and hook code. A `permissions` that is not an object or an `allow` that is
+not a list is left alone. Uninstall removes only the rule, plus `allow` and `permissions` when that
+empties them; the byte-identical restore of the original settings file still applies.
+
+The script install includes the rule in its `settings.json` merge. A plugin user runs, once:
+
+```sh
+sh "<plugin root>/hooks/context-guard-hook" adapters/claude/access.py install   # or uninstall
+```
+
+`access.py` adds the same rule under its own manifest
+(`~/.context-guard/state/claude-handoff-access/install-manifest.json`); `--dry-run` writes nothing,
+`--home` acts on another home. The plugin's `SessionStart` offers it once per profile: only while
+`handoff_access.enabled` is true, `settings.json` is missing or lacks the rule (an unreadable or
+invalid file gets no offer), neither the `claude` nor the `claude-handoff-access` manifest exists,
+and the marker `~/.context-guard/state/offers/claude-handoff-access` is missing; the hook creates
+the marker, and `access.py install` does too. CoWork has no `settings.json` to edit; see
+[distribution.md](distribution.md) for its folder permissions.
+
+To opt out, set `"handoff_access": {"enabled": false}` in `~/.context-guard/config.json`, then run
+`access.py uninstall` (plugin) or rerun `cli.py install --runtime claude` (script install), or
+delete the rule by hand.
+
 ## Tiers
 
 <!-- BEGIN generated: tiers -->
@@ -43,7 +90,8 @@ installed kit and the plugin, both sets of hooks fire.
   `claude plugin marketplace add <dir>` and `claude plugin install context-guard@context-guard`,
   and start a new session. Claude copies the plugin to
   `~/.claude/plugins/cache/<marketplace>/context-guard/<version>/` and loads its hooks, agents and
-  skills from there; there is no extra install step.
+  skills from there. The only optional step is the handoff allow rule from
+  [Handoff write access](#handoff-write-access), which the first session offers once.
 - CoWork: upload `context-guard-claude-<version>.zip` (the plugin root is the zip root). CoWork
   loads plugins only, so the script installer has no effect there.
 - Verify: `claude plugin list` shows `context-guard@context-guard` enabled, `/hooks` lists its

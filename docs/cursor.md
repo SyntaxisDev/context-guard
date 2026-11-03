@@ -2,6 +2,15 @@
 
 Shared behaviour is in [architecture.md](architecture.md). This page lists only what differs.
 
+## Directory overrides
+
+Cursor documents `CURSOR_CONFIG_DIR` for its CLI configuration file, but does not establish
+that it relocates user hooks, rules, agents or chat storage. context-guard therefore keeps
+these install paths under `<home>/.cursor`; it does not interpret that variable as a runtime
+home override. Custom telemetry locations remain configurable through the Cursor adapter's
+telemetry settings. This gap needs confirmation of Cursor's hook and extension discovery
+contract before an override can safely relocate the installed files.
+
 | item | Cursor |
 | --- | --- |
 | Telemetry | Chat record `composerData:<conversation_id>` in Cursor's `state.vscdb` (read-only, 1 s timeout): `contextTokensUsed`, `contextTokenLimit`. Path from `telemetry.state_db` or the per-platform default. Cursor CLI (`cursor-agent`) chats are not in that database; when it has no record, the CLI's own store `<telemetry.cli_chats>/<workspace hash>/<conversation_id>/store.db` (default `~/.cursor/chats`, found by conversation id, read-only) is used: `meta` row `0` holds hex-encoded JSON whose `latestRootBlobId` names a protobuf blob in `blobs`; its field 5 is the context usage message with tokens used (field 1) and context window (field 2). `telemetry.window_fallback` applies when no window is known. Any changed shape, invalid count or undecodable protobuf means no telemetry (fail open). |
@@ -65,6 +74,10 @@ The vendored hook reads the baked `adapters/cursor/config.json` and resolves its
 An installed context-guard Claude plugin registers its hooks in Cursor when Third-Party Imports is on; the Claude adapter ignores payloads carrying `cursor_version`, leaving those events to the Cursor hooks.
 
 Use one path per machine: the script install and `hooks_install.py` both register hooks in `~/.cursor/hooks.json`, so both would fire on every event and double notes, state and logs. `hooks_install.py install` warns when the script install is present; uninstall one before enabling the other.
+
+## Handoff writes outside the workspace
+
+Handoffs live in `~/.context-guard/handoffs` (`paths.handoff_dir`), outside the workspace, and the agent writes them with its file tool. If Settings → Agents → External-File Protection is on, Cursor asks before that write. The setting lives only in the IDE (no file-based configuration, and its default is undocumented), so context-guard never changes it: `handoff_access.enabled` has no effect in Cursor. Approve the write when asked, or turn the protection off. Cursor CLI (`cursor-agent`) users can allow the directory without a prompt by adding `Write(/<absolute handoff dir>/**)` to `permissions.allow` in `~/.cursor/cli-config.json`; context-guard does not write that file either. This is the documented gap for the handoff access that Codex and Claude Code get from the installer.
 
 ## Tiers
 

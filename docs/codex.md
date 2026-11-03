@@ -2,18 +2,29 @@
 
 Shared behaviour is in [architecture.md](architecture.md). This page lists only what differs.
 
-| item               | Codex                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Telemetry          | Tail of the rollout JSONL (`transcript_path`, last `rollout.tail_bytes`, 2 MiB): latest `token_count` `last_token_usage` and `model_context_window`. A compaction record after it invalidates the count. For subagents, the single `rollout-*<agent_id>.jsonl` in the parent rollout's date directory or the day before or after.                                                                                                                  |
-| Events             | `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `SubagentStop` in `~/.codex/hooks.json` (merged; left as is when it already holds exactly these handlers). `SubagentStop` always passes; it only starts the root waker (see [How the orchestrator is woken](#how-the-orchestrator-is-woken)).                                                                                                                                                         |
-| Subagent detection | `agent_id` present. Subagent hooks carry the parent's `session_id`, so state is keyed by `agent_id`. `SessionStart` and `Stop` never fire in subagents.                                                                                                                                                                                                                                                                  |
-| Channel            | Policy and handoff list through `SessionStart` `additionalContext`. `PostCompact` cannot carry context, so compaction is handled by `SessionStart` with `source: compact` (re-arms tiers, re-injects). Default cap is about 2,500 tokens per message; the handler sets `additionalContextLimit` from `hook_output.session_context_limit` (6000; env `CONTEXT_GUARD_HOOK_OUTPUT_SESSION_CONTEXT_LIMIT`, applied at install).                                                                                                                |
-| Notes              | UserPromptSubmit/PostToolUse `additionalContext` in the same hook, logged as `note` and `note_delivered`; block `{"decision":"block","reason","systemMessage"}`; Stop refresh as `decision: block` (continue).                                                                                                                                                                                                                                                                            |
-| Agents             | `~/.codex/agents/<role>.toml`, registered in a kit-owned `[agents.<role>]` section of `config.toml` (parsed with `tomllib`). Codex rewrites `config.toml` itself and inserts new tables (hook trust, projects, tui) before the trailing END marker, so install and uninstall move any table other than the kit's `[agents.<role>]` to just after the section. An edited kit table or an existing agent name outside the section is a conflict. |
-| Capability limits  | Role TOML ignores `sandbox_mode`, approval, network and MCP; subagents inherit the parent turn. Only `features.shell_tool = false` is real (set when `shell` is false). `write`, `network`, `mcp`, `git_push` are advisory lines in `developer_instructions` and listed as not enforced in the policy's role table.                                                                                                                            |
-| Per-spawn override | `spawn_agent` `model` and `reasoning_effort`; policy also asks for `agent_type` and `fork_turns: "none"`. A spawn without `model` runs the role file, which pins the role's default tier, and is logged as `subagent_spawn` with that tier and its `model`/`effort` (a different `reasoning_effort` alone is matched to its tier). |
-| Shell handoff access | Shell tools resolve relative handoff paths against the call's `workdir`, else the payload `cwd`. |
-| Transcripts        | `~/.codex/sessions/<yyyy>/<mm>/<dd>/`.                                                                                                                                                                                                                                                                                                                                                                                                         |
+## Configuration directory
+
+The installer and plugin helpers use an absolute `CODEX_HOME`, defaulting to `<home>/.codex`
+when it is empty, unset or relative. Hooks, config, agent registrations, skills and installed
+policy files all target that directory. Use the same environment for install, update,
+status, doctor and uninstall. Each alternate directory has an independent install manifest
+and setup-offer markers, identified by a 32-character hash of its resolved path. Handoffs,
+hook state and the kit remain shared under `~/.context-guard`; the kit stays until the last
+profile is removed. `--home` does not override `CODEX_HOME`; unset it or point it into the
+temporary home for sandbox checks. Transcript reads follow hook payload paths.
+
+| item                 | Codex                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Telemetry            | Tail of the rollout JSONL (`transcript_path`, last `rollout.tail_bytes`, 2 MiB): latest `token_count` `last_token_usage` and `model_context_window`. A compaction record after it invalidates the count. For subagents, the single `rollout-*<agent_id>.jsonl` in the parent rollout's date directory or the day before or after.                                                                                                              |
+| Events               | `SessionStart`, `UserPromptSubmit`, `PostToolUse`, `Stop`, `SubagentStop` in `~/.codex/hooks.json` (merged; left as is when it already holds exactly these handlers). `SubagentStop` always passes; it only starts the root waker (see [How the orchestrator is woken](#how-the-orchestrator-is-woken)).                                                                                                                                       |
+| Subagent detection   | `agent_id` present. Subagent hooks carry the parent's `session_id`, so state is keyed by `agent_id`. `SessionStart` and `Stop` never fire in subagents.                                                                                                                                                                                                                                                                                        |
+| Channel              | Policy and handoff list through `SessionStart` `additionalContext`. `PostCompact` cannot carry context, so compaction is handled by `SessionStart` with `source: compact` (re-arms tiers, re-injects). Default cap is about 2,500 tokens per message; the handler sets `additionalContextLimit` from `hook_output.session_context_limit` (6000; env `CONTEXT_GUARD_HOOK_OUTPUT_SESSION_CONTEXT_LIMIT`, applied at install).                    |
+| Notes                | UserPromptSubmit/PostToolUse `additionalContext` in the same hook, logged as `note` and `note_delivered`; block `{"decision":"block","reason","systemMessage"}`; Stop refresh as `decision: block` (continue).                                                                                                                                                                                                                                 |
+| Agents               | `~/.codex/agents/<role>.toml`, registered in a kit-owned `[agents.<role>]` section of `config.toml` (parsed with `tomllib`). Codex rewrites `config.toml` itself and inserts new tables (hook trust, projects, tui) before the trailing END marker, so install and uninstall move any table other than the kit's `[agents.<role>]` to just after the section. An edited kit table or an existing agent name outside the section is a conflict. |
+| Capability limits    | Role TOML ignores `sandbox_mode`, approval, network and MCP; subagents inherit the parent turn. Only `features.shell_tool = false` is real (set when `shell` is false). `write`, `network`, `mcp`, `git_push` are advisory lines in `developer_instructions` and listed as not enforced in the policy's role table.                                                                                                                            |
+| Per-spawn override   | `spawn_agent` `model` and `reasoning_effort`; policy also asks for `agent_type` and `fork_turns: "none"`. A spawn without `model` runs the role file, which pins the role's default tier, and is logged as `subagent_spawn` with that tier and its `model`/`effort` (a different `reasoning_effort` alone is matched to its tier).                                                                                                             |
+| Shell handoff access | Shell tools resolve relative handoff paths against the call's `workdir`, else the payload `cwd`.                                                                                                                                                                                                                                                                                                                                               |
+| Transcripts          | `~/.codex/sessions/<yyyy>/<mm>/<dd>/`.                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## How the orchestrator is woken
 
@@ -64,6 +75,51 @@ reason). A failure, such as `codex` missing from `PATH` or an app server that do
   trigger `queue`, and `waker.log` has a `sent` line for the root. The thread is archived and the
   app server stopped afterwards; a running daemon or desktop app only sees the queued message.
 
+## Handoff write access
+
+Handoffs live in `~/.context-guard/handoffs` (`paths.handoff_dir`), outside the workspace. The
+`workspace-write` sandbox writes only the workspace and temporary directories, so every handoff
+write escalates, and with `approvals_reviewer = "auto_review"` the reviewer can reject it as an
+unrelated write prompted by context-guard instructions. Codex reads extra sandbox roots from
+`[sandbox_workspace_write].writable_roots` in `config.toml`, so with `handoff_access.enabled`
+(default `true`) the install adds the absolute handoff directory there, and nothing else: not
+`~/.context-guard`, which also holds the kit and hook code.
+
+- No `sandbox_workspace_write` table: a marked block (`# BEGIN context-guard handoff access` …
+  `# END context-guard handoff access`) creates it with `writable_roots = ["<dir>"]`, placed
+  just before the agents section so Codex keeps inserting its own tables into that section,
+  whose eviction moves them out. Tables Codex inserts into a block that ends the file are
+  moved after it the same way.
+- A `[sandbox_workspace_write]` table without `writable_roots`: one owned line after its header,
+  `writable_roots = ["<dir>"]  # context-guard handoff access`.
+- `writable_roots` already holding the directory: no change.
+- Any other shape (a `writable_roots` without the directory, an inline table, dotted keys):
+  no change, and install prints `[codex] note: <config.toml>: ...` asking you to add the
+  directory yourself. It is not a conflict; the agents still register.
+
+Each edit is checked with `tomllib` to change nothing but that key. Uninstall removes exactly the
+block or line; an edited one (for example after changing `paths.handoff_dir`) is kept and
+reported as a conflict.
+
+The script install includes the edit in its `config.toml` change. A plugin user runs, once:
+
+```sh
+sh "<plugin root>/hooks/context-guard-hook" adapters/codex/access.py install   # or uninstall
+```
+
+`access.py` makes the same edit in `$CODEX_HOME/config.toml` (else `~/.codex/config.toml`) under
+its own manifest (`~/.context-guard/state/codex-handoff-access/install-manifest.json`), with
+`--dry-run`, `--home` and `--force` like `agents.py`. The plugin's `SessionStart` offers it once,
+ever: only while `handoff_access.enabled` is true, `config.toml` is missing or parses without the
+directory (an unreadable or invalid file gets no offer), neither the `codex` nor the
+`codex-handoff-access` manifest exists, and the marker
+`~/.context-guard/state/offers/codex-handoff-access` is missing; the hook creates the marker, and
+`access.py install` does too.
+
+To opt out, set `"handoff_access": {"enabled": false}` in `~/.context-guard/config.json`, then run
+`access.py uninstall` (plugin) or rerun `cli.py install --runtime codex` (script install), or
+delete the owned block or line by hand.
+
 ## Tiers
 
 <!-- BEGIN generated: tiers -->
@@ -80,15 +136,15 @@ reason). A failure, such as `codex` missing from `PATH` or an app server that do
 packaging rules in [distribution.md](distribution.md)). Use one path per runtime: with both the
 installed kit and the plugin, both sets of hooks fire.
 
-| file | role |
-| --- | --- |
-| `.codex-plugin/plugin.json` | `name`, `version`, `description`, `skills: "./skills/"`, `hooks: "./hooks/hooks.json"`, `interface` (`displayName`, `shortDescription`, `developerName`, `category`). No `.claude-plugin/` or root `plugin.json`: Codex reads those too and would mix formats. |
-| `hooks/hooks.json` | The installer's handler groups (same events, timeout and `additionalContextLimit`), each `sh "${PLUGIN_ROOT}/hooks/context-guard-hook" adapters/codex/hooks.py <event>`. Codex sets `PLUGIN_ROOT` in the hook environment. |
-| `skills/<name>/SKILL.md` | Rendered like the installer's; Codex names them `context-guard:<skill>`. `install-context-guard` is not shipped. |
-| `policy/context-guard.md` | The installer's policy, for a Codex home with the named role agents. |
-| `policy/context-guard-roleless.md` | The same policy for a home without them: spawn Codex's default agent (no `agent_type`, `fork_turns: "none"`) with the role's tier `model` and `reasoning_effort`, and start the message with `roles/<role>.md`. Every denied capability is listed as not enforced. Ends with the agents install command. |
-| `roles/<role>.md` | Role brief: the role body plus an advisory line for every denied capability, shell included. |
-| `core/`, `content/`, `adapters/codex/` | Vendored code. |
+| file                                   | role                                                                                                                                                                                                                                                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `.codex-plugin/plugin.json`            | `name`, `version`, `description`, `skills: "./skills/"`, `hooks: "./hooks/hooks.json"`, `interface` (`displayName`, `shortDescription`, `developerName`, `category`). No `.claude-plugin/` or root `plugin.json`: Codex reads those too and would mix formats.                                           |
+| `hooks/hooks.json`                     | The installer's handler groups (same events, timeout and `additionalContextLimit`), each `sh "${PLUGIN_ROOT}/hooks/context-guard-hook" adapters/codex/hooks.py <event>`. Codex sets `PLUGIN_ROOT` in the hook environment.                                                                               |
+| `skills/<name>/SKILL.md`               | Rendered like the installer's; Codex names them `context-guard:<skill>`. `install-context-guard` is not shipped.                                                                                                                                                                                         |
+| `policy/context-guard.md`              | The installer's policy, for a Codex home with the named role agents.                                                                                                                                                                                                                                     |
+| `policy/context-guard-roleless.md`     | The same policy for a home without them: spawn Codex's default agent (no `agent_type`, `fork_turns: "none"`) with the role's tier `model` and `reasoning_effort`, and start the message with `roles/<role>.md`. Every denied capability is listed as not enforced. Ends with the agents install command. |
+| `roles/<role>.md`                      | Role brief: the role body plus an advisory line for every denied capability, shell included.                                                                                                                                                                                                             |
+| `core/`, `content/`, `adapters/codex/` | Vendored code.                                                                                                                                                                                                                                                                                           |
 
 `.agents/plugins/marketplace.json` (with `--marketplace`) lists the plugin as
 `{"source": "local", "path": "./plugins/context-guard"}`, `installation: AVAILABLE`,
@@ -106,14 +162,16 @@ installed kit and the plugin, both sets of hooks fire.
 3. Optional, for the named subagents: run the agents command below, then start a new session.
    Without them the role-less policy, which names this command with the plugin root filled in,
    spawns Codex's default agent per role.
-4. Verify: `/hooks` lists the five context-guard handlers as trusted, and after a prompt
+4. Optional, so handoff writes skip sandbox approval: run the `access.py` command from
+   [Handoff write access](#handoff-write-access) (the first session offers it once).
+5. Verify: `/hooks` lists the five context-guard handlers as trusted, and after a prompt
    `~/.context-guard/state/codex/events.jsonl` ends with a `prompt` record; with the agents,
    `~/.codex/agents/` holds one `<role>.toml` per role.
 
 Updating: replace the marketplace directory with the new release (or `codex plugin marketplace
 upgrade` for a Git marketplace), reinstall with `codex plugin remove` and `codex plugin add
 context-guard@<marketplace>`, review `/hooks` if asked, and rerun the agents command from the new plugin root so the role files match.
-Removing: run the agents command with `uninstall` first (it lives in the plugin), then
+Removing: run the agents and access commands with `uninstall` first (they live in the plugin), then
 `codex plugin remove context-guard@<marketplace>`.
 
 Plugins cannot ship agents (Codex loads them only from `~/.codex/agents/*.toml` or

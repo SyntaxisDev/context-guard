@@ -9,6 +9,7 @@ import json
 import subprocess
 import sys
 import tempfile
+import tomllib
 import unittest
 import uuid
 from pathlib import Path
@@ -227,8 +228,13 @@ class InstallTests(unittest.TestCase):
         self.assertEqual(cursor["afterFileEdit"], [{"command": "./format.sh"}])
         self.assertIn({"command": "say done"}, cursor["stop"])
         claude = json.loads((Kit.home / ".claude/settings.json").read_text())
-        self.assertEqual((claude["model"], claude["permissions"]), ("sonnet", {"allow": ["Bash(ls:*)"]}))
-        self.assertTrue((Kit.home / ".codex/config.toml").read_text().startswith(USER_FILES[".codex/config.toml"]))
+        handoffs = Kit.home / ".context-guard" / "handoffs"
+        self.assertEqual(
+            (claude["model"], claude["permissions"]), ("sonnet", {"allow": ["Bash(ls:*)", f"Edit(/{handoffs}/**)"]})
+        )
+        codex_config = (Kit.home / ".codex/config.toml").read_text()
+        self.assertTrue(codex_config.startswith(USER_FILES[".codex/config.toml"]))
+        self.assertEqual(tomllib.loads(codex_config)["sandbox_workspace_write"]["writable_roots"], [str(handoffs)])
         for name in (".codex/AGENTS.md", ".claude/CLAUDE.md"):
             self.assertEqual((Kit.home / name).read_text(), USER_FILES[name])
 

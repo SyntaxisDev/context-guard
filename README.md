@@ -35,12 +35,31 @@ backups), `--set section.key=value` (write the user config; the key must exist i
 `content/defaults.json` or an adapter `config.json`).
 Exit codes: 0 ok, 1 conflicts, doctor problems or (doctor) nothing installed, 2 the command could not run.
 
+Claude Code uses `CLAUDE_CONFIG_DIR` (default `~/.claude`) and Codex uses `CODEX_HOME`
+(default `~/.codex`). Set the same variable
+when installing, updating, checking or uninstalling a profile. Each profile has its own
+install record; handoffs and the kit remain shared under `~/.context-guard`.
+
+```sh
+CLAUDE_CONFIG_DIR="$HOME/.claude_personal" uv run --python 3.14 python cli.py install --runtime claude
+```
+
+`--home` changes context-guard's user home; it does not override these native directory
+variables. For sandbox checks, unset them or point them inside the temporary home.
+Cursor's CLI config-directory override is not applied to hooks or agents; see
+[Cursor directory overrides](docs/cursor.md#directory-overrides).
+
 Installation copies one kit to `~/.context-guard/kit` with a pinned Python 3.14 venv; hooks
 call that interpreter. Start a new session afterwards (reload the window in Cursor) and, in
 Codex, trust the new hooks in `/hooks`: context-guard never writes hook trust. `doctor` checks
 the install; after a prompt, `~/.context-guard/state/<runtime>/events.jsonl` ends with a `prompt`
 record. Unrelated hooks and settings are preserved; see
-[docs/architecture.md](docs/architecture.md#install-engine).
+[docs/architecture.md](docs/architecture.md#install-engine). For Codex and Claude Code the install
+also lets the agent write handoffs without an approval prompt: the handoff directory (only that
+directory) goes into Codex's sandbox `writable_roots` and a Claude Code `Edit` allow rule. Opt out
+with `--set handoff_access.enabled=false`, then reinstall; details in
+[docs/codex.md](docs/codex.md#handoff-write-access)
+and [docs/claude.md](docs/claude.md#handoff-write-access).
 
 ### Updating
 
@@ -69,7 +88,8 @@ zip `context-guard-<runtime>-<version>.zip` (plugin at the zip root), a marketpl
   The agent offers step 2 once, ever. Plugin root, verification and removal: [docs/cursor.md](docs/cursor.md#registering-the-hooks).
 - Codex: unzip the Codex marketplace zip, then `codex plugin marketplace add <dir>` and
   `codex plugin add context-guard@context-guard`; trust the hooks with `/hooks`. For the named
-  subagents, run the agents command (the first session offers it once); plugin root, verification, updates and removal:
+  subagents, run the agents command, and for handoff writes without sandbox approval the access
+  command (the first session offers each once); plugin root, verification, updates and removal:
   [docs/codex.md](docs/codex.md#installing-the-plugin).
 
 To build the same packages from a checkout, with settings baked in through `--set`:

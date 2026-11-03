@@ -7,7 +7,7 @@ from pathlib import Path
 
 from adapters.claude import hooks, mapping
 from core import install, render
-from core.install_spec import InstallSpec
+from core.install_spec import InstallSpec, JsonMerge
 
 
 def frontmatter(text: str) -> dict[str, str]:
@@ -37,7 +37,7 @@ class MappingTestCase(unittest.TestCase):
         self.tmp.cleanup()
 
     def spec(self) -> InstallSpec:
-        return mapping.install_spec(self.home, self.kit, self.python, self.config)
+        return mapping.install_spec(self.home, self.kit, self.python, self.config, environ={})
 
 
 class RenderedFileTests(MappingTestCase):
@@ -113,7 +113,8 @@ class SettingsMergeTests(MappingTestCase):
         self.assertEqual(merge.path, self.home / ".claude" / "settings.json")
         merged = merge.merge(original)
         self.assertEqual(original, self.settings())
-        self.assertEqual((merged["model"], merged["permissions"]), ("opus", {"allow": ["Bash(ls)"]}))
+        rule = f"Edit(/{self.home}/.context-guard/handoffs/**)"
+        self.assertEqual((merged["model"], merged["permissions"]), ("opus", {"allow": ["Bash(ls)", rule]}))
         self.assertEqual(merged["hooks"]["Notification"], original["hooks"]["Notification"])
         self.assertEqual(merged["hooks"]["PostToolUse"][0], original["hooks"]["PostToolUse"][0])
         self.assertEqual(merged["hooks"]["Stop"][0]["hooks"], [{"type": "command", "command": "notify"}])
@@ -150,6 +151,54 @@ class SettingsMergeTests(MappingTestCase):
             [problem for problem in problems if "settings.json" in problem],
             ["settings.json: hooks must map event names to lists"],
         )
+
+
+class HandoffAccessTests(MappingTestCase):
+    """The settings.json allow rule for the handoff directory, added and removed exactly."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        self.rule = f"Edit(/{self.home}/.context-guard/handoffs/**)"
+
+    def merge(self, *, enabled: bool = True) -> JsonMerge:
+        self.config["handoff_access"]["enabled"] = enabled
+        return self.spec().json_merges[0]
+
+    def test_rule_is_added_with_the_containers_it_needs_and_removed_with_them(self) -> None:
+        merge = self.merge()
+        for original in ({}, {"permissions": {"deny": ["Bash(rm:*)"]}}, {"permissions": {"allow": ["Bash(ls)"]}}):
+            with self.subTest(original=original):
+                merged = merge.merge(json.loads(json.dumps(original)))
+                self.assertEqual(merged["permissions"]["allow"][-1], self.rule)
+                self.assertEqual(merge.merge(json.loads(json.dumps(merged))), merged)
+                self.assertEqual(merge.unmerge(merged), original)
+
+    def test_foreign_permission_shapes_are_left_alone(self) -> None:
+        merge = self.merge()
+        for original in ({"permissions": "ask"}, {"permissions": {"allow": "Bash(ls)"}}):
+            with self.subTest(original=original):
+                merged = merge.merge(json.loads(json.dumps(original)))
+                self.assertEqual(merged["permissions"], original["permissions"])
+
+    def test_disabled_setting_adds_nothing_and_withdraws_an_installed_rule(self) -> None:
+        merge = self.merge(enabled=False)
+        self.assertNotIn("permissions", merge.merge({}))
+        self.assertEqual(
+            merge.merge({"permissions": {"allow": ["Bash(ls)", self.rule]}})["permissions"]["allow"], ["Bash(ls)"]
+        )
+
+    def test_install_and_uninstall_restore_hand_formatted_settings_byte_identical(self) -> None:
+        settings = self.home / ".claude" / "settings.json"
+        settings.parent.mkdir(parents=True)
+        original = '{\n    "permissions": {"allow": ["Bash(ls)"]}\n}'
+        settings.write_text(original)
+        spec, manifest_path = self.spec(), install.manifest_path(self.home, mapping.RUNTIME)
+        install.apply(install.plan(spec, {}), manifest_path, self.home / "backups")
+        self.assertEqual(json.loads(settings.read_text())["permissions"]["allow"], ["Bash(ls)", self.rule])
+        install.apply(
+            install.plan_uninstall(spec, install.read_manifest(manifest_path)), manifest_path, self.home / "b"
+        )
+        self.assertEqual(settings.read_text(), original)
 
 
 OLD_RUNNER = """---

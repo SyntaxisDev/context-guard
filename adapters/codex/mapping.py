@@ -2,13 +2,14 @@
 
 import difflib
 import json
+import os
 import re
 import tomllib
 from collections.abc import Callable, Collection, Mapping
 from functools import partial
 from pathlib import Path
 
-from core import hookfile, render
+from core import config as config_mod, hookfile, install, render
 from core.deadline import HOOK_TIMEOUT_SECONDS
 from core.install_spec import InstallSpec, TextEdit
 from core.render import Agent, RenderedFile, RuntimeMapping
@@ -31,12 +32,22 @@ SECTION = re.compile(
     re.DOTALL,
 )
 TABLE_HEADER = re.compile(r"^[ \t]*\[", re.MULTILINE)
+PLUGIN_ACCESS = "codex-handoff-access"
+SANDBOX_TABLE = "sandbox_workspace_write"
+ROOTS_KEY = "writable_roots"
+ACCESS_BEGIN = "# BEGIN context-guard handoff access"
+ACCESS_END = "# END context-guard handoff access"
+ACCESS_BLOCK = re.compile(re.escape(ACCESS_BEGIN) + r"\n.*?" + re.escape(ACCESS_END) + r"(?:\n|$)", re.DOTALL)
+ACCESS_COMMENT = "# context-guard handoff access"
+SANDBOX_HEADER = re.compile(r"^[ \t]*\[[ \t]*" + SANDBOX_TABLE + r"[ \t]*\][ \t]*(?:#.*)?$", re.MULTILINE)
 OVERRIDE_SYNTAX = (
     "the `spawn_agent` `model` and `reasoning_effort` arguments. Always pass the role as "
     '`agent_type` and `fork_turns: "none"` so the subagent starts from your brief instead of '
     "the full chat history"
 )
-TRANSCRIPTS = "Codex keeps each session as a JSONL rollout under `~/.codex/sessions/<yyyy>/<mm>/<dd>/`."
+TRANSCRIPTS = (
+    "Codex keeps session JSONL rollouts under `$CODEX_HOME/sessions/<yyyy>/<mm>/<dd>/` (default `~/.codex/sessions/`)."
+)
 ADVISORY_LIMITS = {
     "write": "Do not modify project files; write evidence only under /tmp.",
     "network": "Do not use network access (web requests, HTTP clients, package downloads).",
@@ -187,22 +198,24 @@ def hook_groups(command: Callable[[str], str], context_limit: int) -> dict[str, 
     return groups
 
 
-def registration_section(home: Path, descriptions: dict[str, str]) -> str:
+def registration_section(home: Path, descriptions: dict[str, str], environ: Mapping[str, str] | None = None) -> str:
     """Render the kit-owned config.toml section that registers our agents.
 
     Args:
-        home: Home directory the agent files are installed under.
+        home: User home directory.
         descriptions: Description per agent name.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
 
     Returns:
         The marked section, ending with a newline.
     """
+    directory = agents_dir(home, os.environ if environ is None else environ)
     lines = [SECTION_BEGIN]
     for name, description in descriptions.items():
         lines += [
             f"[agents.{name}]",
             f"description = {toml_string(description)}",
-            f"config_file = {toml_string(str(home / AGENTS_DIR / f'{name}.toml'))}",
+            f"config_file = {toml_string(str(directory / f'{name}.toml'))}",
             "",
         ]
     return "\n".join([*lines[:-1], SECTION_END]) + "\n"
@@ -398,6 +411,264 @@ def revert_section(text: str, section: str, names: Collection[str]) -> str:
     return remove_section(text)
 
 
+def roots_line(root: Path) -> str:
+    """Render a `writable_roots` assignment holding only the handoff directory.
+
+    Args:
+        root: The absolute handoff directory.
+
+    Returns:
+        The TOML line without a newline.
+    """
+    return f"{ROOTS_KEY} = [{toml_string(str(root))}]"
+
+
+def access_block(root: Path) -> str:
+    """Render the marked block that creates `[sandbox_workspace_write]` with the handoff directory.
+
+    Args:
+        root: The absolute handoff directory.
+
+    Returns:
+        The block, ending with a newline.
+    """
+    return f"{ACCESS_BEGIN}\n[{SANDBOX_TABLE}]\n{roots_line(root)}\n{ACCESS_END}\n"
+
+
+def owned_line(root: Path) -> str:
+    """Render the marked `writable_roots` line added to an existing `[sandbox_workspace_write]` table.
+
+    Args:
+        root: The absolute handoff directory.
+
+    Returns:
+        The line without a newline.
+    """
+    return f"{roots_line(root)}  {ACCESS_COMMENT}"
+
+
+def has_root(parsed: dict, root: Path) -> bool:
+    """Tell whether a parsed config.toml already lets the sandbox write the handoff directory.
+
+    Args:
+        parsed: Parsed config.toml.
+        root: The absolute handoff directory.
+
+    Returns:
+        True when `[sandbox_workspace_write].writable_roots` is a list holding `root`.
+    """
+    table = parsed.get(SANDBOX_TABLE)
+    roots = table.get(ROOTS_KEY) if isinstance(table, dict) else None
+    return isinstance(roots, list) and str(root) in roots
+
+
+def evict_access_tables(text: str, root: Path) -> str:
+    """Move tables Codex inserted inside our access block, when it ends the file, to just after it.
+
+    Args:
+        text: Current config.toml text.
+        root: The absolute handoff directory.
+
+    Returns:
+        The text with foreign tables after the block, or unchanged when there are none.
+    """
+    match = ACCESS_BLOCK.search(text)
+    if match is None:
+        return text
+    owned = f"[{SANDBOX_TABLE}]\n{roots_line(root)}\n"
+    body = match[0][len(ACCESS_BEGIN) + 1 :].rstrip("\n").removesuffix(ACCESS_END)
+    rest = body.removeprefix(owned)
+    if rest == body or not TABLE_HEADER.match(rest.lstrip("\n")):
+        return text
+    return text[: match.start()] + access_block(root) + "\n" + rest.strip("\n") + "\n" + text[match.end() :]
+
+
+def insert_block(text: str, block: str) -> str:
+    """Put the access block just before our agents section, or append it.
+
+    Kept off the end of the file when the agents section exists, so Codex inserts its tables into
+    the section, whose eviction handles them.
+
+    Args:
+        text: Current config.toml text.
+        block: The rendered access block.
+
+    Returns:
+        The text with the block.
+    """
+    match = SECTION.search(text)
+    if match is not None:
+        return text[: match.start()] + block + "\n" + text[match.start() :]
+    if text and not text.endswith("\n"):
+        return text + "\n\n" + block[:-1]
+    return text + ("\n" if text else "") + block
+
+
+def remove_block(text: str) -> str:
+    """Remove the access block and the blank line that separated it, inverting `insert_block`.
+
+    Args:
+        text: config.toml text.
+
+    Returns:
+        The text without the block, or unchanged when it has none.
+    """
+    match = ACCESS_BLOCK.search(text)
+    if match is None:
+        return text
+    after = text[match.end() :]
+    if match[0].endswith("\n") and after.startswith("\n" + SECTION_BEGIN):
+        return text[: match.start()] + after[1:]
+    before = text[: match.start()]
+    if before.endswith("\n\n"):
+        before = before[:-1] if match[0].endswith("\n") else before[:-2]
+    return before + after
+
+
+def only_root_added(before: dict, result: str, root: Path) -> bool:
+    """Check that an access edit changed nothing but `writable_roots`.
+
+    Args:
+        before: Parsed config.toml before the edit.
+        result: config.toml text after the edit.
+        root: The absolute handoff directory.
+
+    Returns:
+        True when `result` parses to `before` with `writable_roots = [root]` added.
+    """
+    try:
+        after = tomllib.loads(result)
+    except tomllib.TOMLDecodeError:
+        return False
+    table = before.get(SANDBOX_TABLE, {})
+    return after == {**before, SANDBOX_TABLE: {**table, ROOTS_KEY: [str(root)]}}
+
+
+def apply_access(text: str, root: Path) -> str:
+    """Let the workspace-write sandbox write the handoff directory.
+
+    Without `[sandbox_workspace_write]` a marked block creates it; a table without
+    `writable_roots` gets one marked line after its header. Any other shape is left alone and
+    reported by `access_notice`. Invalid TOML raises ValueError from `parse_toml`.
+
+    Args:
+        text: Current config.toml text.
+        root: The absolute handoff directory.
+
+    Returns:
+        The edited text, or the text unchanged when the directory is present or the shape is foreign.
+    """
+    text = evict_access_tables(text, root)
+    parsed = parse_toml(text, "before install")
+    if has_root(parsed, root):
+        return text
+    table = parsed.get(SANDBOX_TABLE)
+    headers = list(SANDBOX_HEADER.finditer(text))
+    if table is None:
+        result = insert_block(text, access_block(root))
+    elif isinstance(table, dict) and ROOTS_KEY not in table and len(headers) == 1:
+        result = text[: headers[0].end()] + "\n" + owned_line(root) + text[headers[0].end() :]
+    else:
+        return text
+    return result if only_root_added(parsed, result, root) else text
+
+
+def strip_access(text: str, root: Path) -> str:
+    """Remove our access block or line where it is exactly as installed; edited ones stay.
+
+    Args:
+        text: config.toml text.
+        root: The absolute handoff directory.
+
+    Returns:
+        The text without our unedited access edit.
+    """
+    text = evict_access_tables(text, root)
+    match = ACCESS_BLOCK.search(text)
+    if match is not None and match[0].rstrip("\n") == access_block(root).rstrip("\n"):
+        text = remove_block(text)
+    return re.sub(re.escape("\n" + owned_line(root)) + r"(?=\n|$)", "", text, count=1)
+
+
+def revert_access(text: str, root: Path) -> str:
+    """Remove our access edit from config.toml text on uninstall.
+
+    Args:
+        text: config.toml text.
+        root: The absolute handoff directory.
+
+    Returns:
+        The text without the access edit, or unchanged when it has none.
+
+    Raises:
+        ValueError: The block or line differs from the installed one, i.e. the user edited it.
+    """
+    stripped = strip_access(text, root)
+    if ACCESS_BEGIN in stripped or ACCESS_COMMENT in stripped:
+        msg = "config.toml context-guard handoff access was edited; remove it by hand"
+        raise ValueError(msg)
+    return stripped
+
+
+def access_notice(text: str, root: Path) -> str:
+    """Tell the user to add the handoff directory when `apply_access` left a foreign shape alone.
+
+    Args:
+        text: config.toml text after the install's edit.
+        root: The absolute handoff directory.
+
+    Returns:
+        The note, or an empty string when the directory is present or the text does not parse.
+    """
+    try:
+        if has_root(tomllib.loads(text), root):
+            return ""
+    except tomllib.TOMLDecodeError:
+        return ""
+    return (
+        f"[{SANDBOX_TABLE}] {ROOTS_KEY} was left as is; add {toml_string(str(root))} to it yourself so "
+        "handoff writes skip sandbox approval, or set handoff_access.enabled to false"
+    )
+
+
+def access_edit(path: Path, root: Path, *, enabled: bool) -> TextEdit:
+    """Build the config.toml edit that grants (or, when disabled, withdraws) handoff write access.
+
+    Args:
+        path: The config.toml file.
+        root: The absolute handoff directory.
+        enabled: The `handoff_access.enabled` setting.
+
+    Returns:
+        The edit; uninstall always removes an unedited access edit, and only an enabled edit has notes.
+    """
+    if not enabled:
+        return TextEdit(path, partial(strip_access, root=root), partial(revert_access, root=root))
+    return TextEdit(
+        path, partial(apply_access, root=root), partial(revert_access, root=root), partial(access_notice, root=root)
+    )
+
+
+def config_edit(path: Path, section: str, names: Collection[str], access: TextEdit) -> TextEdit:
+    """Combine the agent registrations and the handoff access into the one config.toml edit.
+
+    Args:
+        path: The config.toml file.
+        section: The rendered registration section.
+        names: Our agent names.
+        access: The handoff access edit from `access_edit`.
+
+    Returns:
+        One edit applying the section then the access, reverting them in the opposite order.
+    """
+    return TextEdit(
+        path,
+        lambda text: access.apply(apply_section(text, section, names)),
+        lambda text: revert_section(access.revert(text), section, names),
+        access.notice,
+    )
+
+
 def role_descriptions(mapping: RuntimeMapping) -> dict[str, str]:
     """Collect the description of every rendered agent.
 
@@ -431,26 +702,39 @@ def kit_signatures(agents_dir: Path, descriptions: dict[str, str]) -> dict[Path,
     }
 
 
-def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSpec:
-    """Plan the Codex install: rendered files, the hooks.json merge and the config.toml section.
+def install_spec(
+    home: Path, kit: Path, python: Path, config: dict, environ: Mapping[str, str] | None = None
+) -> InstallSpec:
+    """Plan the Codex install: rendered files, the hooks.json merge and the config.toml edit.
+
+    The config.toml edit registers the agents and, with `handoff_access.enabled`, adds the handoff
+    directory to the workspace-write sandbox's writable roots.
 
     Args:
         home: Home directory to install into.
         kit: Installed kit root.
         python: Interpreter that runs the hook script.
         config: Loaded Codex adapter configuration.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
 
     Returns:
         The install spec for the shared installer.
     """
     mapping = runtime_mapping(config)
-    codex = home / CODEX_DIR
+    environment = os.environ if environ is None else environ
+    codex = codex_home(home, environment)
     descriptions = role_descriptions(mapping)
-    section = registration_section(home, descriptions)
+    section = registration_section(home, descriptions, environment)
     script = kit / HOOK_SCRIPT
+    access = access_edit(
+        codex / "config.toml", config_mod.handoff_dir(config, home), enabled=config["handoff_access"]["enabled"]
+    )
     return InstallSpec(
         runtime=RUNTIME,
-        files={home / rendered.path: rendered.text for rendered in render.rendered_files(mapping)},
+        files={
+            codex / Path(rendered.path).relative_to(CODEX_DIR): rendered.text
+            for rendered in render.rendered_files(mapping)
+        },
         json_merges=[
             hookfile.group_merge(
                 codex / "hooks.json",
@@ -460,14 +744,8 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
                 script,
             )
         ],
-        text_edits=[
-            TextEdit(
-                codex / "config.toml",
-                partial(apply_section, section=section, names=descriptions),
-                partial(revert_section, section=section, names=descriptions),
-            )
-        ],
-        kit_signatures=kit_signatures(home / AGENTS_DIR, descriptions),
+        text_edits=[config_edit(codex / "config.toml", section, descriptions, access)],
+        kit_signatures=kit_signatures(codex / "agents", descriptions),
     )
 
 
@@ -482,7 +760,7 @@ def codex_home(home: Path, environ: Mapping[str, str]) -> Path:
         `$CODEX_HOME` when it is set to an absolute path, else `<home>/.codex`.
     """
     codex = environ.get(CODEX_HOME_ENV) or ""
-    return Path(codex) if Path(codex).is_absolute() else home / CODEX_DIR
+    return (Path(codex) if Path(codex).is_absolute() else home / CODEX_DIR).resolve()
 
 
 def agents_dir(home: Path, environ: Mapping[str, str]) -> Path:
@@ -496,3 +774,18 @@ def agents_dir(home: Path, environ: Mapping[str, str]) -> Path:
         `agents` inside the Codex home from `codex_home`.
     """
     return codex_home(home, environ) / "agents"
+
+
+def install_identity(home: Path, name: str, environ: Mapping[str, str] | None = None) -> str:
+    """Identify installation state for the selected native profile.
+
+    Args:
+        home: User home directory.
+        name: Base runtime, helper manifest or offer name.
+        environ: Environment that may set CODEX_HOME; None reads the process environment.
+
+    Returns:
+        The base name for the default root, otherwise a profile-specific name.
+    """
+    environment = os.environ if environ is None else environ
+    return install.profile_name(name, codex_home(home, environment), home / CODEX_DIR)

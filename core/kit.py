@@ -21,7 +21,7 @@ from pathlib import Path
 from core.config import KIT_NAME, kit_root
 from core.install import MANIFEST_NAME, manifest_path
 from core.install_spec import InstallSpec
-from core.state import file_lock
+from core.state import file_lock, read_json
 
 KIT_RUNTIME = "kit"
 SOURCE_ROOT = Path(__file__).resolve().parent.parent
@@ -260,7 +260,8 @@ def installed_runtimes(home: Path) -> list[str]:
         Runtime names, sorted, without the kit itself.
     """
     manifests = manifest_path(home, KIT_RUNTIME).parent.parent.glob(f"*/{MANIFEST_NAME}")
-    return sorted(path.parent.name for path in manifests if path.parent.name != KIT_RUNTIME)
+    names = (read_json(path).get("runtime", path.parent.name) for path in manifests)
+    return sorted({name for name in names if isinstance(name, str) and name != KIT_RUNTIME})
 
 
 def update_argv(home: Path, source: Path, runtimes: list[str]) -> list[str]:
