@@ -59,7 +59,6 @@ TEXT_FIELDS = (
 )
 PATH_FIELDS = ("file_path", "path", "target_file")
 EFFORT_SUFFIX = re.compile(r"-(low|medium|high|xhigh|max)$")
-AGENT_EFFORT = re.compile(r"[\[,]effort=([\w-]+)")
 PENDING_NOTE, PENDING_TIER = "pending_note", "pending_tier"
 CLI_ID = re.compile(r"[\w-]+")
 CLI_META_KEY, CLI_ROOT_KEY = "0", "latestRootBlobId"
@@ -387,19 +386,19 @@ def read_cli_chat(chats: Path | None, conversation_id: str, timeout: float) -> T
 
 
 def agent_profile(profile: dict) -> tuple[str | None, str | None]:
-    """Split a tier's agent-file model, e.g. `claude-opus-5-5[effort=high,context=300k]`.
+    """Read a tier's agent-file model and its effort, e.g. `claude-opus-5-5-high`.
 
     Args:
         profile: One tier profile from the configuration.
 
     Returns:
-        The model id without options and its effort option, each None when absent.
+        The tier's `call` slug and the effort in its suffix, each None when absent.
     """
-    agent_model = profile.get("agent_model")
-    if not valid_text(agent_model) or not agent_model:
+    call = profile.get("call")
+    if not valid_text(call) or not call:
         return None, None
-    effort = AGENT_EFFORT.search(agent_model)
-    return agent_model.split("[", 1)[0] or None, effort[1] if effort else None
+    effort = EFFORT_SUFFIX.search(call)
+    return call, effort[1] if effort else None
 
 
 def spawn_detail(config: dict, tool_input: dict[str, object]) -> dict[str, str | None]:

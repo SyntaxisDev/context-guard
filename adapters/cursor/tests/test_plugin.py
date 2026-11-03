@@ -168,6 +168,76 @@ class HooksInstallTests(PluginTestCase):
         self.assertTrue(all(path in expected or backups in (path, *path.parents) for path in kept), kept)
         self.assertFalse(self.hooks_json.exists())
 
+    def test_install_writes_the_role_agents_on_tier_models_and_uninstall_removes_exactly_those(self) -> None:
+        agents = self.home / mapping.AGENTS_DIR
+        agents.mkdir(parents=True)
+        (agents / "mine.md").write_text("---\nname: mine\n---\n")
+        self.run_install("install")
+        config = hooks.load(self.home, {})
+        expected = {
+            self.home / item.path: item.text
+            for item in render.rendered_files(mapping.runtime_mapping(config))
+            if item.path.startswith(f"{mapping.AGENTS_DIR}/")
+        }
+        self.assertTrue(expected)
+        for path, text in expected.items():
+            self.assertEqual(path.read_text(), text, path)
+            self.assertRegex(path.read_text(), r"\nmodel: [a-z0-9][a-z0-9.\-]*\n")
+        manifest = install.read_manifest(install.manifest_path(self.home, hooks_install.MANIFEST_RUNTIME))
+        self.assertLessEqual({str(path) for path in expected}, set(manifest["files"]))
+        self.run_install("uninstall")
+        self.assertEqual(sorted(path.name for path in agents.iterdir()), ["mine.md"])
+
+    def script_manifest(self) -> Path:
+        return install.manifest_path(self.home, mapping.RUNTIME)
+
+    def install_script(self) -> None:
+        plan = install.plan(self.installed(), install.read_manifest(self.script_manifest()))
+        install.apply(plan, self.script_manifest(), install.backup_dir(self.home))
+
+    def uninstall_script(self) -> None:
+        plan = install.plan_uninstall(self.installed(), install.read_manifest(self.script_manifest()))
+        install.apply(plan, self.script_manifest(), install.backup_dir(self.home))
+
+    def role_files(self) -> list[Path]:
+        config = hooks.load(self.home, {})
+        return [
+            self.home / item.path
+            for item in render.rendered_files(mapping.runtime_mapping(config))
+            if item.path.startswith(f"{mapping.AGENTS_DIR}/")
+        ]
+
+    def test_the_script_install_and_the_hooks_install_never_own_the_same_role_file(self) -> None:
+        for name, first, second, remove_second in (
+            (
+                "script then hooks",
+                self.install_script,
+                lambda: self.run_install("install"),
+                lambda: self.run_install("uninstall"),
+            ),
+            ("hooks then script", lambda: self.run_install("install"), self.install_script, self.uninstall_script),
+        ):
+            with self.subTest(name):
+                shutil.rmtree(self.home / ".context-guard", ignore_errors=True)
+                shutil.rmtree(self.home / mapping.AGENTS_DIR, ignore_errors=True)
+                first()
+                second()
+                self.assertFalse(
+                    set(install.read_manifest(self.script_manifest())["files"])
+                    & set(
+                        install.read_manifest(install.manifest_path(self.home, hooks_install.MANIFEST_RUNTIME))["files"]
+                    )
+                )
+                remove_second()
+                self.assertTrue(all(path.is_file() for path in self.role_files()))
+                if name == "script then hooks":
+                    manifest = install.read_manifest(self.script_manifest())
+                    self.assertEqual(install.file_problems(self.installed(), manifest), [])
+                else:
+                    spec = hooks_install.hooks_spec(self.home, hooks_install.KIT, hooks.load(self.home, {}))
+                    manifest = install.read_manifest(install.manifest_path(self.home, hooks_install.MANIFEST_RUNTIME))
+                    self.assertEqual(install.file_problems(spec, manifest), [])
+
     def test_install_records_the_offer_and_uninstall_keeps_it(self) -> None:
         marker = install.offer_marker(self.home, mapping.PLUGIN_HOOKS)
         self.run_install("install")

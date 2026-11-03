@@ -124,6 +124,27 @@ def manifest_path(home: Path, runtime: str) -> Path:
     return kit_root(home) / "state" / runtime / MANIFEST_NAME
 
 
+def unclaimed(home: Path, runtime: str, files: dict[Path, str]) -> dict[Path, str]:
+    """Drop the files another runtime's manifest already owns, so two installs never share one.
+
+    Sharing would let uninstalling either delete files the other still needs.
+
+    Args:
+        home: The user home.
+        runtime: The manifest name of the install planning `files`; its own manifest is ignored.
+        files: The spec's files by path.
+
+    Returns:
+        `files` without the paths recorded by any other manifest.
+    """
+    own = manifest_path(home, runtime)
+    taken: set[str] = set()
+    for path in own.parent.parent.glob(f"*/{MANIFEST_NAME}"):
+        if path != own:
+            taken |= set(read_manifest(path).get("files", {}))
+    return {path: text for path, text in files.items() if str(path) not in taken}
+
+
 def profile_name(name: str, root: Path, default: Path) -> str:
     """Scope an installation or setup marker to its configuration directory.
 

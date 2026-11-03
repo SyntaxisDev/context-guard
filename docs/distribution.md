@@ -145,3 +145,16 @@ root_token, files)`: the native manifest and its path, the hooks file content an
   [genie.md](genie.md).
 - Organisation marketplaces that serve Claude-format plugins (`.claude-plugin/plugin.json` +
   `skills/`) to several runtimes can take the Claude package as is.
+
+## Live roster check
+
+`scripts/plugin_live.sh check --run` also runs a roster case per runtime (`ROSTER_TIMEOUT`, default 240 s).
+A parent on another model spawns one role without a per-spawn model (`investigator`, as `context-guard:investigator` for Claude; Cursor `scout`; Genie `runner`), and
+`scripts/roster_check.py` compares the subagent's observed model with the role's tier model in
+`adapters/<runtime>/config.json` (Cursor: the tier's `call` slug). Observed model: Claude, `message.model`
+of the spawn's stream-json messages; Cursor, the completed Task call's `args.model` (the rendered role files
+are copied to the work dir's `.cursor/agents/`, since `cursor-agent` ignores `~/.cursor/agents`); Codex and
+Genie, the subagent rollout's last `turn_context` model (a forked rollout carries the parent's turns first).
+Cursor's policy has the parent pass the tier slug on every Task, so a passed slug passes and another
+passed model fails. A Genie case whose parent session ran on the expected model fails as inconclusive. Codex and Genie need their role agents installed
+(`adapters/<rt>/agents.py install`).

@@ -9,16 +9,21 @@
 # registers in ~/.cursor/hooks.json (the plugin ships none). Plugins are reinstalled, not updated: the
 # version stays the same and the runtimes cache per version. `check` reports what is installed,
 # leftover script-install files and the events each runtime logged; `check --run` spends cheap
-# model calls (Claude 2, Codex 2, Genie 2, Cursor 2) in a temporary work dir with tiny thresholds and
+# model calls (Claude 4, Codex 4, Genie 3, Cursor 4: 2 prompts, a wake case unless Genie, a roster case)
+# in a temporary work dir with tiny thresholds and
 # passes a runtime when a note fired and was delivered. Hooks keep the real CONTEXT_GUARD_HOME.
-# Then a wake case per runtime except Genie (whose missing queue API is documented; scripts/wake_check.py, a few more calls): the parent spawns a
+# Then a wake case per runtime except Genie (whose missing queue API is documented): the parent spawns a
 # background subagent that sleeps 20 s and answers a token, ends its turn, and passes when it
 # starts a new turn by itself that quotes the token (Codex: through an app server it starts, so the
 # context-guard waker's `codex queue` reaches it). Handoffs the run wrote for its work dir are deleted.
+# Then a roster case per runtime: a parent on another model spawns one role without a per-spawn model
+# (Claude, Codex: investigator, spawned as context-guard:investigator for Claude; Cursor: scout; Genie: runner) and scripts/roster_check.py compares the subagent's observed model with
+# the role's tier model in adapters/<runtime>/config.json (Cursor: the tier's call slug, with the rendered
+# role files copied to the work dir's .cursor/agents because cursor-agent ignores ~/.cursor/agents).
 #
 # Usage: scripts/plugin_live.sh install|check|checklist|uninstall [--only claude|codex|genie|cursor] [--run] [--dry-run] [-v]
 #   --dry-run       print every command without changing anything or calling a model
-#   --run           check: one live smoke and one wake case per runtime (none for Genie)
+#   --run           check: one live smoke per runtime, wake cases where supported and a roster case
 #   -v, --verbose   also print each command and its output (VERBOSE=1); they always go to the run log
 #   PLUGIN_DIST=<dir>    package output (default: ~/.context-guard/plugins)
 #   KEEP=1          keep the temporary work dir of `check --run` (kept anyway on failure)
@@ -26,6 +31,8 @@
 #   CLAUDE_USE_API_KEY=1  keep ANTHROPIC_API_KEY for Claude (default: unset, use the login)
 #   CLAUDE_MODEL, CODEX_MODEL, CODEX_EFFORT, CURSOR_MODEL override the cheap defaults
 #   WAKE_TIMEOUT=<s>     seconds each wake case may take (default: 180)
+#   ROSTER_TIMEOUT=<s>   seconds each roster case may take (default: 240)
+#   CURSOR_ROSTER_PARENT  Cursor parent model of the roster case (default: claude-sonnet-5-5-low)
 # shellcheck disable=SC2329  # cleanup runs through trap
 set -euo pipefail
 
@@ -43,6 +50,8 @@ NEXT_PROMPT="Use your file-reading tool once to read README.md again, then reply
 NAME=context-guard
 PLUGIN=$NAME@$NAME
 WAKE_TIMEOUT=${WAKE_TIMEOUT:-180}
+ROSTER_TIMEOUT=${ROSTER_TIMEOUT:-240}
+CURSOR_ROSTER_PARENT=${CURSOR_ROSTER_PARENT:-claude-sonnet-5-5-low}
 
 COMMAND="" ONLY="" DRY_RUN=0 LIVE=0 VERBOSE=${VERBOSE:-0} KEEP=${KEEP:-0} FAILED=0 READY=0 CLEANED=0
 while (($#)); do
@@ -53,7 +62,7 @@ while (($#)); do
         --run) LIVE=1; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
         -v|--verbose) VERBOSE=1; shift ;;
-        -h|--help) sed -n '2,28s/^# \{0,1\}//p' "$0"; exit 0 ;;
+        -h|--help) sed -n '2,34s/^# \{0,1\}//p' "$0"; exit 0 ;;
         *) echo "unknown argument: $1" >&2; exit 2 ;;
     esac
 done
@@ -170,12 +179,12 @@ install_genie() {
 }
 
 install_cursor() {
-    ui_start Cursor "copying the plugin and registering its hooks"
+    ui_start Cursor "copying the plugin, registering its hooks and role agents"
     ui_run rm -rf "$CURSOR_PLUGIN" || return 1
     ui_run mkdir -p "${CURSOR_PLUGIN%/*}" || return 1
     ui_run cp -R "$DIST/cursor/plugins/$NAME" "$CURSOR_PLUGIN" || return 1
     ui_run sh "$CURSOR_PLUGIN/hooks/context-guard-hook" adapters/cursor/hooks_install.py install || return 1
-    ui_done ok "plugin copied ($(dist_version cursor)) to $CURSOR_PLUGIN${UI_SEP}hooks registered in ~/.cursor/hooks.json"
+    ui_done ok "plugin copied ($(dist_version cursor)) to $CURSOR_PLUGIN${UI_SEP}hooks registered in ~/.cursor/hooks.json, role agents in ~/.cursor/agents"
 }
 
 next_steps() {
@@ -430,6 +439,52 @@ wake_cursor() {
         cursor-agent -p --output-format stream-json --force --trust --workspace "$WORK" --model "$CURSOR_MODEL"
 }
 
+# roster_run <tool> <runtime> -- <roster_check.py args>: run one roster case and report its verdict.
+roster_run() {
+    local tool=$1 runtime=$2 log=$LOGS/$2-roster.jsonl verdict code=0 hint
+    shift 3
+    ui_start "$tool roster" "role subagent runs on its tier model (up to ${ROSTER_TIMEOUT}s)" long
+    ui_show "${PY[@]}" "$ROOT/scripts/roster_check.py" "$runtime" --log "$log" "$@"
+    if ((DRY_RUN)); then return 0; fi
+    verdict=$(env -u CONTEXT_GUARD_THRESHOLDS_NOTE_CAP -u CONTEXT_GUARD_HANDOFF_REFRESH_REFRESH_TOKENS \
+        "${PY[@]}" "$ROOT/scripts/roster_check.py" "$runtime" --log "$log" "$@" </dev/null 2>>"$UI_LOG") || code=$?
+    { printf -- '--- %s (exit %s): %s\n' "$log" "$code" "$verdict"; cat "$log" 2>/dev/null; printf -- '--- end\n'; } >>"$UI_LOG"
+    if ((code == 0)) && [[ $verdict == ok* ]]; then
+        UI_PASSED=$((UI_PASSED + 1))
+        ui_done ok "tier model${UI_SEP}${verdict#ok }"
+        return 0
+    fi
+    FAILED=1 UI_FAILED=$((UI_FAILED + 1))
+    ui_done fail "failed$UI_SEP${verdict#fail }"
+    hint=$(smoke_hint "$runtime" "$log")
+    [[ -z $hint ]] || ui_hint "$hint"
+    if [[ -s $log ]]; then ui_detail "see $log"; ui_tail "$log"; fi
+}
+
+roster_claude() {
+    claude_auth
+    roster_run Claude claude -- --cwd "$WORK" --timeout "$ROSTER_TIMEOUT" -- \
+        "${CLAUDE_AUTH[@]}" claude -p --output-format stream-json --verbose --model "$CLAUDE_MODEL" \
+        --add-dir "$STORE" --permission-mode acceptEdits
+}
+
+roster_codex() {
+    roster_run Codex codex -- --cwd "$WORK" --timeout "$ROSTER_TIMEOUT" --sessions "${CODEX_HOME:-$HOME/.codex}/sessions" -- \
+        codex exec --json --skip-git-repo-check -C "$WORK" -m "$CODEX_MODEL" -c "model_reasoning_effort=\"$CODEX_EFFORT\"" \
+        --enable multi_agent_v2
+}
+
+# No model flag: Genie's session default (gpt-5.6-sol) differs from the cheap tier of the runner role.
+roster_genie() {
+    roster_run Genie genie -- --cwd "$WORK" --timeout "$ROSTER_TIMEOUT" --sessions "${GENIE_HOME:-$HOME/.genie}/sessions" -- \
+        genie exec --json --skip-git-repo-check --sandbox workspace-write -C "$WORK"
+}
+
+roster_cursor() {
+    roster_run Cursor cursor -- --cwd "$WORK" --timeout "$ROSTER_TIMEOUT" -- \
+        cursor-agent -p --output-format stream-json --trust --workspace "$WORK" --model "$CURSOR_ROSTER_PARENT"
+}
+
 # clean_handoffs: delete the handoffs this run's prompts wrote into the real store for its work dir.
 clean_handoffs() {
     local out
@@ -456,7 +511,7 @@ live_smoke() {
     fi
     WORK=$RUN_DIR/work
     LOGS=$RUN_DIR/logs
-    ui_section "Live smoke (2 cheap prompts and a wake case per tool)"
+    ui_section "Live smoke (2 cheap prompts, a wake case and a roster case per tool)"
     ui_show mkdir -p "$WORK" "$LOGS" "$STORE"
     if ((!DRY_RUN)); then
         mkdir -p "$WORK" "$LOGS" "$STORE"
@@ -481,6 +536,7 @@ live_smoke() {
         else
             smoke_skip "$tool wake" "the smoke could not start"
         fi
+        if ((READY)); then "roster_$runtime"; else smoke_skip "$tool roster" "the smoke could not start"; fi
     done
     clean_handoffs
     smoke_summary
@@ -559,7 +615,7 @@ uninstall_cursor() {
     ui_start Cursor "removing the plugin and its hooks"
     ui_run "${PY[@]}" "$ROOT/adapters/cursor/hooks_install.py" uninstall --home "$HOME" || return 1
     ui_run rm -rf "$CURSOR_PLUGIN" || return 1
-    ui_done ok "plugin removed from $CURSOR_PLUGIN${UI_SEP}hooks removed from ~/.cursor/hooks.json; reload the Cursor window"
+    ui_done ok "plugin removed from $CURSOR_PLUGIN${UI_SEP}hooks removed from ~/.cursor/hooks.json, role agents from ~/.cursor/agents; reload the Cursor window"
 }
 
 cmd_uninstall() {

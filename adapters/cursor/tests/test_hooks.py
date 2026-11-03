@@ -500,7 +500,7 @@ class ToolEventTests(CursorHookCase):
             self.spawns(),
             [
                 {"role": "reviewer", "tier": "standard", "model": "claude-sonnet-5-5-medium", "effort": "medium"},
-                {"role": "scout", "tier": "cheap", "model": "claude-haiku-5-5", "effort": "low"},
+                {"role": "scout", "tier": "cheap", "model": "claude-haiku-5-5-thinking-low", "effort": "low"},
             ],
         )
 

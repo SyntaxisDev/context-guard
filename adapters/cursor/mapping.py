@@ -1,13 +1,12 @@
 """Cursor-native rendering of the shared content and the install plan for ~/.cursor."""
 
 import json
-import re
 from collections.abc import Callable
 from functools import partial
 from pathlib import Path
 from typing import NamedTuple
 
-from core import deadline, hookfile, render
+from core import deadline, hookfile, install, render
 from core.install_spec import InstallSpec, JsonMerge, frontmatter_signatures
 from core.observation import PROMPT, SESSION, STOP, TOOL
 
@@ -44,54 +43,39 @@ HOOK_EVENTS = {
     "stop": HookEvent(STOP, (("loop_limit", 1),)),
 }
 OVERRIDE_SYNTAX = (
-    "the Task tool `model` argument set to the tier's slug from this table; omit it to run the role's default tier"
+    "the Task tool `model` argument set to the tier's slug from this table; pass it on every Task, not only to "
+    "override, because plugin agents inherit the parent's model and the Cursor CLI ignores `~/.cursor/agents`. Use "
+    "the role's default tier slug unless you are stepping up. The user authorises this; never omit it"
 )
 TRANSCRIPTS = "Cursor keeps chat transcripts as JSONL files under `~/.cursor/projects/<workspace>/agent-transcripts/`."
 POLICY_FRONTMATTER = (
     "---\ndescription: context-guard delegation, context and handoff policy\nalwaysApply: true\n---\n\n"
 )
-CONTEXT_OPTION = re.compile(r"context=[^,\]]*")
 
 
 def describe_tier(profile: dict[str, str]) -> str:
     """Describe a tier for the policy's tier table.
 
     Args:
-        profile: Tier profile with the Task `call` slug and the `agent_model` of agent files.
+        profile: Tier profile with the `call` slug.
 
     Returns:
-        Markdown naming both model forms.
+        Markdown naming the slug.
     """
-    return f"`{profile['call']}` (agent files use `{profile['agent_model']}`)"
-
-
-def with_context(model: str, context: str | None) -> str:
-    """Set the context option of a Cursor `id[opt=val,...]` model for a variant agent.
-
-    Args:
-        model: Cursor model id, with or without an option list.
-        context: Context size option, e.g. `300k`; None or empty keeps the model unchanged.
-
-    Returns:
-        The model with its `context` option replaced or added.
-    """
-    if not context:
-        return model
-    if CONTEXT_OPTION.search(model):
-        return CONTEXT_OPTION.sub(f"context={context}", model)
-    if model.endswith("]"):
-        return f"{model[:-1]},context={context}]"
-    return f"{model}[context={context}]"
+    return f"`{profile['call']}`"
 
 
 def render_agent(agent: render.Agent, profile: dict[str, str]) -> render.RenderedFile:
     """Render a role as a Cursor agent file.
 
-    Cursor can only restrict a role by `readonly`, which also removes the shell.
+    Cursor can only restrict a role by `readonly`, which also removes the shell. The model is
+    the tier's plain `call` slug: Cursor reads no option list there and silently falls back to
+    the parent's model for an unknown id. It has no per-agent context size, so variants differ
+    only in name.
 
     Args:
         agent: The role variant to render.
-        profile: Tier profile whose `agent_model` the agent runs on.
+        profile: Tier profile whose `call` slug the agent runs on.
 
     Returns:
         The agent markdown file under the agents directory.
@@ -101,7 +85,7 @@ def render_agent(agent: render.Agent, profile: dict[str, str]) -> render.Rendere
         "---",
         f"name: {agent.name}",
         f"description: {json.dumps(agent.role.description)}",
-        f"model: {with_context(profile['agent_model'], agent.context)}",
+        f"model: {profile['call']}",
         f"readonly: {readonly}",
         "---",
         "",
@@ -249,7 +233,7 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
         The install spec for the shared installer.
     """
     mapping = runtime_mapping(config)
-    files = {home / item.path: item.text for item in render.rendered_files(mapping)}
+    files = install.unclaimed(home, RUNTIME, {home / item.path: item.text for item in render.rendered_files(mapping)})
     script = str(kit / HOOK_SCRIPT)
     hooks = JsonMerge(
         home / HOOKS_FILE,

@@ -17,6 +17,14 @@ keeps working when the plugin moves or is removed, needs no lookup of Cursor's u
 layout, and fails open through the launcher like the plugin itself. Rerunning install after a
 plugin update refreshes the copy; an unchanged copy is left as is. Install also creates the
 `~/.context-guard/state/offers/cursor-hooks` marker, so the plugin rule never offers the step again.
+
+Cursor runs a plugin's agents on the parent's model (it strips their `model`), but keeps the `model`
+of agents under `~/.cursor/agents` and lets them win over a same-named plugin agent. Install
+therefore also writes the rendered role files there (each on its tier's model), owned through the
+same manifest: uninstall removes exactly those, and an unchanged file is left as is. Role files that the
+`cursor` script install already owns stay with it (and it leaves ours), so uninstalling one never
+deletes the other's. The Cursor CLI
+reads no `~/.cursor/agents`, which the policy covers by passing the tier model on every Task.
 """
 
 import argparse
@@ -32,8 +40,8 @@ KIT = Path(__file__).resolve().parents[2]
 if str(KIT) not in sys.path:
     sys.path.insert(0, str(KIT))
 
-from adapters.cursor import mapping  # noqa: E402
-from core import config as config_mod, install, kit, package  # noqa: E402
+from adapters.cursor import hooks, mapping  # noqa: E402
+from core import config as config_mod, install, kit, package, render  # noqa: E402
 from core.install_spec import InstallSpec, JsonMerge  # noqa: E402
 
 MANIFEST_RUNTIME = mapping.PLUGIN_HOOKS
@@ -67,21 +75,29 @@ def hook_command(launcher: Path, event: str) -> str:
     return shlex.join(["sh", str(launcher), mapping.HOOK_SCRIPT, event])
 
 
-def hooks_spec(home: Path, source: Path) -> InstallSpec:
-    """Plan the stable hook copy and the hooks.json merge.
+def hooks_spec(home: Path, source: Path, config: dict) -> InstallSpec:
+    """Plan the stable hook copy, the role agent files and the hooks.json merge.
 
     A missing LICENSE or NOTICE in `source` raises `core.package.PackageError` (a ValueError).
 
     Args:
         home: The user home.
         source: The plugin root or source checkout whose code is copied.
+        config: Loaded Cursor adapter configuration, whose tiers set the agents' models.
 
     Returns:
-        The install spec owning the copied files and our hooks.json entries.
+        The install spec owning the copied files, the agent files and our hooks.json entries.
     """
     directory = hooks_dir(home)
     launcher = directory / package.LAUNCHER
     files = {directory / relative: text for relative, text in package.vendored_files(source, mapping.RUNTIME).items()}
+    agent_prefix = f"{mapping.AGENTS_DIR}/"
+    agents = {
+        home / item.path: item.text
+        for item in render.rendered_files(mapping.runtime_mapping(config))
+        if item.path.startswith(agent_prefix)
+    }
+    files |= install.unclaimed(home, MANIFEST_RUNTIME, agents)
     files[launcher] = package.LAUNCHER_TEXT
     script = str(launcher)
     merge = JsonMerge(
@@ -94,20 +110,21 @@ def hooks_spec(home: Path, source: Path) -> InstallSpec:
     return InstallSpec(MANIFEST_RUNTIME, files=files, json_merges=[merge])
 
 
-def plan(command: str, home: Path, *, force: bool) -> install.Plan:
+def plan(command: str, home: Path, environ: Mapping[str, str], *, force: bool) -> install.Plan:
     """Plan an install or uninstall of the hooks without writing anything.
 
     Rendering and manifest failures raise ValueError or OSError from `core.install` and `core.package`.
 
     Args:
         command: "install" or "uninstall".
-        home: The user home that holds hooks.json, the stable copy and the manifest.
+        home: The user home that holds hooks.json, the agents, the stable copy and the manifest.
+        environ: Environment for the configuration overrides.
         force: Whether to replace or remove user-edited files, keeping backups.
 
     Returns:
         The plan; an uninstall also removes the bytecode caches the hooks wrote into the copy.
     """
-    spec = hooks_spec(home, KIT)
+    spec = hooks_spec(home, KIT, hooks.load(home, environ))
     manifest = install.read_manifest(install.manifest_path(home, MANIFEST_RUNTIME))
     if command == "install":
         return install.plan(spec, manifest, force=force)
@@ -148,7 +165,7 @@ def main(argv: list[str] | None = None, environ: Mapping[str, str] | None = None
     environment = os.environ if environ is None else environ
     home = args.home.expanduser().absolute() if args.home else config_mod.resolve_home(KIT, environment)
     try:
-        result = plan(args.command, home, force=args.force)
+        result = plan(args.command, home, environment, force=args.force)
         if not args.dry_run:
             install.apply(result, install.manifest_path(home, MANIFEST_RUNTIME), install.backup_dir(home))
             if args.command == "install":

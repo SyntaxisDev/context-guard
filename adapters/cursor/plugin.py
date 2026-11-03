@@ -31,16 +31,18 @@ HOOKS_NOTE = f"""
 ## Hooks
 
 Context warnings, the handoff listing and subagent tracking come from context-guard hooks, which
-this plugin does not register by itself. Registered hooks start every chat with a session context
+this plugin does not register by itself. The same step also writes the role agents to
+`~/.cursor/agents`, so the Cursor app runs each on its tier's model instead of the parent's.
+Registered hooks start every chat with a session context
 (separate from this rule) whose first line is `{mapping.SESSION_MARKER}` Subagents skip this
 section. If this chat has no such line, check whether `{HOOKS_OFFER_MARKER}` exists
 (`$CONTEXT_GUARD_HOME` replaces `~` when set). If it exists, say nothing about hooks. Otherwise,
-offer once in your reply to register them, then create that file with a file-writing tool so the
+offer once in your reply to register them and the role agents, then create that file with a file-writing tool so the
 offer is never repeated. When the user agrees or asks, run this command (or give it to them), where
 `<plugin root>` is the directory holding this rule's `rules/` directory, then ask them to reload the
 Cursor window and to turn Settings > Agents > Third-Party Imports off unless they use it otherwise
 (the hooks do not need it, and it imports duplicate Claude Code and Codex configuration). Rerun the
-command after a plugin update; `uninstall` in place of `install` removes the hooks.
+command after a plugin update; `uninstall` in place of `install` removes the hooks and agents.
 
 ```sh
 {HOOKS_COMMAND}

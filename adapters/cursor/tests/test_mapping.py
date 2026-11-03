@@ -1,5 +1,6 @@
 import copy
 import json
+import re
 import shlex
 import tempfile
 import unittest
@@ -26,19 +27,6 @@ def frontmatter(text: str) -> tuple[dict[str, str], str]:
     return dict(line.split(": ", 1) for line in lines[1:]), body
 
 
-def model_options(model: str) -> tuple[str, dict[str, str]]:
-    """Split a Cursor model slug such as `name[key=value,...]` into its name and options.
-
-    Args:
-        model: The model slug, with or without a bracketed option list.
-
-    Returns:
-        The model name and its options.
-    """
-    name, _, options = model.removesuffix("]").partition("[")
-    return name, dict(option.split("=", 1) for option in options.split(",") if option)
-
-
 class MappingCase(unittest.TestCase):
     """A temporary home with the Cursor adapter config and its install spec."""
 
@@ -62,21 +50,23 @@ class RenderedFileTests(MappingCase):
                 self.assertEqual(set(fields), {"name", "description", "model", "readonly"})
                 self.assertEqual(fields["name"], name)
                 self.assertEqual(json.loads(fields["description"]), role.description)
-                self.assertEqual(fields["model"], self.config["tiers"][role.default_tier]["agent_model"])
+                self.assertEqual(fields["model"], self.config["tiers"][role.default_tier]["call"])
                 self.assertEqual(fields["readonly"], "false" if role.capabilities["shell"] else "true")
                 self.assertTrue(body.strip())
 
-    def test_variant_context_is_set_in_the_configured_model_options(self) -> None:
+    def test_models_are_plain_cursor_slugs_for_every_tier_and_variant(self) -> None:
+        slug = re.compile(r"^[a-z0-9][a-z0-9.\-]*$")
         role = render.load_roles()["implementer"]
         for tier, profile in self.config["tiers"].items():
             with self.subTest(tier=tier):
+                self.assertRegex(profile["call"], slug)
                 agent = render.Agent("implementer-long", role, tier, "1m", "Body")
                 rendered = mapping.render_agent(agent, profile)
                 self.assertEqual(rendered.path, ".cursor/agents/implementer-long.md")
-                name, options = model_options(profile["agent_model"])
-                self.assertEqual(
-                    model_options(frontmatter(rendered.text)[0]["model"]), (name, {**options, "context": "1m"})
-                )
+                self.assertEqual(frontmatter(rendered.text)[0]["model"], profile["call"])
+        for path, text in self.spec.files.items():
+            if path.parent == self.home / ".cursor" / "agents":
+                self.assertRegex(frontmatter(text)[0]["model"], slug)
 
     def test_policy_rule_is_always_applied_and_fully_rendered(self) -> None:
         policy = self.spec.files[self.home / ".cursor" / "rules" / "context-guard.mdc"]
@@ -84,6 +74,7 @@ class RenderedFileTests(MappingCase):
         self.assertEqual(fields["alwaysApply"], "true")
         self.assertNotRegex(policy, r"\{\{")
         self.assertIn(mapping.OVERRIDE_SYNTAX, body)
+        self.assertIn("pass it on every Task", body)
         for profile in self.config["tiers"].values():
             self.assertIn(f"`{profile['call']}`", body)
 
