@@ -211,7 +211,7 @@ class LeafTests(PolicyFixture):
         for role, below, at in (
             ("reviewer", 119_999, 120_000),
             ("runner", 59_999, 60_000),
-            ("implementer", 79_999, 80_000),
+            ("implementer", 149_999, 150_000),
             ("not-a-role", 79_999, 80_000),
         ):
             with self.subTest(role=role):

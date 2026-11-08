@@ -43,7 +43,7 @@ ROOT_EXPECTED = {
     "PreCompact": "pass",
     "PostCompact": "pass",
 }
-ROOT_TOKENS, LEAF_TOKENS, WINDOW = 195_000, 130_000, 200_000
+ROOT_TOKENS, LEAF_TOKENS, WINDOW = 195_000, 160_000, 200_000
 CODEX_TOKENS, CODEX_WINDOW = 250_000, 258_400
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 

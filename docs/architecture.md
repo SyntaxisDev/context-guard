@@ -108,7 +108,7 @@ identity suffix. Writes and reads inside the store are detected from tool events
 
 `content/roles/roles.json` declares per role `shell, write, network, mcp, git_push`,
 `default_tier`, `allowed_tiers` and an optional `budget_tokens` (reviewer and investigator
-120k, scout and runner 60k, implementer the global 80k), plus optional `variants`
+120k, implementer 150k, scout and runner 60k), plus optional `variants`
 (`name, role, tier, context`).
 
 | role         | shell | write | network | mcp | git_push | default  | allowed               |

@@ -27,7 +27,8 @@
       "description": "Executes an agreed plan or handoff file. Use after the design is decided; pass the plan/handoff path and the scope. Not for design decisions.",
       "capabilities": {"shell": true, "write": true, "network": false, "mcp": true, "git_push": false},
       "default_tier": "standard",
-      "allowed_tiers": ["standard", "deep"]
+      "allowed_tiers": ["standard", "deep"],
+      "budget_tokens": 150000
     },
     "runner": {
       "description": "Mechanical execution. Use for tests, lint, builds, long-running commands, status checks, and git chores the user explicitly asked for (commit, push, rebase, PR).",
