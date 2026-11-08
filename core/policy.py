@@ -30,8 +30,11 @@ TIERS = ("note", "firm", "block")
 RANK = {None: 0, "note": 1, "firm": 2, "block": 3}
 BUDGET_MESSAGE = (
     "[context-guard] Your live context is ~{tokens}k tokens, past your ~{budget}k subagent budget. "
-    "Report what is done and what is left, and say explicitly if the remaining work cannot be "
-    "split into smaller tasks. Then stop, unless finishing is only a few steps away."
+    "Checkpoint now: write what is done, what is left and any processes or files you started to "
+    "your progress file. If you have produced nothing yet (no edit, no finding), keep working "
+    "until you have. Once you have, report what is done and what is left, and say explicitly if "
+    "the remaining work cannot be split into smaller tasks. Then stop, unless finishing is only "
+    "a few steps away."
 )
 NO_FALSE_CLAIM = "Never say the handoff is updated unless you wrote it in this turn."
 

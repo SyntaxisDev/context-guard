@@ -2,7 +2,7 @@
 
 If you are a subagent, ignore the delegation section and just do your task.
 
-Long chats consume context and increase per-step cost. Keep the main chat focused on design, decisions and synthesis.
+Keep the main chat focused on design, decisions and synthesis.
 
 ## Delegate heavy work
 
@@ -15,7 +15,7 @@ Long chats consume context and increase per-step cost. Keep the main chat focuse
 - Route by what the role can do. A role without shell, network or MCP access cannot run queries or commands; a role without push access cannot open PRs.
 - Do small things yourself: one edit, one command, one file read. Subagent startup has overhead.
 - Give every subagent a self-contained brief: goal, paths, constraints, and the expected output (at most ~30 lines; anything longer goes to a file whose path it returns).
-- For a subagent expected to run more than a few minutes, name a progress file under /tmp in the brief; it appends each finished step, plus any started job/run IDs with their check and cancel commands.
+- For a subagent expected to run more than a few minutes, name a progress file under /tmp in the brief; it appends each finished step and lists up front its side effects (background PIDs, output dirs, spend, job/run IDs with check and cancel commands).
 - When `runner` reports several independent errors, fix them in parallel (one implementer per group) instead of one round trip each.
 - {{subagent_delivery}}
 
@@ -31,7 +31,7 @@ Long chats consume context and increase per-step cost. Keep the main chat focuse
 
 ### Tiers
 
-Each spawn runs on a tier. Prefer the role's default tier. Step up only for scope or difficulty, within the role's allowed tiers. Split work across several subagents instead of raising the context; live context per subagent should stay well under 100k tokens.
+Each spawn runs on a tier. Prefer the role's default tier. Step up only for scope or difficulty, within the role's allowed tiers. Split work across several subagents instead of raising the context; keep each subagent's live context within its role budget.
 
 {{tier_table}}
 
@@ -46,9 +46,11 @@ Each role has a live-context budget. At it, the subagent is told to report what 
 - split the remainder across several subagents when it can be;
 - finish it yourself if only a few small steps are left.
 
+Budget stops, restarts and crashes are internal: handle them yourself and never cite them to the user or suggest a new chat for them. Involve the user only for a blocker they can resolve more easily, a genuine question, or news that materially changes the plan.
+
 ### When a subagent does not return
 
-On an error, no report, an interruption, no return at all, or a context-guard note that a background subagent has gone silent or was orphaned, read its progress file and transcript (the note gives the transcript path and agent id when known). Do not try to ping a running subagent: resuming a running agent interrupts it. If it is dead, cancel its jobs that are still running, then resume it by agent id where the runtime supports it or re-spawn from the progress file without redoing finished steps.
+On an error, no report, an interruption, no return at all, or a context-guard note that a background subagent has gone silent or was orphaned, read its progress file and transcript (the note gives the transcript path and agent id when known). Do not try to ping a running subagent: resuming a running agent interrupts it. If it is dead, first check what it left running (its side-effect list, `ps`/`lsof` on its output paths); cancel what is unwanted and name the rest do-not-touch in the next brief, and tells the new subagent to check for processes or locks before moving or replacing a path. Then resume it by agent id where the runtime supports it or re-spawn from the progress file without redoing finished steps.
 
 ## Explain the result
 

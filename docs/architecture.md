@@ -30,7 +30,7 @@ No dispatcher superclass. Each adapter supplies functions:
 | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
 | `observe(payload) -> Observation`                                | native payload to `Observation` (tokens, window, model, `is_subagent`, `compacted`, cwd, prompt, `ToolUse`). `ValueError` means fail open. |
 | `respond(decision) -> payload`                                   | `Decision` to the runtime's response shape; any error means pass.                                                                          |
-| `mapping.runtime_mapping`/render                                 | tier profiles, override syntax, native permissions, channel, parent-resume capability, skills dir.                                        |
+| `mapping.runtime_mapping`/render                                 | tier profiles, override syntax, native permissions, channel, parent-resume capability, skills dir.                                         |
 | `mapping.install_spec(home, kit, python, config) -> InstallSpec` | kit-owned files, JSON merges (hook events and matchers, `deadline.HOOK_TIMEOUT_SECONDS`), text edits, kit signatures.                      |
 | `config.json`                                                    | tiers plus runtime-specific telemetry and hook settings.                                                                                   |
 | `runner.py`                                                      | provider for the optional runner.                                                                                                          |
@@ -75,13 +75,18 @@ unwritten`). Otherwise the stop hook asks for an update when tokens grew by `ref
   since the last write or refresh request and `min_seconds` passed since that request
   (`source: refresh`), so an ignored refresh is not repeated without growth.
 - **Leaf mode** (`is_subagent`): no policy text, handoff list, notes or refresh. Once at the
-  subagent's budget one advisory note (never a block): report what is done and what is left,
-  say explicitly if the remainder cannot be split, then stop unless finishing is a few steps
-  away. The budget is the role's optional `budget_tokens` in `roles.json` when the adapter
+  subagent's budget one advisory note (never a block): checkpoint to the progress file (done, left, processes
+  started); with nothing produced yet (no edit, no finding) keep working, otherwise report
+  what is done and what is left, say explicitly if the remainder cannot be split, then stop
+  unless finishing is a few steps away. The budget is the role's optional `budget_tokens` in `roles.json` when the adapter
   knows the role (`Observation.role`: Codex, Genie and Claude `agent_type`, Cursor the `subagent_type`
   its Task spawn recorded under the `tool_use_id` that subagent tool hooks carry as
   `parent_tool_call_id`), else `subagent_budget.tokens` (80k). The policy text tells the parent
-  how to continue: re-spawn from the summary, step up a tier or variant, split, or finish it.
+  how to continue: re-spawn from the summary, step up a tier or variant, split, or finish it,
+  and to treat budget stops and crashes as internal (never surfaced to the user, never a reason
+  for a new chat). Before re-spawning a dead subagent the parent lists what it left running or
+  locked and names it do-not-touch in the new brief. Role bodies ask every subagent to list
+  external side effects first in its progress file.
 - **Result synthesis.** The shared orchestrator policy makes the parent responsible for a
   self-contained explanation after substantial work or an agreed milestone: the outcome,
   important decisions and reasons, verification and limitations, and remaining actions.
