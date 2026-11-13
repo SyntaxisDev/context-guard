@@ -6,7 +6,7 @@ from types import SimpleNamespace
 from unittest import mock
 
 from adapters.cursor import hooks, mapping, subagents
-from core import policy
+from core import deadline, policy
 from core.runner import service
 from tests import harness
 
@@ -120,6 +120,56 @@ class PromptTests(CursorHookCase):
         note = self.hook("postToolUse", tool_name="Shell", tool_input={"command": "ls"})
         self.assertIn(message, note["additional_context"])
         self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
+
+    def test_untiered_runner_report_survives_first_context_warning(self) -> None:
+        self.user_config({"runner": {"enabled": True}})
+        message = "A pending runner report is available."
+        with mock.patch.object(
+            hooks.runner, "services", return_value=SimpleNamespace(prompt=lambda _: service.Routing(message=message))
+        ):
+            self.assertEqual(self.hook("beforeSubmitPrompt", prompt="new request"), {"continue": True})
+        self.tokens("c1", 120000)
+        note = self.hook("postToolUse", tool_name="Shell", tool_input={"command": "ls"})
+        self.assertIn(message, note["additional_context"])
+        self.assertIn("Context check", note["additional_context"])
+        self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
+
+    def test_blocked_prompt_routing_is_rendered_once_before_commit(self) -> None:
+        self.user_config({"classifier": {"enabled": True}})
+        self.tokens("c1", 190000)
+        message = "A pending runner report is available."
+        rendered: list[tuple[object, bool]] = []
+        original = hooks.respond
+
+        def capture(decision: object, event: str) -> dict:
+            """Record response timing and return the native response.
+
+            Args:
+                decision: Decision being rendered.
+                event: Semantic hook event.
+
+            Returns:
+                The rendered response.
+            """
+            rendered.append((decision, deadline.active().committed))
+            return original(decision, event)
+
+        with (
+            mock.patch.object(
+                hooks.runner,
+                "services",
+                return_value=SimpleNamespace(prompt=lambda _: service.Routing(message=message)),
+            ),
+            mock.patch.object(hooks, "respond", side_effect=capture),
+        ):
+            response = deadline.run_within(
+                lambda: self.hook("beforeSubmitPrompt", prompt="continue the work"), {"continue": True}
+            )
+        self.assertEqual(response["user_message"].count(message), 1)
+        self.assertFalse(response["continue"])
+        self.assertEqual(len(rendered), 1)
+        self.assertFalse(rendered[0][1])
+        self.assertEqual(response, original(rendered[0][0], "prompt"))
 
     def test_block_reports_chat_tokens_and_the_chat_limit(self) -> None:
         self.tokens("c1", 190000)
