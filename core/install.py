@@ -58,6 +58,22 @@ def marked_section(begin: str, end: str) -> re.Pattern[str]:
     return re.compile(re.escape(begin) + r"\r?\n.*?" + re.escape(end) + r"(?:\r?\n|$)", re.DOTALL)
 
 
+def marked_body(section: str, begin: str, end: str) -> str:
+    """Extract the body of a matched section without its complete opening line ending.
+
+    Args:
+        section: Text matching `marked_section(begin, end)`.
+        begin: Opening marker line.
+        end: Closing marker line.
+
+    Returns:
+        The text between the marker lines, preserving its line endings.
+    """
+    body = section[len(begin) :]
+    body = body[2:] if body.startswith("\r\n") else body[1:]
+    return body.rstrip("\r\n").removesuffix(end)
+
+
 def same_section(actual: str, expected: str) -> bool:
     """Compare only an owned section, accepting CRLF in place of LF.
 

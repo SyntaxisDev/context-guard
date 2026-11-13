@@ -36,7 +36,7 @@ ACCESS_BEGIN = "# BEGIN context-guard handoff access"
 ACCESS_END = "# END context-guard handoff access"
 ACCESS_BLOCK = install.marked_section(ACCESS_BEGIN, ACCESS_END)
 ACCESS_COMMENT = "# context-guard handoff access"
-SANDBOX_HEADER = re.compile(r"^[ \t]*\[[ \t]*" + SANDBOX_TABLE + r"[ \t]*\][ \t]*(?:#.*)?$", re.MULTILINE)
+SANDBOX_HEADER = re.compile(r"^[ \t]*\[[ \t]*" + SANDBOX_TABLE + r"[ \t]*\][ \t]*(?:#[^\r\n]*)?(?=\r?$)", re.MULTILINE)
 OVERRIDE_SYNTAX = (
     "the `spawn_agent` `model` and `reasoning_effort` arguments. Always pass the role as "
     '`agent_type` and `fork_turns: "none"` so the subagent starts from your brief instead of '
@@ -234,7 +234,7 @@ def evict_foreign_tables(text: str, names: Collection[str]) -> str:
     match = SECTION.search(text)
     if match is None:
         return text
-    body = match[0][len(SECTION_BEGIN) + 1 :].rstrip("\r\n").removesuffix(SECTION_END)
+    body = install.marked_body(match[0], SECTION_BEGIN, SECTION_END)
     starts = [header.start() for header in TABLE_HEADER.finditer(body)]
     ours, foreign = [body[: starts[0]] if starts else body], []
     for start, end in zip(starts, [*starts[1:], len(body)], strict=True):
@@ -243,8 +243,8 @@ def evict_foreign_tables(text: str, names: Collection[str]) -> str:
         (ours if owned else foreign).append(chunk)
     if not foreign:
         return text
-    section = f"{SECTION_BEGIN}\n{''.join(ours).rstrip('\n')}\n{SECTION_END}\n"
-    return text[: match.start()] + section + "\n" + "".join(foreign).rstrip("\n") + "\n" + text[match.end() :]
+    section = f"{SECTION_BEGIN}\n{''.join(ours).rstrip('\r\n')}\n{SECTION_END}\n"
+    return text[: match.start()] + section + "\n" + "".join(foreign).rstrip("\r\n") + "\n" + text[match.end() :]
 
 
 def remove_section(text: str) -> str:
@@ -481,12 +481,11 @@ def evict_access_tables(text: str, root: Path) -> str:
     if match is None:
         return text
     owned = f"[{SANDBOX_TABLE}]\n{roots_line(root)}\n"
-    body = match[0][len(ACCESS_BEGIN) :].removeprefix("\r\n").removeprefix("\n")
-    body = body.rstrip("\r\n").removesuffix(ACCESS_END)
+    body = install.marked_body(match[0], ACCESS_BEGIN, ACCESS_END)
     rest = body.removeprefix(owned.replace("\n", "\r\n") if body.startswith(owned.replace("\n", "\r\n")) else owned)
-    if rest == body or not TABLE_HEADER.match(rest.lstrip("\n")):
+    if rest == body or not TABLE_HEADER.match(rest.lstrip("\r\n")):
         return text
-    return text[: match.start()] + access_block(root) + "\n" + rest.strip("\n") + "\n" + text[match.end() :]
+    return text[: match.start()] + access_block(root) + "\n" + rest.strip("\r\n") + "\n" + text[match.end() :]
 
 
 def insert_block(text: str, block: str) -> str:
@@ -575,7 +574,9 @@ def apply_access(text: str, root: Path) -> str:
     if table is None:
         result = insert_block(text, access_block(root))
     elif isinstance(table, dict) and ROOTS_KEY not in table and len(headers) == 1:
-        result = text[: headers[0].end()] + "\n" + owned_line(root) + text[headers[0].end() :]
+        boundary = headers[0].end()
+        newline = "\r\n" if text[boundary:].startswith("\r\n") else "\n"
+        result = text[:boundary] + newline + owned_line(root) + text[boundary:]
     else:
         return text
     return result if only_root_added(parsed, result, root) else text
