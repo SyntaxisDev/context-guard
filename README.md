@@ -79,7 +79,7 @@ section of [docs/architecture.md](docs/architecture.md#install-engine).
 
 ### Plugins from GitHub Releases
 
-Each [release](https://github.com/SyntaxDev/context-guard/releases) attaches, per runtime, a plugin
+Each [release](https://github.com/SyntaxisDev/context-guard/releases) attaches, per runtime, a plugin
 zip `context-guard-<runtime>-<version>.zip` (plugin at the zip root), a marketplace zip
 `context-guard-<runtime>-marketplace-<version>.zip` (listing plus `plugins/`), and `SHA256SUMS`.
 

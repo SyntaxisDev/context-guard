@@ -83,7 +83,7 @@ class LayoutTests(PluginTestCase):
         root = self.build()
         manifest = json.loads((root / plugin.MANIFEST_FILE).read_text())
         self.assertEqual((manifest["name"], manifest["version"]), (plugin.NAME, kit.source_version()))
-        self.assertEqual(manifest["interface"]["developerName"], "SyntaxDev")
+        self.assertEqual(manifest["interface"]["developerName"], "SyntaxisDev")
         for key in ("skills", "hooks"):
             with self.subTest(key=key):
                 self.assertTrue(manifest[key].startswith("./"))
