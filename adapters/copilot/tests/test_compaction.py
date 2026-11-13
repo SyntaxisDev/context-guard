@@ -2,7 +2,7 @@ import copy
 from unittest.mock import patch
 
 from adapters.copilot import hooks
-from core import deadline
+from core import deadline, state
 from tests import harness
 
 
@@ -107,3 +107,24 @@ class CompactionTransactionTests(harness.RuntimeHookCase):
             self.assertIn("current-policy", response["additionalContext"])
             self.assertNotIn("obsolete-policy", response["additionalContext"])
             self.assertEqual(self.fire(), {})
+
+    def test_session_start_compaction_drops_obsolete_pending_context(self) -> None:
+        with state.session_state(self.state_dir, "copilot", "root") as saved:
+            saved["adapter"] = {"recovery_context": "obsolete-policy"}
+        self.complete("compaction-1")
+        start = harness.payload(
+            "copilot",
+            "sessionStart-new",
+            self.home,
+            self.project,
+            sessionId="root",
+            cwd=str(self.project),
+            transcriptPath=str(self.transcript),
+        )
+        with patch.object(hooks, "session_policy", return_value="current-policy"):
+            response = hooks.handle("sessionStart", start, self.config, self.home, {})
+        self.assertIn("current-policy", response["additionalContext"])
+        with state.session_state(self.state_dir, "copilot", "root") as saved:
+            self.assertEqual(saved["adapter"]["compaction"], "compaction-1")
+            self.assertNotIn("recovery_context", saved["adapter"])
+        self.assertNotIn("obsolete-policy", str(self.fire()))

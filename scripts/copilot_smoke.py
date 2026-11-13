@@ -10,6 +10,7 @@ import sys
 import tempfile
 import time
 import uuid
+from contextlib import ExitStack
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,6 +116,52 @@ def output_directory(output: Path | None) -> Path:
     else:
         target.mkdir(parents=True, mode=0o700)
     return target
+
+
+def verified_output_fd(output: Path) -> int:
+    """Bind the smoke result to an owned directory even if its pathname changes.
+
+    Args:
+        output: Validated absolute evidence directory.
+
+    Returns:
+        Open directory descriptor; caller must close it.
+
+    Raises:
+        RuntimeError: The directory changed or is not private.
+    """
+    with ExitStack() as cleanup:
+        fd = os.open(output, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+        cleanup.callback(os.close, fd)
+        mode = os.fstat(fd)
+        path_mode = output.stat(follow_symlinks=False)
+        if (
+            not stat.S_ISDIR(mode.st_mode)
+            or mode.st_uid != os.getuid()
+            or mode.st_mode & (stat.S_IWGRP | stat.S_IWOTH)
+            or (mode.st_dev, mode.st_ino) != (path_mode.st_dev, path_mode.st_ino)
+        ):
+            msg = "smoke output must remain an owned, non-writable-by-others directory"
+            raise RuntimeError(msg)
+        cleanup.pop_all()
+    return fd
+
+
+def write_result(directory_fd: int, record: dict) -> None:
+    """Create the exclusive result inside the previously verified directory.
+
+    Args:
+        directory_fd: Open descriptor for the validated output directory.
+        record: Final smoke observations.
+    """
+    fd = os.open(
+        "result.json",
+        os.O_WRONLY | os.O_CREAT | os.O_EXCL | os.O_NOFOLLOW,
+        0o600,
+        dir_fd=directory_fd,
+    )
+    with os.fdopen(fd, "w") as stream:
+        stream.write(json.dumps(record, indent=2) + "\n")
 
 
 def installed_hook(runtime: Path, event: str, payload: dict, cwd: Path, env: dict[str, str]) -> dict:
@@ -257,6 +304,23 @@ def main() -> int:
     parser.add_argument("--copilot-cli", default=shutil.which("copilot"), help="CLI executable or measured cli-main.js")
     args = parser.parse_args()
     args.output = output_directory(args.output)
+    directory_fd = verified_output_fd(args.output)
+    try:
+        return run_smoke(args, directory_fd)
+    finally:
+        os.close(directory_fd)
+
+
+def run_smoke(args: argparse.Namespace, directory_fd: int) -> int:
+    """Run the sandbox and save its result in the validated output directory.
+
+    Args:
+        args: Parsed smoke arguments with an absolute output directory.
+        directory_fd: Open descriptor for the verified output directory.
+
+    Returns:
+        Process exit code.
+    """
     record = {"mode": "native" if args.run else "dry-run", "started": time.time(), "output": str(args.output)}
     base = args.output / "sandbox"
     home, runtime, work = base / "home", base / "runtime", base / "work"
@@ -303,7 +367,7 @@ def main() -> int:
         record["error"] = f"{type(exc).__name__}: {exc}"
         record["retained_sandbox"] = str(base)
     record["finished"] = time.time()
-    (args.output / "result.json").write_text(json.dumps(record, indent=2) + "\n")
+    write_result(directory_fd, record)
     print(
         json.dumps(
             {key: record[key] for key in ("mode", "status", "error", "output", "retained_sandbox") if key in record}

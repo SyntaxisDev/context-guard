@@ -352,8 +352,8 @@ def evaluate(
         if compact:
             adapter = state.setdefault("adapter", {})
             adapter["compaction"] = identity
+            adapter.pop("recovery_context", None)
             if obs.event != SESSION:
-                adapter.pop("recovery_context", None)
                 if decision.kind == BLOCK:
                     adapter["recovery_context"] = recovery_text
                 elif recovery_text:
