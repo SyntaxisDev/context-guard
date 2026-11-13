@@ -14,6 +14,7 @@ import sys
 from collections.abc import Mapping
 from dataclasses import dataclass, replace
 from pathlib import Path
+from types import SimpleNamespace
 
 KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
@@ -39,6 +40,7 @@ from core.observation import (
     Observation,
     ToolUse,
 )
+from core.runner import service
 
 RUNTIME = "cursor"
 PROMPT_HOOK = "beforeSubmitPrompt"
@@ -615,7 +617,7 @@ def observe(native: str, payload: object, config: dict, home: Path) -> Observati
     )
 
 
-def take_pending(state: dict) -> tuple[str, str] | None:
+def take_pending(state: dict) -> tuple[str, str | None] | None:
     """Remove the waiting prompt note from session state.
 
     Args:
@@ -627,9 +629,9 @@ def take_pending(state: dict) -> tuple[str, str] | None:
     """
     adapter = state.setdefault("adapter", {})
     message, tier = adapter.pop(PENDING_NOTE, None), adapter.pop(PENDING_TIER, None)
-    if not isinstance(message, str) or "tier" not in state:
+    if not isinstance(message, str) or (tier is not None and "tier" not in state):
         return None
-    return message, tier if isinstance(tier, str) else state["tier"]
+    return message, tier if isinstance(tier, str) else state.get("tier")
 
 
 def handoff_written(decision: Decision) -> bool:
@@ -734,6 +736,20 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
     if obs.tool is not None and obs.tool.action == SPAWN:
         subagents.remember_spawn(directory, payload, obs.tool.detail.get("role"))
     responses: list[tuple[Decision, dict]] = []
+    routes: list[service.Routing] = []
+
+    def routed_prompt(prompt: Observation) -> service.Routing:
+        """Retain prompt routing for transactional deferred delivery.
+
+        Args:
+            prompt: The root prompt observation.
+
+        Returns:
+            The prompt service's routing decision.
+        """
+        routing = runner.services(home).prompt(prompt)
+        routes.append(routing)
+        return routing
 
     def compose(decision: Decision, state: dict) -> Decision:
         """Render the composed decision before its state transaction commits.
@@ -748,8 +764,9 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
         Raises:
             ValueError: Model context could not be rendered for delivery.
         """
+        combined = service.combine(decision, routes[0]) if routes else decision
         decision = subagents.deliver_state(
-            obs, recovery.deliver(obs, carry_note(obs, decision, state), state, config, home), state
+            obs, recovery.deliver(obs, carry_note(obs, combined, state), state, config, home), state
         )
         response = respond(decision, obs.event)
         if decision.message and obs.event in (TOOL, SESSION) and not response.get("additional_context"):
@@ -762,7 +779,7 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
         obs,
         config,
         home,
-        lambda: runner.services(home),
+        lambda: SimpleNamespace(prompt=routed_prompt),
         lambda decision: responses[0][1] if responses and decision == responses[0][0] else respond(decision, obs.event),
         lambda response: obs.event == TOOL and "additional_context" in response,
         adjust=compose,
