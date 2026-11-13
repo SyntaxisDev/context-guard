@@ -12,8 +12,8 @@ See [docs/architecture.md](docs/architecture.md) and the runtime pages
 [Cursor](docs/cursor.md), [Codex](docs/codex.md), [Genie](docs/genie.md),
 [Claude Code](docs/claude.md), [Copilot CLI](docs/copilot.md).
 The [conformance guide](docs/conformance.md) explains registry discovery, adapter-owned drivers,
-structural validation and behavioral checks. The [measured baseline](docs/conformance-baseline.md)
-records existing failures separately from the [declared feature support](docs/feature-registry.md).
+structural validation and behavioral checks. The [feature registry](docs/feature-registry.md)
+defines declared support separately from executable conformance results.
 
 ## Install
 
@@ -68,7 +68,7 @@ and [docs/claude.md](docs/claude.md#handoff-write-access).
 
 Copilot local packaging and namespaced role-preference setup are described in
 [Copilot packaging](docs/copilot.md#plugin-package). Durable handoff-directory access is configured
-per workspace through an explicit helper; [native evidence and current measurements](docs/copilot.md) state the boundary.
+per workspace through an explicit helper; [the Copilot contract](docs/copilot.md) states the boundary.
 
 ### Updating
 

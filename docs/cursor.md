@@ -31,17 +31,16 @@ contract before an override can safely relocate the installed files.
 
 Cursor wakes the parent natively: when a background Task subagent finishes, Cursor starts a new parent turn with its result, without a user message, so the shared policy's "end your turn and pick up each result as a new turn" holds as written. context-guard adds only fallback notes for the cases the runtime cannot report: a background subagent silent past `subagents.silence_minutes` (its transcript shows no finished turn), a foreground subagent whose result never arrived, and one the parent moved on from (see Unreturned subagents above). The notes reach the parent on its next tool result or `sessionStart`; an idle parent fires no hook, so it sees them at its first tool result after the user next writes (`beforeSubmitPrompt` cannot add context).
 
-The independent shared wake driver replays a measured Cursor CLI capture using
+The independent shared wake driver replays a recorded Cursor CLI capture using
 `adapters/cursor/tests/native_lifecycle.py`. It requires a correlated background
 Task and agent identity, a completed root generation before the actual child token
 read, actual native child output, a matching **subagent** completion notification
-(the earlier shell notification is insufficient), and distinct root assistant text
+(a shell notification is insufficient), and distinct root assistant text
 in a new completed generation with no further terminal input. Native messages have
 per-session order and blob identities; root text messages are correlated in order
 with completed hook generations, rather than inventing native message timestamps.
-The recorded child launched `sleep` and `cat` in parallel: **the strict delay control
-FAILED**, although the measured token read occurred after root idle. This supports
-the wake contract and does not establish compliance with the requested delay.
+The replay establishes native wake but does not establish compliance with the child's
+requested delay.
 Fixtures are generated only by `scripts/record_payloads.py --runtime cursor
 --cursor-lifecycle-root <capture>`; this explicit route reads capture artifacts only.
 It hashes projected artifacts separately from reported original DB/WAL hashes;
@@ -110,14 +109,12 @@ state transaction. Successful rendering commits consumption and clears fired tie
 render failure or deadline fallback before commit preserves retry. Persisted response state
 is the hook's delivery boundary; host receipt and model compliance cannot be acknowledged by hooks.
 
-Native CLI evidence from Cursor `2026.11.11-043ef28` records manual `/summarize`, a matching
-completed stop and an independently rendered Summary. A subsequent Read hook's
-`additional_context` was stored in the native tool result and recalled exactly on a later
-model turn. The first reply ignored the instruction: delivery and recall are proven, reliable
-instruction compliance and handoff writes are not. The CLI internally chose a different
-summarization model despite the explicit conversation model. No IDE compaction replay has
-been measured; the same adapter uses the nearest equivalent lifecycle and context channel
-there, conditional on those hooks being emitted. Automatic compaction has not been measured.
+The CLI recovery fixture covers manual `/summarize`, a matching completed stop,
+an independently rendered Summary and later recall of Read-hook `additional_context`.
+Delivery and recall do not guarantee instruction compliance or handoff writes.
+The CLI may choose a different summarization model from the explicit conversation model.
+IDE and automatic compaction recovery remain unverified; the adapter uses the nearest
+equivalent lifecycle and context channel there, conditional on those hooks being emitted.
 
 The source-backed recipe fixtures are generated only with
 `scripts/record_payloads.py --runtime cursor --cursor-capture <captured-hooks.jsonl>`.
@@ -155,8 +152,8 @@ Readonly filesystem errors are reported. Potential overlapping project Write den
 and retained; runtime readonly, protected paths, ignore rules and higher-level native restrictions
 remain overrides, so an installed grant alone is not proof of effective access.
 
-Native Cursor CLI `2026.11.11-043ef28` demonstrated an external Write with this grant without
-approval, an ungranted external Write prompting for approval, and explicit denies blocking writes.
+The project grant allows external Writes without approval; an ungranted external Write
+can prompt for approval and explicit denies still block writes.
 OS temporary directory exemptions can independently permit ungranted writes: this grant is
 an auto-approval mechanism, not an exclusive filesystem boundary. See the
 [CLI permission contract](https://cursor.com/docs/cli/reference/permissions).
