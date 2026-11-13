@@ -8,6 +8,7 @@ from pathlib import Path
 
 from adapters.genie import hooks, mapping
 from core import config as config_mod, install, render
+from core.install_spec import InstallSpec
 
 USER_CONFIG = """model = "gpt-6.1-sol"
 approval_policy = "on-request"
@@ -111,6 +112,27 @@ class ConfigTomlTests(SpecCase):
         )
         self.assertEqual(self.registrations.apply(applied), applied)
         self.assertEqual(self.registrations.revert(applied), original)
+
+    def test_crlf_config_install_reinstall_and_uninstall_preserve_user_bytes(self) -> None:
+        path = self.registrations.path
+        path.parent.mkdir(parents=True)
+        original = USER_CONFIG.replace("\n", "\r\n").encode()
+        path.write_bytes(original)
+        spec = InstallSpec(mapping.RUNTIME, text_edits=[self.registrations])
+        manifest_path = install.manifest_path(self.home, mapping.RUNTIME)
+        first = install.plan(spec, {})
+        self.assertFalse(first.conflicts)
+        install.apply(first, manifest_path, self.home / "backups")
+        installed = install.read_text(path)
+        path.write_bytes(installed.replace("\r\n", "\n").replace("\n", "\r\n").encode())
+        manifest = install.read_manifest(manifest_path)
+        again = install.plan(spec, manifest)
+        self.assertFalse(again.conflicts)
+        self.assertFalse(again.changes)
+        removal = install.plan_uninstall(spec, manifest)
+        self.assertFalse(removal.conflicts)
+        install.apply(removal, manifest_path, self.home / "backups")
+        self.assertEqual(path.read_bytes(), original)
 
     def test_apply_keeps_user_edits_made_after_install(self) -> None:
         applied = self.registrations.apply(USER_CONFIG) + '\n[profiles.fast]\nmodel = "gpt-6-luna"\n'
