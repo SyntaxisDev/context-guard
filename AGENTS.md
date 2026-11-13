@@ -1,7 +1,7 @@
 # Developing context-guard
 
 Context-guard provides context warnings, task handoffs and delegation support for
-Cursor, Codex, Genie and Claude Code. Layout and contracts are in `docs/architecture.md`.
+Cursor, Codex, Genie, Claude Code and GitHub Copilot CLI. Layout and contracts are in `docs/architecture.md`.
 Python is 3.14+ and standard library only; run everything through `uv`.
 
 ## Principles
@@ -12,7 +12,7 @@ sections below are the concrete rules that apply them here; they win where they 
 ## Runtime parity
 
 context-guard is universal. Every feature (warnings, handoffs, delegation policy, subagent
-tracking and delivery of subagent results) is designed for all four runtimes at once: shared
+tracking and delivery of subagent results) is designed for all registered runtimes at once: shared
 behaviour in `content/` and `core/`, with an equivalent in each adapter. When a runtime lacks a
 native mechanism, build the closest equivalent in its adapter or document the gap and its reason
 in `docs/<runtime>.md`; never ship a feature or fix for one runtime only without that decision.
@@ -72,8 +72,12 @@ findings rather than extending it, and keep any `noqa` targeted to one rule.
 - Never write or bypass runtime hook trust.
 - Precedence is defaults, adapter config, user config, environment override.
 - No backward-compatibility layers; only user-owned files and handoff data are preserved.
-- Never touch live homes (`~/.cursor`, `~/.codex`, `~/.genie`, `~/.claude`, `~/.context-guard`) in tests or
+- Never touch live homes (`~/.cursor`, `~/.codex`, `~/.genie`, `~/.claude`, `~/.copilot`, `~/.context-guard`) in tests or
   verification; use `--home` with a temporary directory.
+- Routine task handoff saves in `~/.context-guard/handoffs` are expected agent bookkeeping,
+  with standing user authorization; save them without requesting permission again. They are
+  separate from test or verification mutations of runtime homes. Requiring renewed approval
+  for a routine handoff save is a regression. Respect enforced filesystem approval decisions.
 
 ## Validation
 
@@ -85,10 +89,23 @@ uv run --python 3.14 python -m unittest discover -s adapters/cursor/tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/codex/tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/genie/tests -t .
 uv run --python 3.14 python -m unittest discover -s adapters/claude/tests -t .
+uv run --python 3.14 python -m unittest discover -s adapters/copilot/tests -t .
 uv run --python 3.14 python scripts/gen_docs.py --check
 uvx ruff check .
 uvx ruff format --check .
 ```
+
+Registry/driver completeness and behavioral conformance have separate commands:
+
+```sh
+uv run --python 3.14 python scripts/conformance.py --structure
+uv run --python 3.14 python scripts/conformance.py --json /tmp/conformance.json
+```
+
+Structure must pass. Conformance returns nonzero for behavior failures and
+`NOT IMPLEMENTED` declarations; never mask that exit status or weaken assertions to make it
+green. Classify infrastructure defects, adapter gaps and documented runtime limitations
+separately. See `docs/conformance.md` and `docs/conformance-baseline.md`.
 
 Also spot-check with `--python 3.15`. Tests assert observable contracts or distinct failure
 modes, not helper structure. The `tests` run covers three layers beyond unit tests:

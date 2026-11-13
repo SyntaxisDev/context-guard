@@ -7,8 +7,8 @@ plugins to the GitHub release; no built plugin is committed to the repository.
 
 | path                                      | for                                                                     | what it writes                                                                                                                                                   |
 | ----------------------------------------- | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `cli.py install --runtime <rt>`           | Cursor, Codex, Genie, Claude Code CLI                                   | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
-| `cli.py package --runtime <rt> --out DIR` | Runtimes with a plugin spec: Claude Code and CoWork, Cursor, Codex, Genie | `DIR/<rt>/plugins/context-guard/`: vendored code, `LICENSE`, `NOTICE`, launcher, plugin manifest, hooks (not Cursor), agents, skills, policy. Nothing outside `DIR`. |
+| `cli.py install --runtime <rt>`           | Cursor, Codex, Genie, Claude Code CLI, Copilot CLI                                   | Kit at `~/.context-guard/kit` with a venv, native rules/agents/skills, hook registrations merged into the runtime settings, an install manifest. See the README. |
+| `cli.py package --runtime <rt> --out DIR` | Runtimes with a plugin spec: Claude Code and CoWork, Cursor, Codex, Genie, Copilot CLI | `DIR/<rt>/plugins/context-guard/`: vendored code, `LICENSE`, `NOTICE`, launcher, plugin manifest, hooks (not Cursor), agents, skills, policy. Nothing outside `DIR`. |
 | `... --marketplace NAME`                  | Sharing through a marketplace repo                                      | Also the runtime's marketplace listing under `DIR/<rt>/` (Claude: `.claude-plugin/marketplace.json`) listing the plugin at `./plugins/context-guard`.           |
 | GitHub release assets                     | Users who do not clone the repository                                   | Per runtime a plugin zip (plugin root at the zip root) and a marketplace zip (listing + `plugins/`), plus `SHA256SUMS`. See Releases.                            |
 
@@ -56,6 +56,12 @@ claude --plugin-dir dist/claude/plugins/context-guard
 claude plugin validate dist/claude/plugins/context-guard
 claude plugin marketplace add ./dist/claude        # when built with --marketplace
 ```
+
+Copilot packages use `.github/plugin/plugin.json`, flat native hook handlers and
+`.github/plugin/marketplace.json` for local catalogues. Packaged roles need an explicit,
+reversible per-profile preference setup for effort/context pins; see
+[Copilot packaging](copilot.md#plugin-package). This helper never registers duplicate hooks
+or changes trust. Source builds support the package; no Copilot release asset is claimed here.
 
 ## Releases
 

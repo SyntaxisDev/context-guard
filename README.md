@@ -1,7 +1,7 @@
 # context-guard
 
 Context warnings, task handoffs and delegation support for AI coding runtimes: Cursor,
-Codex, Genie and Claude Code. One core and one content source; thin per-runtime adapters.
+Codex, Genie, Claude Code and GitHub Copilot CLI. One core and one content source; thin per-runtime adapters.
 
 - Warns once per tier as chat context grows and blocks just before compaction (identical resend continues).
 - Keeps handoff files so a new chat can resume a task.
@@ -10,7 +10,10 @@ Codex, Genie and Claude Code. One core and one content source; thin per-runtime 
 
 See [docs/architecture.md](docs/architecture.md) and the runtime pages
 [Cursor](docs/cursor.md), [Codex](docs/codex.md), [Genie](docs/genie.md),
-[Claude Code](docs/claude.md).
+[Claude Code](docs/claude.md), [Copilot CLI](docs/copilot.md).
+The [conformance guide](docs/conformance.md) explains registry discovery, adapter-owned drivers,
+structural validation and behavioral checks. The [measured baseline](docs/conformance-baseline.md)
+records existing failures separately from the [declared feature support](docs/feature-registry.md).
 
 ## Install
 
@@ -24,20 +27,21 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.14+. From the repository 
 
 ```sh
 uv run --python 3.14 python cli.py install --runtime all --dry-run   # preview, writes nothing
-uv run --python 3.14 python cli.py install --runtime cursor          # or codex, genie, claude, all
+uv run --python 3.14 python cli.py install --runtime cursor          # or codex, genie, claude, copilot, all
 uv run --python 3.14 python cli.py status --runtime all
 uv run --python 3.14 python cli.py doctor --runtime all
 uv run --python 3.14 python cli.py uninstall --runtime all
 ```
 
-Options: `--runtime` (repeatable; `cursor`, `codex`, `genie`, `claude` or `all`), `--home DIR` (install into
+Options: `--runtime` (repeatable; `cursor`, `codex`, `genie`, `claude`, `copilot` or `all`), `--home DIR` (install into
 another home, for testing), `--dry-run`, `--force` (replace conflicting kit files, keeping
 backups), `--set section.key=value` (write the user config; the key must exist in
 `content/defaults.json` or an adapter `config.json`).
 Exit codes: 0 ok, 1 conflicts, doctor problems or (doctor) nothing installed, 2 the command could not run.
 
 Claude Code uses `CLAUDE_CONFIG_DIR` (default `~/.claude`), Codex uses `CODEX_HOME`
-(default `~/.codex`), and Genie uses `GENIE_HOME` (default `~/.genie`). Set the same variable
+(default `~/.codex`), Genie uses `GENIE_HOME` (default `~/.genie`), and Copilot uses
+`COPILOT_HOME` (default `~/.copilot`). Set the same variable
 when installing, updating, checking or uninstalling a profile. Each profile has its own
 install record; handoffs and the kit remain shared under `~/.context-guard`.
 
@@ -61,6 +65,10 @@ directory) goes into Codex and Genie's sandbox `writable_roots` and a Claude Cod
 with `--set handoff_access.enabled=false`, then reinstall; details in
 [docs/codex.md](docs/codex.md#handoff-write-access), [docs/genie.md](docs/genie.md#handoff-write-access)
 and [docs/claude.md](docs/claude.md#handoff-write-access).
+
+Copilot local packaging and namespaced role-preference setup are described in
+[Copilot packaging](docs/copilot.md#plugin-package). Durable handoff-directory access is configured
+per workspace through an explicit helper; [native evidence and current measurements](docs/copilot.md) state the boundary.
 
 ### Updating
 
@@ -137,3 +145,24 @@ home for the plugins and checks them in each runtime (`--dry-run` prints what it
 ## License
 
 Apache License 2.0; see [LICENSE](LICENSE) and [NOTICE](NOTICE).
+
+<!-- BEGIN generated: declared-support -->
+Declared support (capability declarations, not test results).
+
+Gap links explain the reason and kind; universal guarantees cannot be opted out.
+
+| Capability | claude | codex | copilot | cursor | genie |
+| --- | --- | --- | --- | --- | --- |
+| `session_context` | supported | supported | supported | supported | supported |
+| `prompt_warning` | supported | supported | supported | supported | supported |
+| `prompt_block` | supported | supported | supported | supported | supported |
+| `tool_warning` | supported | supported | supported | supported | supported |
+| `handoff_refresh` | supported | supported | supported | supported | supported |
+| `compaction_recovery` | supported | supported | supported | supported | supported |
+| `subagent_budget` | supported | supported | supported | supported | supported |
+| `silent_subagent_note` | supported | supported | supported | supported | supported |
+| `background_result_wake` | supported | supported | supported | supported | [runtime_limit](docs/genie.md#unsupported) |
+| `handoff_access` | supported | supported | supported | supported | supported |
+| `roles` | supported | supported | supported | supported | supported |
+| `runner` | supported | supported | supported | supported | [runtime_limit](docs/genie.md#unsupported) |
+<!-- END generated: declared-support -->
