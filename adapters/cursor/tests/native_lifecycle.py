@@ -55,7 +55,7 @@ def candidate_boundaries(fixture: dict, spawn: dict) -> tuple[dict, dict, dict, 
     Returns:
         Background, idle, actual read and root result boundaries, or None.
     """
-    hooks, root, token = fixture["hooks"], fixture["root_session"], fixture["token"]
+    hooks, root, token = fixture["hooks"], fixture["root_session"], fixture["marker"]
     child = spawn["output"].get("agentId")
     if not child or child == root or not spawn.get("tool_use_id"):
         return None
@@ -208,9 +208,9 @@ def transcripts_valid(fixture: dict, child: str) -> bool:
     ):
         return False
     for rows in transcripts:
-        if not rows or rows[0].get("role") != "user" or fixture["token"] in rows[0].get("text", ""):
+        if not rows or rows[0].get("role") != "user" or fixture["marker"] in rows[0].get("text", ""):
             return False
-        if not any(r.get("role") == "assistant" and fixture["token"] in r.get("text", "") for r in rows):
+        if not any(r.get("role") == "assistant" and fixture["marker"] in r.get("text", "") for r in rows):
             return False
         if rows[-1].get("type") != "turn_ended" or rows[-1].get("status") != "success":
             return False
@@ -228,7 +228,7 @@ def native_receipt(fixture: dict, spawn: dict, stops: list[dict]) -> dict | None
     Returns:
         Matching root receipt boundary, or no valid delivery.
     """
-    root, token = fixture["root_session"], fixture["token"]
+    root, token = fixture["root_session"], fixture["marker"]
     child = spawn["output"]["agentId"]
     rows = fixture["native"]
     child_text = [actual_text(r) for r in rows if r.get("session_id") == child and token in actual_text(r)]
@@ -310,7 +310,7 @@ def root_boundaries_valid(
     Returns:
         Whether root identity and independent corroboration are valid.
     """
-    token, child = fixture["token"], spawn["output"]["agentId"]
+    token, child = fixture["marker"], spawn["output"]["agentId"]
     if any(r.get("agent_id") or r.get("parent_tool_call_id") for r in root_rows):
         return False
     root_calls = [p for r in root_rows for p in r.get("content", []) if p.get("type") == "tool-call"]
@@ -384,17 +384,13 @@ def observed_wake(fixture: dict) -> dict:
         "native-allowlisted-events.json",
         "terminal-chronology.jsonl",
         "ordered-events.json",
-        "native-source-hashes.json",
-        "transcript-source-hashes.json",
-        "source-hashes.json",
-        "report.md",
         "transcript-0",
         "transcript-1",
     }
     if (
         {a.get("name") for a in artifacts} != required
         or any(not re.fullmatch(r"[a-f0-9]{64}", a.get("sha256", "")) or a.get("bytes", 0) <= 0 for a in artifacts)
-        or not re.fullmatch(r"CLEAN_BLIND_[a-f0-9]+", fixture.get("token", ""))
+        or not re.fullmatch(r"NATIVE_CURSOR_WAKE_[a-f0-9]+", fixture.get("marker", ""))
     ):
         return result
     boundaries = hook_boundaries(fixture)

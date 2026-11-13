@@ -10,7 +10,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from adapters.cursor.tests.native_lifecycle import observed_wake
-from scripts.cursor_lifecycle import framed_text, native_event
+from scripts.cursor_lifecycle import framed_text, native_event, record_cursor_lifecycle
 from scripts.record_payloads import main
 from tests import harness
 
@@ -163,7 +163,7 @@ class NativeWakeTests(unittest.TestCase):
         fixture["native"][8]["content"][0]["text"] = fixture["native"][10]["content"][0]["text"]
         self.assert_rejected(fixture)
         fixture = self.fixture()
-        fixture["hooks"][1]["prompt"] = fixture["token"]
+        fixture["hooks"][1]["prompt"] = fixture["marker"]
         self.assert_rejected(fixture)
         fixture = self.fixture()
         fixture["native"][4]["content"][0]["operation"] = "Read"
@@ -207,7 +207,7 @@ class NativeWakeTests(unittest.TestCase):
         self.assert_rejected(fixture)
 
     def test_scrubber_preserves_only_token_framing(self) -> None:
-        token = self.fixture()["token"]
+        token = self.fixture()["marker"]
         self.assertEqual(framed_text(f"private {token} /private/path"), f"<scrubbed>{token}<scrubbed>")
         event = native_event(
             {
@@ -347,9 +347,7 @@ class NativeWakeTests(unittest.TestCase):
                 json.dumps({"ns": r["ns"], r["kind"]: "redacted"}) for r in fixture["terminal"]
             ),
             "ordered-events.json": json.dumps(fixture["ordered"]),
-            "native-source-hashes.json": json.dumps(
-                {r["source_id"]: r["sha256"] for r in fixture["provenance"]["original_database_hashes"]}
-            ),
+            "native-source-hashes.json": json.dumps({}),
             "source-hashes.json": "{}",
             "transcript-source-hashes.json": "{}",
             "report.md": "strict delay FAILED",
@@ -368,11 +366,24 @@ class NativeWakeTests(unittest.TestCase):
             )
         return sources
 
-    def test_recorded_artifacts_distinguish_projected_bytes_from_original_database_hashes(self) -> None:
+    def test_recorded_artifacts_keep_native_evidence_without_investigation_metadata(self) -> None:
         fixture = self.fixture()
         provenance = fixture["provenance"]
-        self.assertIn("not a snapshot", provenance["database_hash_scope"])
-        self.assertEqual(len(provenance["original_database_hashes"]), 4)
+        self.assertNotIn("database_hash_scope", provenance)
+        self.assertNotIn("original_database_hashes", provenance)
         native = next(a for a in provenance["artifacts"] if a["name"] == "native-allowlisted-events.json")
-        self.assertNotIn(native["sha256"], [a["sha256"] for a in provenance["original_database_hashes"]])
         self.assertEqual(len(native["sha256"]), hashlib.sha256().digest_size * 2)
+
+    def test_original_database_source_ids_hide_the_entire_path(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for name, text in self.capture_sources(self.fixture()).items():
+                (root / name).write_text(text)
+            path = "/tmp/client-Acme_capture/session/store.db"
+            (root / "native-source-hashes.json").write_text(json.dumps({path: "a" * 64}))
+            fixture = record_cursor_lifecycle(root, lambda value: value)["lifecycle/idle-parent-wake"]
+            [source] = fixture["provenance"]["original_database_hashes"]
+            self.assertEqual(
+                source["source_id"], hashlib.sha256(("context-guard-fixture:" + path).encode()).hexdigest()
+            )
+            self.assertNotIn("client-Acme", source["source_id"])

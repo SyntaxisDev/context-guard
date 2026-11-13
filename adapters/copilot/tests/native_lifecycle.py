@@ -5,7 +5,7 @@ notifications to journal turns. Controlled child context and result sentinels pr
 model-visible delivery; a completion notification or a prompt marker alone cannot.
 """
 
-ARTIFACT_NAMES = frozenset({"journal", "lifecycle", "wire", "manifest"})
+ARTIFACT_NAMES = frozenset({"journal", "lifecycle", "wire"})
 
 
 def model_chunks(wire: list[dict]) -> dict[tuple[str, str | None], dict]:

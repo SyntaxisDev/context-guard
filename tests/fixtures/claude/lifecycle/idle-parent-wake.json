@@ -1,8 +1,5 @@
 {
-  "experiment": {
-    "prompt_template": "<scrubbed>",
-    "token": "NATIVE_CLAUDE_WAKE_Q8J2"
-  },
+  "marker": "NATIVE_CLAUDE_WAKE_Q8J2",
   "provenance": {
     "artifacts": [
       {
@@ -14,27 +11,12 @@
         "bytes": 994,
         "name": "request",
         "sha256": "34b5a493588de10cb9b5fc3ed60611f0670383beb5b01b2582bbb8a372750caf"
-      },
-      {
-        "bytes": 2575,
-        "name": "probe",
-        "sha256": "041d75ae63ea12711d3300ccf79a7858fd34313eecf2fe5efc22f4e315816980"
-      },
-      {
-        "bytes": 2275,
-        "name": "verifier",
-        "sha256": "05879e6eb8778b45caf67e597d929f07c560cf55b3ba012682187d2280eed752"
-      },
-      {
-        "bytes": 55,
-        "name": "original_smoke_verdict",
-        "sha256": "ab35a8f8e50d0c5c362ab6f8e48973b5f6513ce1661acaaac6aaa545ea586f06"
       }
     ],
     "version": "2.1.311"
   },
   "root_session": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
-  "source": "Measured Claude native stream; offline replay, not fresh host execution",
+  "source": "Claude native idle-parent wake; offline replay",
   "wire": [
     {
       "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",

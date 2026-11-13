@@ -6,7 +6,7 @@ import re
 from collections.abc import Callable
 from pathlib import Path
 
-MARKER = re.compile(r"CLEAN_BLIND_[a-f0-9]+")
+MARKER = re.compile(r"NATIVE_CURSOR_WAKE_[a-f0-9]+")
 IDENTITIES = ("session_id", "generation_id", "tool_use_id", "parent_tool_call_id", "agent_id")
 
 
@@ -163,7 +163,7 @@ def record_cursor_lifecycle(root: Path, fake_id: Callable[[str], str]) -> dict[s
             + [artifact(p, f"transcript-{i}") for i, p in enumerate(transcripts)],
             "original_database_hashes": [
                 {
-                    "source_id": fake_id(p),
+                    "source_id": hashlib.sha256(("context-guard-fixture:" + p).encode()).hexdigest(),
                     "session_id": fake_id(Path(p).parent.name),
                     "kind": "wal" if p.endswith("-wal") else "database",
                     "sha256": h,
