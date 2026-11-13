@@ -8,8 +8,8 @@ license-files = ["LICENSE", "NOTICE"]
 dependencies = []
 
 [project.urls]
-Homepage = "https://github.com/SyntaxDev/context-guard"
-Repository = "https://github.com/SyntaxDev/context-guard"
+Homepage = "https://github.com/SyntaxisDev/context-guard"
+Repository = "https://github.com/SyntaxisDev/context-guard"
 
 [tool.uv]
 package = false

@@ -18,7 +18,7 @@ from core.package import LAUNCHER, PLUGINS_DIR, PluginSpec
 NAME = hooks.PLUGIN_NAME
 DISPLAY_NAME = "context-guard"
 DESCRIPTION = "Context warnings, task handoffs and delegation support for Codex"
-DEVELOPER = "SyntaxDev"
+DEVELOPER = "SyntaxisDev"
 CATEGORY = "Productivity"
 MANIFEST_FILE = ".codex-plugin/plugin.json"
 MARKETPLACE_FILE = ".agents/plugins/marketplace.json"
