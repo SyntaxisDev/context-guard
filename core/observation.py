@@ -77,6 +77,7 @@ class Observation:
         is_subagent: True when the event comes from a subagent.
         role: The subagent's role, if known.
         compacted: True when the runtime reports the context was compacted.
+        rearm_on_usage: Whether falling usage alone may reset warning tiers.
         cwd: Working directory of the session, or empty when unknown.
         prompt: The user prompt on prompt events.
         tool: The completed tool call on tool events.
@@ -94,6 +95,7 @@ class Observation:
     is_subagent: bool = False
     role: str | None = None
     compacted: bool = False
+    rearm_on_usage: bool = True
     cwd: str = ""
     prompt: str | None = None
     tool: ToolUse | None = None
