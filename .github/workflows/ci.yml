@@ -25,14 +25,33 @@ jobs:
       - uses: astral-sh/setup-uv@v6
       - name: Core tests
         run: uv run --python ${{ matrix.python }} python -m unittest discover -s tests -t .
-      - name: Cursor adapter tests
-        run: uv run --python ${{ matrix.python }} python -m unittest discover -s adapters/cursor/tests -t .
-      - name: Codex adapter tests
-        run: uv run --python ${{ matrix.python }} python -m unittest discover -s adapters/codex/tests -t .
-      - name: Claude adapter tests
-        run: uv run --python ${{ matrix.python }} python -m unittest discover -s adapters/claude/tests -t .
+      - name: Adapter tests
+        run: |
+          status=0
+          for suite in adapters/*/tests; do
+            echo "::group::$suite"
+            uv run --python ${{ matrix.python }} python -m unittest discover -s "$suite" -t . || status=1
+            echo "::endgroup::"
+          done
+          exit $status
       - name: Generated docs are current
         run: uv run --python ${{ matrix.python }} python scripts/gen_docs.py --check
+
+  conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v6
+      - name: Registry and driver structure
+        run: uv run --python 3.14 python scripts/conformance.py --structure
+      - name: Shared scenarios
+        run: uv run --python 3.14 python scripts/conformance.py --json conformance.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: conformance
+          path: conformance.json
+          retention-days: 7
 
   lint:
     runs-on: ubuntu-latest
