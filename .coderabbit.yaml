@@ -11,20 +11,73 @@ reviews:
     - "!tests/fixtures/**"
     - "!uv.lock"
   path_instructions:
+    - path: "**"
+      instructions: |
+        Prioritise consistency with the project's documented practices, architecture and
+        established patterns. Consult AGENTS.md, docs/principles.md, docs/architecture.md,
+        docs/conformance.md, docs/feature-registry.md and the docs/<runtime>.md page for any
+        adapter touched. Review responsibility placement, state ownership, lifecycle handling,
+        interfaces and tests, not just whether the changed code works in isolation. Flag changes
+        that bypass existing abstractions, duplicate responsibilities or introduce competing
+        patterns. Weigh tradeoffs by the priority order in docs/principles.md (correct, safe,
+        minimal, clear, focused, predictable, verifiable, composable, observable, efficient) and
+        flag speculative abstractions, safeguards or tests that no requirement or meaningful risk
+        justifies. Recommend the smallest change that fits the existing architecture, citing the
+        relevant rule or example. Distinguish accepted requirements from proposals and personal
+        preferences.
     - path: "core/**"
       instructions: >-
-        Runtime-neutral: never import an adapter or name a runtime home. Python 3.14+, standard
-        library only. Functions at most 80 lines with Google-style docstrings.
+        Runtime-neutral: never import an adapter or name, discover or hard-code a runtime home,
+        executable or database; paths arrive as arguments. Python 3.14+, standard library only.
     - path: "adapters/**"
       instructions: >-
-        Every feature needs a declared disposition in every adapter (runtime parity). Telemetry
-        failures fail open; runner command validation fails closed; hooks finish within their deadline.
+        Runtime parity: a feature or fix ships for every registered runtime, or the gap and its
+        reason are documented in docs/<runtime>.md. Telemetry failures fail open; runner command
+        validation fails closed; hooks finish within their deadline and pass on overrun. An
+        adapter never reads another runtime's home.
+    - path: "{cli.py,core/install*.py,core/kit.py,adapters/*/plugin.py}"
+      instructions: >-
+        Installers preserve unrelated hooks, settings and user edits, use manifests for
+        replacement and retirement, report conflicts and keep backups. Dry runs write nothing.
+        Never write or bypass runtime hook trust.
     - path: "tests/**"
       instructions: >-
-        Tests assert observable contracts, never touch live runtime homes, and must not weaken
-        conformance assertions to make results green.
+        Tests assert observable contracts or distinct failure modes, not helper structure, and
+        never touch live runtime homes (use --home with a temporary directory). Conformance
+        assertions must not be weakened, skipped or marked expected-failure to make results green.
+        Fixtures come only from scripts/record_payloads.py.
+    - path: "{content/**,docs/**,README.md,AGENTS.md}"
+      instructions: >-
+        Docs and shipped text state the current contract only: no change history, proposals,
+        measurements of past runs or personal paths. Shared policy text must hold for every
+        runtime; runtime-specific wording goes through adapter mapping placeholders.
+  pre_merge_checks:
+    custom_checks:
+      - name: "Runtime parity"
+        mode: "warning"
+        instructions: >-
+          Pass when every behaviour change in core/, content/ or one adapter is either applied to
+          every adapter under adapters/ or the PR documents the runtime gap and its reason in the
+          affected docs/<runtime>.md. Fail otherwise, naming the missing runtimes.
+      - name: "Live artifacts only"
+        mode: "warning"
+        instructions: >-
+          Fail when the PR adds proposals, investigation notes, run reports, measurement logs,
+          scratch files, personal paths, internal company names or credentials. Pass otherwise.
+      - name: "Docs follow behaviour"
+        mode: "warning"
+        instructions: >-
+          Fail when the PR changes behaviour, configuration, paths or adapter tiers without
+          updating the matching docs/, README.md or shipped content. Pass otherwise.
   tools:
     ruff:
       enabled: true
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - "AGENTS.md"
+      - "docs/principles.md"
+      - "docs/architecture.md"
 chat:
   auto_reply: true

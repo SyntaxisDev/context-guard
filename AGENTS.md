@@ -4,6 +4,11 @@ Context-guard provides context warnings, task handoffs and delegation support fo
 Cursor, Codex, Genie and Claude Code. Layout and contracts are in `docs/architecture.md`.
 Python is 3.14+ and standard library only; run everything through `uv`.
 
+## Principles
+
+Weigh design and review tradeoffs by the priority order in `docs/principles.md`. The
+sections below are the concrete rules that apply them here; they win where they are more specific.
+
 ## Runtime parity
 
 context-guard is universal. Every feature (warnings, handoffs, delegation policy, subagent
