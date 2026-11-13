@@ -2,7 +2,7 @@
 
 context-guard warns about growing chat context, keeps task handoffs, and routes work to
 role-based subagents. One runtime-neutral core and one content source serve Cursor, Codex,
-Genie and Claude Code through thin adapters.
+Genie, Claude Code and GitHub Copilot CLI through thin adapters.
 
 ```text
 content/   policy, roles.json + role bodies, skills, defaults.json   (what users receive)
@@ -18,7 +18,7 @@ Data flows `content -> core.render -> adapter mapping -> native files`, and
 Python is 3.14+, standard library only. `core/` never imports an adapter and never names a
 runtime home; every home and path is passed in. An adapter never reads another runtime's home.
 
-Every feature has an equivalent in all four adapters. Where a runtime has no native mechanism,
+Every feature has a declared disposition in every registered adapter. Where a runtime has no native mechanism,
 its adapter supplies the closest equivalent, or `docs/<runtime>.md` states the gap and why.
 Shared policy text holds for every runtime; runtime-specific wording comes from mapping placeholders.
 
@@ -143,12 +143,13 @@ with delayed delivery stated explicitly.
 
 ## Delivery channels
 
-| runtime | policy                                              | handoff list and notes                                    |
-| ------- | --------------------------------------------------- | --------------------------------------------------------- |
-| Cursor  | `~/.cursor/rules/context-guard.mdc` (`alwaysApply`) | `sessionStart` additional context; notes via tool results |
-| Codex   | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
-| Genie   | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
-| Claude  | `~/.claude/rules/context-guard.md`                  | SessionStart additionalContext                            |
+| runtime     | policy                                              | handoff list and notes                                    |
+| ----------- | --------------------------------------------------- | --------------------------------------------------------- |
+| Cursor      | `~/.cursor/rules/context-guard.mdc` (`alwaysApply`) | `sessionStart` additional context; notes via tool results |
+| Codex       | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
+| Genie       | SessionStart additionalContext                      | SessionStart (also `source: compact`)                     |
+| Claude      | `~/.claude/rules/context-guard.md`                  | SessionStart additionalContext                            |
+| Copilot CLI | `sessionStart` additionalContext                    | `sessionStart` additionalContext (ranked handoffs)        |
 
 User `CLAUDE.md` and `AGENTS.md` are never edited. Skills (`handoff`,
 `install-context-guard`) and agents are native files tracked in the manifest.
@@ -378,3 +379,11 @@ suite (see `AGENTS.md`). Installer checks use `--home` with a temporary director
 live home. Fixture tests prove contracts; hook execution inside a real runtime needs a live
 smoke run, `scripts/sandbox_smoke.sh`, which uses the real logins and sandboxes only the hook
 and config wiring. Each runtime doc ends with an Unverified list of facts not yet observed.
+
+Diagnostic event appends are best effort and never wait for another event-log writer.
+Contention drops those diagnostic records so a committed hook response can still reach
+the runtime within its deadline; session-state transactions remain serialized.
+
+JSON permission retirement validates present containers before changing ownership.
+Malformed settings keep their bytes and manifest entries for a repair-and-retry uninstall;
+missing containers remain explicit user removals.
