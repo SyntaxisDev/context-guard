@@ -42,7 +42,7 @@ class NativeWakeTests(unittest.TestCase):
         self.assertTrue(evidence["parent_started"])
         self.assertTrue(evidence["result_delivered"])
         self.assertEqual(list(evidence["sequence"].values()), [3, 7, 9, 11, 14, 15])
-        token = fixture["experiment"]["token"]
+        token = fixture["marker"]
         self.assertIn(token, fixture["wire"][7]["result"])
         self.assertNotEqual(token, fixture["wire"][7]["result"])
         self.assertEqual(token, fixture["wire"][15]["result"])
@@ -99,7 +99,7 @@ class NativeWakeTests(unittest.TestCase):
         self.assert_rejected(fixture)
 
     def test_redaction_keeps_token_framing_and_scrubs_unrelated_text(self) -> None:
-        token = self.fixture()["experiment"]["token"]
+        token = self.fixture()["marker"]
         self.assertEqual(framed_text(f"private prompt {token} private output"), f"<scrubbed>{token}<scrubbed>")
         self.assertEqual(framed_text(token), token)
         event = native_event(
@@ -123,7 +123,7 @@ class NativeWakeTests(unittest.TestCase):
 
     def test_notification_must_match_actual_child_output_not_just_known_token(self) -> None:
         fixture = self.fixture()
-        fixture["wire"][11]["summary"] = fixture["experiment"]["token"]
+        fixture["wire"][11]["summary"] = fixture["marker"]
         self.assert_rejected(fixture)
 
     def test_reply_cannot_belong_to_child_or_reuse_an_earlier_message(self) -> None:

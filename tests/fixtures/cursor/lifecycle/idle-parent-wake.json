@@ -82,7 +82,7 @@
       "ns": 1794569749782532000,
       "output": {
         "exitCode": 0,
-        "text": "CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>"
+        "text": "NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>"
       },
       "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
       "tool_name": "Shell",
@@ -123,6 +123,7 @@
       "status": "completed"
     }
   ],
+  "marker": "NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e",
   "native": [
     {
       "content": [
@@ -161,7 +162,7 @@
     {
       "content": [
         {
-          "result": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "result": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
           "toolCallId": "toolu_18379ec6d342fb885eff7dd7",
           "toolName": "Shell",
           "type": "tool-result"
@@ -174,7 +175,7 @@
     {
       "content": [
         {
-          "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "text": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
           "type": "text"
         }
       ],
@@ -248,19 +249,19 @@
     {
       "message_id": "840d72fb66d1a94061435d7b44591b56c0f235273c0871f5a2a3a416e0867b93",
       "notification": {
-        "detail": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "detail": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
         "kind": "subagent",
         "status": "success",
         "task_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
       },
       "role": "user",
       "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
-      "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>"
+      "text": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>"
     },
     {
       "content": [
         {
-          "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "text": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
           "type": "text"
         }
       ],
@@ -401,26 +402,6 @@
         "sha256": "774147f5c6dcdebeceb4bd95d032bbf46d5c20c66b6f6475177e4651a2996d4f"
       },
       {
-        "bytes": 750,
-        "name": "native-source-hashes.json",
-        "sha256": "c91f7514d69c9174dcb60090704795a0f184959925620c22bc22052e0b06fa17"
-      },
-      {
-        "bytes": 574,
-        "name": "transcript-source-hashes.json",
-        "sha256": "d2782c4af7037883d421e8398ae459a379e757a0952eea423b0025d49c9c0555"
-      },
-      {
-        "bytes": 377,
-        "name": "source-hashes.json",
-        "sha256": "8fb324d559bf79c313ea2c8277e780ac9edfd5c4bd81edc903a6cf71186fd514"
-      },
-      {
-        "bytes": 7273,
-        "name": "report.md",
-        "sha256": "bde99059eb4c4af5d3d0073399b7176451bcaa305c1335597a32351784d6ccfb"
-      },
-      {
         "bytes": 2091,
         "name": "transcript-0",
         "sha256": "b664886359ee2ece32e15736b61d998c9de5ab6dc17e417892fe45994f8c66db"
@@ -430,37 +411,10 @@
         "name": "transcript-1",
         "sha256": "e565216933467006d9fc2c22fdee4fcf44a4e6b0744b5c3336954c1c8c4afea4"
       }
-    ],
-    "database_hash_scope": "Reported original DB/WAL bytes; projected events are separate artifacts, not a snapshot",
-    "original_database_hashes": [
-      {
-        "kind": "database",
-        "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
-        "sha256": "4ecb364c1e98be49d3e0f468ec541e4b6ef0cd560095929d98adb0e9ba10597c",
-        "source_id": "/49822/fe59c.7503e/.94fb36/9c997/a9fc6abf07337009dbfbf4faa43551f6/7fb78d49-822f-e59c-7503-e94fb369c997/a9fc6.ab"
-      },
-      {
-        "kind": "wal",
-        "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "source_id": "/be35b/0a261.7905e/.902381/0412a/b0efda6cda314b1cdf2043ebee024813/fb708abe-35b0-a261-7905-e9023810412a/b0efd.a6-cda"
-      },
-      {
-        "kind": "database",
-        "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
-        "sha256": "2bf525e87a559ccf11048666feabb79e0d1cc60bb58a919eca9cd547403487e6",
-        "source_id": "/20a8f/a0b2f.c2172/.84cbd0/a2a73/2b1ec2f1d021e863c5ff62ab80a6e134/021cb620-a8fa-0b2f-c217-284cbd0a2a73/2b1ec.2f"
-      },
-      {
-        "kind": "wal",
-        "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
-        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
-        "source_id": "/27944/0eca8.b0655/.d439ea/d65b8/9c12f69ae1fdf7290db39e1dc6c2bc56/95278127-9440-eca8-b065-5d439ead65b8/9c12f.69-ae1"
-      }
     ]
   },
   "root_session": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
-  "source": "Measured Cursor CLI capture; offline replay, not fresh host execution or IDE proof",
+  "source": "Cursor native idle-parent wake; offline replay",
   "terminal": [
     {
       "kind": "output",
@@ -863,7 +817,6 @@
       "ns": 1794569785663429000
     }
   ],
-  "token": "CLEAN_BLIND_535a827bd5af8c806315440e",
   "transcript_sessions": [
     "1afa874b-de25-7090-ff7e-dfade6f7912a",
     "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
@@ -885,7 +838,7 @@
       {
         "role": "assistant",
         "status": null,
-        "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "text": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
         "type": null
       },
       {
@@ -935,7 +888,7 @@
       {
         "role": "assistant",
         "status": null,
-        "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "text": "<scrubbed>NATIVE_CURSOR_WAKE_535a827bd5af8c806315440e<scrubbed>",
         "type": null
       },
       {

@@ -101,7 +101,7 @@ class HookTests(harness.RuntimeHookCase):
         logged = self.logged()
         self.assertIn("handoff_written", {entry["event"] for entry in logged})
         detail = next(entry["detail"] for entry in logged if entry["event"] == "subagent_spawn")
-        self.assertEqual(detail["role"], "spike-plugin:plugin-child")
+        self.assertEqual(detail["role"], "plugin-child")
         self.assertEqual(detail["model"], "gpt-6-luna")
 
     def test_recorded_patch_add_and_update_credit_handoff_writes(self) -> None:

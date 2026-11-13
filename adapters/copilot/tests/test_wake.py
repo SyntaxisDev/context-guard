@@ -37,7 +37,7 @@ class NativeWakeTests(unittest.TestCase):
         messages = model_chunks(fixture["wire"])
         self.assertIn("CHILD_RETURNED_ACP", messages[(evidence["model_message"], None)]["text"])
         self.assertEqual(
-            {item["name"] for item in fixture["provenance"]["artifacts"]}, {"journal", "lifecycle", "wire", "manifest"}
+            {item["name"] for item in fixture["provenance"]["artifacts"]}, {"journal", "lifecycle", "wire"}
         )
         for artifact in fixture["provenance"]["artifacts"]:
             self.assertRegex(artifact["sha256"], r"^[0-9a-f]{64}$")

@@ -5,7 +5,7 @@
     "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
     "timestamp": 1794137204134,
     "toolArgs": {
-      "agent_type": "spike-plugin:plugin-child",
+      "agent_type": "plugin-child",
       "description": "<scrubbed>",
       "mode": "<scrubbed>",
       "model": "gpt-6-luna",

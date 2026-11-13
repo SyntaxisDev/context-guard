@@ -17,7 +17,7 @@
 - Copilot: native `hook.start` inputs and `hook.end` outputs from an explicit sandbox home's
   `session-state/*/events.jsonl` (`--copilot-home`, never defaulted), telemetry templates from the
   same logs, and an output contract checked against the SDK hook contracts d.ts (`--copilot-contract`).
-  Optional `--copilot-lifecycle-root` records measured native ACP wake with hashed source provenance;
+  Optional `--copilot-lifecycle-root` records native ACP wake with scrubbed source identities;
   ordinary tests only replay the scrubbed fixture and never access those capture roots.
 
 Output: tests/fixtures/<runtime>/<event>-<case>.json = {"source", "event", "payload"} plus
@@ -398,11 +398,11 @@ def record_cursor_capture(path: Path, scrub: Scrubber) -> dict[str, dict]:
         pre = row["payload"]
         for following, stop in enumerate(rows[index + 1 :], index + 1):
             payload = stop.get("payload", {})
-            if (
-                stop.get("event") == "stop"
-                and payload.get("status") == "completed"
-                and all(payload.get(key) == pre.get(key) for key in ("conversation_id", "session_id", "generation_id"))
+            if stop.get("event") == "stop" and all(
+                payload.get(key) == pre.get(key) for key in ("conversation_id", "session_id", "generation_id")
             ):
+                if payload.get("status") != "completed" or payload.get("loop_count", 0) != 0:
+                    break
                 tool = next(
                     (
                         item["payload"]
@@ -1635,7 +1635,7 @@ def lifecycle_artifact(path: Path, name: str) -> dict:
 
 
 def record_copilot_lifecycle(root: Path, scrub: Scrubber) -> dict[str, dict]:
-    """Record measured idle-parent wake from explicitly supplied native spike captures.
+    """Record idle-parent wake from explicitly supplied native captures.
 
     Args:
         root: Explicit capture directory; never inferred from a runtime home.
@@ -1677,7 +1677,7 @@ def record_copilot_lifecycle(root: Path, scrub: Scrubber) -> dict[str, dict]:
         ],
     }
     fixture = {
-        "source": "Measured Copilot native ACP idle-parent wake; offline captured observation, not fresh execution",
+        "source": "Copilot native ACP idle-parent wake; offline replay, not fresh execution",
         "provenance": provenance,
         "root_session": scrub.fake_id(session),
         "journal": [lifecycle_event(record, scrub) for record in journal if record.get("type") in LIFECYCLE_TYPES],
@@ -1698,14 +1698,84 @@ def write(found: dict[str, dict], runtime: str, out: Path, *, dry_run: bool, scr
         scrub: The recording's scrubber, which refuses sensitive content.
     """
     for name, data in sorted(found.items()):
-        scrub.check(data)
-        path = out / runtime / f"{name}.json"
+        projected_name, projected = project_fixture(runtime, name, data)
+        scrub.check(projected)
+        path = out / runtime / f"{projected_name}.json"
         print(
             f"{'would write' if dry_run else 'wrote'} {path.relative_to(ROOT) if path.is_relative_to(ROOT) else path}"
         )
         if not dry_run:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+            path.write_text(json.dumps(projected, indent=2, sort_keys=True) + "\n")
+
+
+def project_fixture(runtime: str, name: str, fixture: dict) -> tuple[str, dict]:
+    """Project recorded fixtures into neutral, test-relevant evidence.
+
+    Args:
+        runtime: Runtime owning the recording.
+        name: Existing fixture name.
+        fixture: Scrubbed recorder output or an existing recorder fixture.
+
+    Returns:
+        Neutral fixture name and content with identities and native evidence preserved.
+    """
+    if runtime == "copilot":
+        name = re.sub(r"(?<=-)[a-z-]+-plugin-child", "plugin-child", name)
+        fixture = json.loads(re.sub(r"[\w-]+:plugin-child", "plugin-child", json.dumps(fixture)))
+    if name != "lifecycle/idle-parent-wake":
+        return name, fixture
+    fixture = dict(fixture)
+    fixture["source"] = f"{runtime.title()} native idle-parent wake; offline replay"
+    provenance = fixture.get("provenance", {})
+    if runtime == "claude":
+        fixture["marker"] = fixture.pop("experiment")["token"] if "experiment" in fixture else fixture["marker"]
+        allowed = {"wire", "request"}
+    elif runtime == "cursor":
+        fixture["marker"] = fixture.pop("token") if "token" in fixture else fixture["marker"]
+        allowed = {
+            "hooks.jsonl",
+            "native-allowlisted-events.json",
+            "terminal-chronology.jsonl",
+            "ordered-events.json",
+            "transcript-0",
+            "transcript-1",
+        }
+    else:
+        allowed = {"journal", "lifecycle", "wire"}
+    fixture["provenance"] = {
+        **({"version": provenance["version"]} if "version" in provenance else {}),
+        "artifacts": [item for item in provenance.get("artifacts", []) if item["name"] in allowed],
+    }
+    return name, fixture
+
+
+def project_existing_lifecycle(out: Path, runtime: str, *, dry_run: bool) -> None:
+    """Reproject existing recorder fixtures without reading runtime homes.
+
+    Args:
+        out: Fixture output root; existing inputs come from the repository fixture root.
+        runtime: Runtime to project, or all supported lifecycle runtimes.
+        dry_run: Report paths without modifying files.
+    """
+    runtimes = ("claude", "cursor", "copilot") if runtime == "all" else (runtime,)
+    for selected in runtimes:
+        paths = [FIXTURES / selected / "lifecycle/idle-parent-wake.json"]
+        if selected == "copilot":
+            paths.extend(sorted((FIXTURES / selected).glob("*.json")))
+        for path in paths:
+            if not path.is_file():
+                continue
+            name, data = project_fixture(
+                selected, path.relative_to(FIXTURES / selected).with_suffix("").as_posix(), json.loads(path.read_text())
+            )
+            target = out / selected / f"{name}.json"
+            print(f"{'would write' if dry_run else 'wrote'} {target}")
+            if not dry_run:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_text(json.dumps(data, indent=2, sort_keys=True) + "\n")
+                if path != target and path.name != target.name and out == FIXTURES:
+                    path.unlink()
 
 
 def default_codex_binary() -> Path | None:
@@ -1736,7 +1806,7 @@ def record_copilot_inputs(args: argparse.Namespace, scrub: Scrubber) -> dict[str
         scrub: Primary native identity scrubber.
 
     Returns:
-        Hook, telemetry and optional measured lifecycle fixtures.
+        Hook, telemetry and optional native lifecycle fixtures.
     """
     found = record_copilot(args.copilot_home, args.copilot_contract, scrub)
     if args.copilot_lifecycle_root is not None:
@@ -1800,11 +1870,21 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--genie-binary", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=FIXTURES)
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--project-existing-lifecycle",
+        action="store_true",
+        help="reproject recorded lifecycle and plugin-child fixtures without reading runtime homes",
+    )
     args = parser.parse_args(argv)
+    if args.project_existing_lifecycle:
+        project_existing_lifecycle(args.out, args.runtime, dry_run=args.dry_run)
+        return 0
     validate_cursor_capture_route(args, parser)
-    runtimes = tuple(discover()) if args.runtime == "all" else (args.runtime,)
-    if args.runtime == "all" and args.copilot_home is None:
-        runtimes = tuple(runtime for runtime in runtimes if runtime != "copilot")
+    runtimes = (
+        tuple(runtime for runtime in discover() if runtime != "copilot" or args.copilot_home is not None)
+        if args.runtime == "all"
+        else (args.runtime,)
+    )
     missing = set(runtimes) - RECORDER_RUNTIMES
     if missing:
         parser.error(f"no native fixture recorder for: {', '.join(sorted(missing))}")

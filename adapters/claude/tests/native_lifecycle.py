@@ -2,7 +2,7 @@
 
 import re
 
-ARTIFACT_NAMES = frozenset({"wire", "request", "probe", "verifier", "original_smoke_verdict"})
+ARTIFACT_NAMES = frozenset({"wire", "request"})
 
 
 def model_text(row: dict) -> str:
@@ -106,7 +106,7 @@ def observed_wake(fixture: dict) -> dict:
         )
     ):
         return result
-    rows, root, token = fixture["wire"], fixture["root_session"], fixture["experiment"]["token"]
+    rows, root, token = fixture["wire"], fixture["root_session"], fixture["marker"]
     if not re.fullmatch(r"NATIVE_CLAUDE_WAKE_[A-Z0-9]+", token):
         return result
     for start, spawn in enumerate(rows):

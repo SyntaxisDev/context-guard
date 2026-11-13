@@ -581,70 +581,12 @@
         "bytes": 189272,
         "name": "wire",
         "sha256": "0256ae829ba64f891e2e9fabc2671352ac9eb79b9cb3c10fd0438b7fa50e20d1"
-      },
-      {
-        "bytes": 2395,
-        "name": "manifest",
-        "sha256": "cdc69c1ef01f99fe5d5bc504ed1410f7a8cddb0bfb522718c27f99240a431495"
-      }
-    ],
-    "build_commit": "2bfb456b",
-    "runtime_sources": [
-      {
-        "bytes": 2410,
-        "name": "package.json",
-        "sha256": "2fec16c0c1049c1352617d425a615f599264d561cb0cdf7be5949f38d3ce9eb2"
-      },
-      {
-        "bytes": 8998057,
-        "name": "cli-main.js",
-        "sha256": "3270429bd380550f6e250a49400f68f0e087a377904e78783bf5fdf644769ee4"
-      },
-      {
-        "bytes": 118059120,
-        "name": "runtime.node",
-        "sha256": "0eae290b7e80529f44935ddce0e87919a49c017353269fad5e239579bc3ade3a"
-      },
-      {
-        "bytes": 7622688,
-        "name": "cli-native.node",
-        "sha256": "598ac36779b197d6faa42e07afbfc7c49bf924b294f517e7e66ace60cc9a78f2"
-      },
-      {
-        "bytes": 145581,
-        "name": "types.d.ts",
-        "sha256": "7c39457661228e79e429fd09fce1e5ef5a4771802d6bd2c7fc3599e53ec5edaa"
-      },
-      {
-        "bytes": 1516377,
-        "name": "rpc.d.ts",
-        "sha256": "140b68ae6b492451cb31660baf4c85b3836635efca8b80d96aa1905f1aba500a"
-      },
-      {
-        "bytes": 562812,
-        "name": "session-events.d.ts",
-        "sha256": "027ed7b7c5eb96f19ef454f98feda915d268e5715d26893880f77b27b12b6232"
-      },
-      {
-        "bytes": 1117349,
-        "name": "session-events.schema.json",
-        "sha256": "84b7518af2e12318585ff0420f837ed2babfdd1e7aedbb1960ad8d25191332ac"
-      },
-      {
-        "bytes": 2988473,
-        "name": "api.schema.json",
-        "sha256": "76e5d0871680e1625932757c7678b12e0288a5cfa82291b36b758aff4a003ec5"
-      },
-      {
-        "bytes": 14605,
-        "name": "agent-author.md",
-        "sha256": "10c5719a0c79b98c3820ccb8e43ec0f56be00f772d1ca9b60fbbc6b12f0d284c"
       }
     ],
     "version": "1.0.107"
   },
   "root_session": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
-  "source": "Measured Copilot native ACP idle-parent wake; offline captured observation, not fresh execution",
+  "source": "Copilot native idle-parent wake; offline replay",
   "wire": [
     {
       "direction": "send",
