@@ -1,0 +1,30 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+language: en-GB
+reviews:
+  profile: chill
+  request_changes_workflow: false
+  high_level_summary: true
+  auto_review:
+    enabled: true
+    drafts: false
+  path_filters:
+    - "!tests/fixtures/**"
+    - "!uv.lock"
+  path_instructions:
+    - path: "core/**"
+      instructions: >-
+        Runtime-neutral: never import an adapter or name a runtime home. Python 3.14+, standard
+        library only. Functions at most 80 lines with Google-style docstrings.
+    - path: "adapters/**"
+      instructions: >-
+        Every feature needs a declared disposition in every adapter (runtime parity). Telemetry
+        failures fail open; runner command validation fails closed; hooks finish within their deadline.
+    - path: "tests/**"
+      instructions: >-
+        Tests assert observable contracts, never touch live runtime homes, and must not weaken
+        conformance assertions to make results green.
+  tools:
+    ruff:
+      enabled: true
+chat:
+  auto_reply: true
