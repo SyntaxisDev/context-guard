@@ -200,6 +200,36 @@ class HandoffAccessTests(MappingTestCase):
         )
         self.assertEqual(settings.read_text(), original)
 
+    def test_malformed_permission_uninstall_preserves_ownership_for_retry(self) -> None:
+        path = self.home / ".claude/settings.json"
+        path.parent.mkdir(parents=True)
+        manifest_path = install.manifest_path(self.home, mapping.RUNTIME)
+        for malformed in (
+            {"permissions": None},
+            {"permissions": []},
+            {"permissions": {"allow": "broken"}},
+            {"permissions": {"allow": [1]}},
+            {"permissions": {"deny": "broken"}},
+        ):
+            with self.subTest(malformed=malformed):
+                path.write_text("{}")
+                spec = self.spec()
+                install.apply(install.plan(spec, {}), manifest_path, self.home / "backups")
+                path.write_text(json.dumps(malformed))
+                original = path.read_bytes()
+                plan = install.plan_uninstall(spec, install.read_manifest(manifest_path))
+                self.assertTrue(any(conflict.path == path for conflict in plan.conflicts))
+                install.apply(plan, manifest_path, self.home / "backups")
+                self.assertEqual(path.read_bytes(), original)
+                self.assertIn(str(path), install.read_manifest(manifest_path)["merges"])
+                path.write_text(json.dumps({"permissions": {"allow": [self.rule]}}))
+                install.apply(
+                    install.plan_uninstall(spec, install.read_manifest(manifest_path)),
+                    manifest_path,
+                    self.home / "backups",
+                )
+                self.assertFalse(manifest_path.exists())
+
 
 OLD_RUNNER = """---
 name: runner
