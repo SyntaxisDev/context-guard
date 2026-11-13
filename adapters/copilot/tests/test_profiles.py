@@ -32,15 +32,17 @@ class ProfileTests(unittest.TestCase):
         """
         return mapping.install_spec(self.home, self.home / "kit", Path("/py"), self.config, environ={})
 
-    def apply(self, *, uninstall: bool = False) -> None:
+    def apply(self, *, uninstall: bool = False, edited: bool = False) -> None:
         """Apply a regenerated installation or removal plan.
 
         Args:
             uninstall: Whether to reverse the existing installation.
+            edited: Whether kept user edits should be reported as notes.
         """
         planner = install.plan_uninstall if uninstall else install.plan
         result = planner(self.spec(), install.read_manifest(self.manifest))
         self.assertEqual(result.conflicts, [])
+        self.assertEqual(bool(result.notes), edited)
         install.apply(result, self.manifest, self.home / "backups")
 
     def test_reinstall_and_uninstall_restore_preexisting_entries_and_empty_containers(self) -> None:
@@ -67,8 +69,8 @@ class ProfileTests(unittest.TestCase):
         data["subagents"]["agents"]["scout"]["model"] = "custom"
         data["new"] = True
         self.settings.write_text(json.dumps(data))
-        self.apply()
-        self.apply(uninstall=True)
+        self.apply(edited=True)
+        self.apply(uninstall=True, edited=True)
         self.assertEqual(
             json.loads(self.settings.read_text()),
             {
@@ -77,6 +79,55 @@ class ProfileTests(unittest.TestCase):
                 "subagents": {"agents": {"scout": data["subagents"]["agents"]["scout"]}},
             },
         )
+
+    def test_tier_change_replaces_owned_preferences_and_removes_last_installed_values(self) -> None:
+        self.settings.write_text('{"theme": "dark"}\n')
+        self.apply()
+        self.config["tiers"]["cheap"]["model"] = "changed-model"
+        self.config["tiers"]["cheap"]["effort"] = "high"
+        self.apply()
+        installed = install.read_manifest(self.manifest)["merges"][str(self.settings)]["installed"]
+        self.assertEqual(installed["scout"]["model"], "changed-model")
+        self.assertEqual(installed["scout"]["effortLevel"], "high")
+        self.assertEqual(json.loads(self.settings.read_text())["subagents"]["agents"]["scout"], installed["scout"])
+        self.apply(uninstall=True)
+        self.assertEqual(self.settings.read_text(), '{"theme": "dark"}\n')
+
+    def test_tier_change_uninstall_uses_old_values_and_preserves_user_edits(self) -> None:
+        self.settings.write_text('{"theme": "dark"}\n')
+        self.apply()
+        data = json.loads(self.settings.read_text())
+        data["subagents"]["agents"]["scout"]["model"] = "user-model"
+        self.settings.write_text(json.dumps(data))
+        self.config["tiers"]["cheap"]["model"] = "changed-model"
+        reinstall = install.plan(self.spec(), install.read_manifest(self.manifest))
+        self.assertEqual(reinstall.conflicts, [])
+        self.assertTrue(any("scout" in note.message for note in reinstall.notes))
+        install.apply(reinstall, self.manifest, self.home / "backups")
+        self.assertEqual(json.loads(self.settings.read_text())["subagents"]["agents"]["scout"]["model"], "user-model")
+        removal = install.plan_uninstall(self.spec(), install.read_manifest(self.manifest))
+        self.assertEqual(removal.conflicts, [])
+        self.assertTrue(any("scout" in note.message for note in removal.notes))
+        install.apply(removal, self.manifest, self.home / "backups")
+        self.assertEqual(json.loads(self.settings.read_text())["subagents"]["agents"]["scout"]["model"], "user-model")
+        self.assertFalse(self.manifest.exists())
+
+    def test_tier_change_uninstall_without_reinstall_removes_old_preferences(self) -> None:
+        self.settings.write_text('{"theme": "dark"}\n')
+        self.apply()
+        self.config["tiers"]["cheap"]["model"] = "changed-model"
+        self.apply(uninstall=True)
+        self.assertEqual(self.settings.read_text(), '{"theme": "dark"}\n')
+
+    def test_old_manifest_without_installed_values_preserves_unknown_preferences(self) -> None:
+        self.settings.write_text('{"theme": "dark"}\n')
+        self.apply()
+        manifest = install.read_manifest(self.manifest)
+        manifest["merges"][str(self.settings)].pop("installed")
+        self.manifest.write_text(json.dumps(manifest))
+        self.config["tiers"]["cheap"]["model"] = "changed-model"
+        self.apply(uninstall=True)
+        self.assertIn("scout", json.loads(self.settings.read_text())["subagents"]["agents"])
 
     def test_helper_dry_run_and_real_round_trip_touch_only_namespaced_preferences(self) -> None:
         original = '{ "theme": "dark", "subagents": {"agents": {}} }\n'
@@ -94,6 +145,26 @@ class ProfileTests(unittest.TestCase):
                 self.assertFalse((self.settings.parent / "agents").exists())
                 self.assertFalse((self.settings.parent / "hooks").exists())
         self.assertEqual(self.settings.read_text(), original)
+
+    def test_helper_tier_change_dry_run_and_uninstall(self) -> None:
+        self.settings.write_text('{"theme": "dark"}\n')
+        argv = ["install", "--home", str(self.home)]
+        self.assertEqual(agents.main(argv, {}, io.StringIO()), 0)
+        config_file = self.home / ".context-guard/config.json"
+        config_file.write_text('{"runtimes": {"copilot": {"tiers": {"cheap": {"model": "changed-model"}}}}}')
+        before = self.settings.read_bytes()
+        manifest = install.manifest_path(self.home, agents.MANIFEST_RUNTIME)
+        recorded = manifest.read_bytes()
+        self.assertEqual(agents.main([*argv, "--dry-run"], {}, io.StringIO()), 0)
+        self.assertEqual(self.settings.read_bytes(), before)
+        self.assertEqual(manifest.read_bytes(), recorded)
+        self.assertEqual(agents.main(argv, {}, io.StringIO()), 0)
+        self.assertEqual(
+            json.loads(self.settings.read_text())["subagents"]["agents"]["context-guard:scout"]["model"],
+            "changed-model",
+        )
+        self.assertEqual(agents.main(["uninstall", "--home", str(self.home)], {}, io.StringIO()), 0)
+        self.assertEqual(self.settings.read_text(), '{"theme": "dark"}\n')
 
     def test_namespace_normalization_and_policy_are_specific_to_our_plugin(self) -> None:
         self.assertEqual(tools.role_name("context-guard:reviewer120k"), "reviewer120k")

@@ -160,7 +160,11 @@ sh <plugin-root>/hooks/context-guard-hook adapters/copilot/agents.py uninstall
 The helper honors `COPILOT_HOME` and `--home`, uses its own profile manifest, and changes no
 hooks, agent files, trust or permissions. Uninstall preserves user-owned and edited settings.
 Both main installation and the helper preserve matching pre-existing entries and empty
-containers through reinstall/uninstall using their manifest originals.
+containers through reinstall/uninstall using their manifest originals. Their manifests also
+record each owned preference's last installed value: a changed tier replaces an unchanged
+kit entry, and uninstall removes it even when the current tier differs. User-edited entries
+stay the user's: they are kept and reported as notes without failing the run, and entries
+with no recorded value are treated as user-owned.
 
 ## Runner
 
@@ -183,6 +187,9 @@ The native command is opt-in, authenticated and spends credits. It installs only
 temporary sandbox, uses existing authentication and never writes trust. The smoke checks
 handoff context, warning delivery, refusal and resend behavior, and whether a denied handoff
 write leaves permissions unchanged. Interactive delivery remains unverified.
+Without `--output`, each run creates a private temporary evidence directory. An explicit
+output must be owned by the caller, not writable by others, and have no existing sandbox or
+result file. Smoke subprocesses discard inherited `CONTEXT_GUARD_*` overrides.
 
 The smoke counts unique native request event IDs. Usage exports across resumed turns are
 cumulative and must not be summed.

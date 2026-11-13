@@ -246,7 +246,9 @@ with each profile's environment to refresh all installed policy and agent files.
 3. **Apply** writes each file to a temporary file beside it and renames it into place (through a
    symlink to its target, keeping the existing mode), so a hook importing a kit module during an
    install reads the old or the new file, never a partial one. It then records `state/<rt>/install-manifest.json` (sha256 of
-   files, merges, edits, and the original text of a user JSON file a merge rewrote; files
+   files, merges, edits, and the original text of a user JSON file a merge rewrote; merges
+   that own individual preference values also record their last installed values to distinguish
+   kit entries from subsequent user edits on replacement and removal; files
    whose content would not change are not rewritten). **Dry run** prints the plan and writes nothing.
 4. **Uninstall** reverses via the manifest; the shared kit goes only with the last runtime.
    A merged JSON file whose unmerged content equals its recorded original gets the original

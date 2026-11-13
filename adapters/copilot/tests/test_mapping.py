@@ -57,6 +57,7 @@ class SettingsMergeTests(unittest.TestCase):
         self.settings.write_text(original)
         planned = install.plan(self.spec, {})
         self.assertEqual(self.settings.read_text(), original)
+        self.assertEqual(install.plan(self.spec, {}).changes, planned.changes)
         change = next(item for item in planned.changes if item.path == self.settings)
         merged = json.loads(change.text)
         self.assertEqual(merged["theme"], "dark")
@@ -65,7 +66,8 @@ class SettingsMergeTests(unittest.TestCase):
         self.assertEqual(sorted(merged["subagents"]["agents"]), names)
         self.assertEqual(sorted(merged), ["subagents", "theme"])
         self.settings.write_text(change.text)
-        removal = install.plan_uninstall(self.spec, planned.manifest)
+        updated = mapping.subagent_merge(self.settings, mapping.subagent_settings(self.config), planned.manifest)
+        removal = install.plan_uninstall(install.InstallSpec("copilot", json_merges=[updated]), planned.manifest)
         restored = next(item for item in removal.changes if item.path == self.settings)
         self.assertEqual(restored.text, original)
 
