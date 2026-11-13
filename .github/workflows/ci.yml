@@ -37,7 +37,7 @@ jobs:
         run: uv run --python 3.14 python scripts/conformance.py --structure
       - name: Shared scenarios
         run: uv run --python 3.14 python scripts/conformance.py --json conformance.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: always()
         with:
           name: conformance
@@ -58,7 +58,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: astral-sh/setup-uv@v6
       - run: uv run --python 3.14 python cli.py package --runtime all --out dist
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: plugins
           path: dist/
