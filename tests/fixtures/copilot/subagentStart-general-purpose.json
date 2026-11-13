@@ -1,0 +1,14 @@
+{
+  "event": "subagentStart",
+  "payload": {
+    "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+    "agentName": "general-purpose",
+    "agentType": "general-purpose",
+    "cwd": "{PROJECT}",
+    "parentAgentId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+    "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+    "timestamp": 1794137284134,
+    "transcriptPath": "{HOME}/session-state/f7f6a0a3-7e99-29c7-607e-d531b0e832a7/events.jsonl"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

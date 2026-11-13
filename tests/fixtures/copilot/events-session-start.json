@@ -1,0 +1,12 @@
+{
+  "record": {
+    "data": {
+      "contextTier": "default",
+      "copilotVersion": "1.0.107",
+      "selectedModel": "gpt-6-luna"
+    },
+    "id": "8fae54a8-29f7-e3ef-70b4-1919951f5219",
+    "type": "session.start"
+  },
+  "source": "Copilot 1.0.107 events.jsonl session.start record, numeric and structural fields only"
+}

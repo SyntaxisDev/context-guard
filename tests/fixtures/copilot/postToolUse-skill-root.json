@@ -1,0 +1,35 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "timestamp": 1794137197804,
+    "toolArgs": {
+      "skill": "<scrubbed>"
+    },
+    "toolCallId": "call_ebb7489d3bb9e253f657649c",
+    "toolName": "skill",
+    "toolResult": {
+      "resultType": "success",
+      "sessionLog": "<scrubbed>",
+      "textResultForLlm": "<scrubbed>",
+      "toolTelemetry": {
+        "metrics": {
+          "context_current_tokens": 15029.0,
+          "context_token_limit": 272000.0,
+          "large_output_threshold_bytes": 20480.0,
+          "skillContentLength": 65
+        },
+        "properties": {
+          "found": "<scrubbed>",
+          "skillNameHash": "<scrubbed>",
+          "skillSource": "<scrubbed>"
+        },
+        "restrictedProperties": {
+          "skillName": "<scrubbed>"
+        }
+      }
+    }
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

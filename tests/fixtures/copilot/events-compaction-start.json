@@ -1,0 +1,17 @@
+{
+  "record": {
+    "data": {
+      "conversationTokens": 207,
+      "currentTokens": 5824,
+      "execution": "direct",
+      "model": "gpt-6-luna",
+      "systemTokens": 5614,
+      "tokenLimit": 128000,
+      "toolDefinitionsTokens": 0,
+      "trigger": "manual"
+    },
+    "id": "c073b448-7e3e-07ea-b48e-c72bc30273f0",
+    "type": "session.compaction_start"
+  },
+  "source": "Copilot 1.0.107 events.jsonl session.compaction_start record, numeric and structural fields only"
+}

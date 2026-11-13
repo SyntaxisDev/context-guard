@@ -16,6 +16,7 @@ from pathlib import Path
 
 from core import state
 from tests import harness
+from tests.driver_support import load_driver
 
 CLI = harness.ROOT / "cli.py"
 CODEX_WINDOW = 258_400
@@ -24,8 +25,11 @@ ROOT_PROMPTS = {
     "codex": "UserPromptSubmit-root",
     "genie": "UserPromptSubmit-root",
     "claude": "UserPromptSubmit-root",
+    "copilot": "userPromptSubmitted-root",
 }
 USER_FILES = {
+    ".copilot/hooks/user.json": '{"version":1,"hooks":{"agentStop":[{"type":"command","bash":"true"}]}}\n',
+    ".copilot/settings.json": '{"user_setting":"preserve me"}\n',
     ".cursor/hooks.json": json.dumps(
         {"version": 1, "hooks": {"afterFileEdit": [{"command": "./format.sh"}], "stop": [{"command": "say done"}]}},
         indent=2,
@@ -83,29 +87,10 @@ def registered(home: Path) -> dict[str, dict[str, str]]:
     Returns:
         Per runtime, native event to the exact command string.
     """
-    cursor = json.loads((home / ".cursor/hooks.json").read_text())["hooks"]
-    found = {
-        "cursor": {
-            event: entry["command"]
-            for event, entries in cursor.items()
-            for entry in entries
-            if kit_command(entry.get("command", ""), home)
-        }
+    return {
+        runtime: load_driver(runtime, home, home / "dev/project", "installed-registration").registered_commands()
+        for runtime in harness.RUNTIMES
     }
-    for runtime, path in (
-        ("codex", ".codex/hooks.json"),
-        ("genie", ".genie/hooks.json"),
-        ("claude", ".claude/settings.json"),
-    ):
-        hooks = json.loads((home / path).read_text())["hooks"]
-        found[runtime] = {
-            event: hook["command"]
-            for event, groups in hooks.items()
-            for group in groups
-            for hook in group.get("hooks", [])
-            if kit_command(hook.get("command", ""), home)
-        }
-    return found
 
 
 class Kit:
@@ -140,11 +125,12 @@ class InstalledCase(unittest.TestCase):
 
     def fire(self, fixture: str, cwd: Path | None = None, **overrides: object) -> dict:
         data = harness.payload(self.runtime, fixture, self.home, self.project, **{**self.ids(), **overrides})
-        command = Kit.commands[self.runtime][data["hook_event_name"]]
+        event = harness.read_fixture(self.runtime, fixture)["event"]
+        command = Kit.commands[self.runtime][event]
         run = harness.run_hook(command, data, self.home, cwd or self.project)
         self.assertEqual((run.returncode, run.stderr), (0, ""), command)
         response = run.response()
-        self.assertEqual(harness.response_problems(self.runtime, data["hook_event_name"], response), [])
+        self.assertEqual(harness.response_problems(self.runtime, event, response), [])
         return response
 
     def ids(self) -> dict:
@@ -165,11 +151,23 @@ class HomeResolutionTests(unittest.TestCase):
     """Installed hooks log under the kit home and stay inert for another CONTEXT_GUARD_HOME."""
 
     def prompt(self, runtime: str, session: str, env: dict) -> dict:
-        ids = {"conversation_id": session} if runtime == "cursor" else {}
+        ids = (
+            {"conversation_id": session}
+            if runtime == "cursor"
+            else {"sessionId": session}
+            if runtime == "copilot"
+            else {}
+        )
         data = harness.payload(
             runtime, ROOT_PROMPTS[runtime], Kit.home, Kit.project, session_id=session, transcript_path=None, **ids
         )
-        run = harness.run_hook(Kit.commands[runtime][data["hook_event_name"]], data, Kit.home, Kit.project, env)
+        run = harness.run_hook(
+            Kit.commands[runtime][harness.read_fixture(runtime, ROOT_PROMPTS[runtime])["event"]],
+            data,
+            Kit.home,
+            Kit.project,
+            env,
+        )
         self.assertEqual((run.returncode, run.stderr), (0, ""))
         return run.response()
 
@@ -192,7 +190,7 @@ class HomeResolutionTests(unittest.TestCase):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         override = Path(temporary.name) / "override"
-        passing = {"cursor": {"continue": True}, "codex": {}, "genie": {}, "claude": {}}
+        passing = {runtime: {"continue": True} if runtime == "cursor" else {} for runtime in harness.RUNTIMES}
         for runtime in harness.RUNTIMES:
             with self.subTest(runtime=runtime):
                 session = str(uuid.uuid4())
@@ -217,9 +215,17 @@ class InstallTests(unittest.TestCase):
         ).stdout.strip()
         self.assertEqual(version, "True")
         expected = {
-            "cursor": {"sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop"},
+            "cursor": {"sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop", "preCompact"},
             "codex": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SubagentStop"},
             "genie": {"SessionStart", "UserPromptSubmit", "PostToolUse", "Stop", "SubagentStop"},
+            "copilot": {
+                "sessionStart",
+                "userPromptSubmitted",
+                "agentStop",
+                "postToolUse",
+                "subagentStart",
+                "subagentStop",
+            },
             "claude": {
                 "SessionStart",
                 "UserPromptSubmit",
@@ -398,6 +404,27 @@ class ClaudeInstalledTests(InstalledCase):
         self.assertEqual(self.walked(), ["note", "note_delivered", "handoff_requested", "block", "resend"])
 
 
+class CopilotInstalledTests(InstalledCase):
+    """Exact installed Copilot commands deliver context, warn, refuse and allow a resend."""
+
+    runtime = "copilot"
+
+    def test_registered_commands_list_note_refresh_block_and_resend(self) -> None:
+        driver = load_driver(self.runtime, self.home, self.project, self.session)
+        driver.commands = Kit.commands[self.runtime]
+        handoff = self.handoff_file()
+        self.assertIn(str(handoff), driver.fire("start").text)
+        driver.tokens(160_000)
+        self.assertIn("Context check", driver.fire("prompt", prompt="Ship it").text)
+        self.assertIn("[context-guard]", driver.fire("stop").text)
+        driver.tokens(265_000)
+        blocked = driver.fire("prompt", prompt="Next step")
+        self.assertTrue(blocked.blocked)
+        self.assertIn("265k", blocked.raw["reason"])
+        self.assertFalse(driver.fire("prompt", prompt="Next step").blocked)
+        self.assertEqual(self.walked(), ["note", "note_delivered", "handoff_requested", "block", "resend"])
+
+
 class UninstallTests(unittest.TestCase):
     """Uninstall restores user files byte for byte and removes everything the kit added."""
 
@@ -409,14 +436,10 @@ class UninstallTests(unittest.TestCase):
         self.assertEqual(cli(home, "install", "--runtime", "all").returncode, 0)
         project = home / "dev" / "project"
         (project / ".git").mkdir(parents=True)
-        for runtime, fixture in (
-            ("cursor", "sessionStart-root"),
-            ("codex", "SessionStart-startup"),
-            ("genie", "SessionStart-startup"),
-            ("claude", "SessionStart-startup"),
-        ):
+        for runtime in harness.RUNTIMES:
+            fixture = load_driver(runtime, home, project, "uninstall").fixtures["start"]
             data = harness.payload(runtime, fixture, home, project)
-            command = registered(home)[runtime][data["hook_event_name"]]
+            command = registered(home)[runtime][harness.read_fixture(runtime, fixture)["event"]]
             self.assertEqual(harness.run_hook(command, data, home, project).returncode, 0)
         result = cli(home, "uninstall", "--runtime", "all")
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -429,7 +452,7 @@ class UninstallTests(unittest.TestCase):
         self.assertFalse((home / ".context-guard/kit").exists())
         leftovers = [
             str(p.relative_to(home))
-            for runtime in (".cursor", ".codex", ".genie", ".claude")
+            for runtime in (".cursor", ".codex", ".genie", ".claude", ".copilot")
             for p in (home / runtime).rglob("*")
             if p.is_file() and p.relative_to(home).as_posix() not in files
         ]

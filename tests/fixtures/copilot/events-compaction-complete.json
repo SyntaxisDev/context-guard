@@ -1,0 +1,17 @@
+{
+  "record": {
+    "data": {
+      "messagesRemoved": 1,
+      "outcome": "applied",
+      "postCompactionTokens": 5964,
+      "preCompactionMessagesLength": 3,
+      "preCompactionTokens": 5824,
+      "success": true,
+      "tokenAccountingBasis": "local_full_context_estimate",
+      "tokensRemoved": 0
+    },
+    "id": "c3b89cc6-bd07-9d77-f8b2-5660ec082d59",
+    "type": "session.compaction_complete"
+  },
+  "source": "Copilot 1.0.107 events.jsonl session.compaction_complete record, numeric and structural fields only"
+}

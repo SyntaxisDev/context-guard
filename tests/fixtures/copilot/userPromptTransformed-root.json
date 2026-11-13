@@ -1,0 +1,11 @@
+{
+  "event": "userPromptTransformed",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "prompt": "recorded prompt (scrubbed)",
+    "sessionId": "fee6c0b4-15e3-e34a-230b-f82b980e83ef",
+    "timestamp": 1794136670227,
+    "transformedPrompt": "<scrubbed>"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

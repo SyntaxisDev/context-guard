@@ -1,0 +1,37 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "0cdfb2ab-45cd-5464-30d2-5a07f1263a10",
+    "timestamp": 1794136982285,
+    "toolArgs": {
+      "path": "{PROJECT}/file.txt"
+    },
+    "toolCallId": "call_37dc9488ccf33781de3421b3",
+    "toolName": "view",
+    "toolResult": {
+      "resultType": "success",
+      "sessionLog": "<scrubbed>",
+      "skipLargeOutputProcessing": true,
+      "textResultForLlm": "<scrubbed>",
+      "toolTelemetry": {
+        "metrics": {
+          "context_current_tokens": 14726.0,
+          "context_token_limit": 272000.0,
+          "resultForLlmLength": 13,
+          "resultLength": 13
+        },
+        "properties": {
+          "command": "<scrubbed>",
+          "fileExtension": "<scrubbed>",
+          "inputs": "<scrubbed>",
+          "options": "<scrubbed>",
+          "resolvedPathAgainstCwd": "<scrubbed>",
+          "viewType": "<scrubbed>"
+        },
+        "restrictedProperties": {}
+      }
+    }
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

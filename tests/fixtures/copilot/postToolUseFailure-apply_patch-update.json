@@ -1,0 +1,13 @@
+{
+  "event": "postToolUseFailure",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "error": "<scrubbed>",
+    "sessionId": "0bab2021-129e-8967-56e9-21fc25b019bb",
+    "timestamp": 1794138243906,
+    "toolArgs": "*** Begin Patch\n*** Update File: <scrubbed>\n@@\n-<scrubbed>\n+<scrubbed>\n*** End Patch\n",
+    "toolCallId": "custom_call_40b74b61697e45226e4df588",
+    "toolName": "apply_patch"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

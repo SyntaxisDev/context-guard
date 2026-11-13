@@ -1,0 +1,76 @@
+{
+  "block_semantics": {
+    "agentStop": "continues the agent; reason becomes the next user message",
+    "subagentStop": "continues the child; reason becomes its next message",
+    "userPromptSubmitted": "refuses the prompt; no model turn"
+  },
+  "outputs": {
+    "agentStop": {
+      "fields": [
+        "decision",
+        "reason"
+      ],
+      "type": "AgentStopHookOutput"
+    },
+    "postToolUse": {
+      "fields": [
+        "modifiedResult",
+        "additionalContext",
+        "suppressOutput"
+      ],
+      "type": "PostToolUseHookOutput"
+    },
+    "postToolUseFailure": {
+      "fields": [
+        "additionalContext"
+      ],
+      "type": "PostToolUseFailureHookOutput"
+    },
+    "sessionEnd": {
+      "fields": [
+        "suppressOutput",
+        "cleanupActions",
+        "sessionSummary"
+      ],
+      "type": "SessionEndHookOutput"
+    },
+    "sessionStart": {
+      "fields": [
+        "additionalContext",
+        "modifiedConfig"
+      ],
+      "type": "SessionStartHookOutput"
+    },
+    "subagentStart": {
+      "fields": [
+        "additionalContext"
+      ],
+      "type": "SubagentStartHookOutput"
+    },
+    "subagentStop": {
+      "fields": [
+        "decision",
+        "reason",
+        "modifiedResponse"
+      ],
+      "type": "SubagentStopHookOutput"
+    },
+    "userPromptSubmitted": {
+      "fields": [
+        "modifiedPrompt",
+        "additionalContext",
+        "suppressOutput",
+        "decision",
+        "reason"
+      ],
+      "type": "UserPromptSubmittedHookOutput"
+    },
+    "userPromptTransformed": {
+      "fields": [
+        "modifiedTransformedPrompt"
+      ],
+      "type": "UserPromptTransformedHookOutput"
+    }
+  },
+  "source": "Maintained from the Copilot SDK hook contracts d.ts (sdk-hook-contracts.d.ts, sha256 92fc196a043876d6a1c3334a3ffa194de73c92a24026cc239551fa30663e87d1); independent of adapters/copilot"
+}

@@ -1,0 +1,17 @@
+{
+  "event": "preToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "0cdfb2ab-45cd-5464-30d2-5a07f1263a10",
+    "toolCalls": [
+      {
+        "args": {
+          "path": "{PROJECT}/file.txt"
+        },
+        "id": "call_37dc9488ccf33781de3421b3",
+        "name": "view"
+      }
+    ]
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

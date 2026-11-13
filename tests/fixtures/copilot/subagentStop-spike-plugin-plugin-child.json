@@ -1,0 +1,19 @@
+{
+  "event": "subagentStop",
+  "payload": {
+    "agentDescription": "<scrubbed>",
+    "agentDisplayName": "<scrubbed>",
+    "agentId": "82634c5e-6f56-17e2-4fa5-3a4905560d39",
+    "agentName": "spike-plugin:plugin-child",
+    "agentType": "spike-plugin:plugin-child",
+    "cwd": "{PROJECT}",
+    "parentAgentId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "response": "<scrubbed>",
+    "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "stopReason": "end_turn",
+    "stop_hook_active": false,
+    "timestamp": 1794137220015,
+    "transcriptPath": "{HOME}/session-state/ae073065-a7fd-dab3-0977-dec37aca573c/events.jsonl"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

@@ -1,0 +1,22 @@
+{
+  "tiers": {
+    "cheap": {
+      "model": "gpt-6-luna",
+      "effort": "low"
+    },
+    "standard": {
+      "model": "gpt-6-sol",
+      "effort": "medium"
+    },
+    "deep": {
+      "model": "gpt-6.1-sol",
+      "effort": "high"
+    }
+  },
+  "events": {
+    "tail_bytes": 2097152
+  },
+  "subagents": {
+    "silence_minutes": 10
+  }
+}
