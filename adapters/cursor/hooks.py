@@ -624,14 +624,17 @@ def take_pending(state: dict) -> tuple[str, str | None] | None:
         state: Mutable session state; the note is popped from its `adapter` section.
 
     Returns:
-        The note and its tier (the session's current tier when none was stored), or None when
+        The note and its tier (the session's current tier when the field was absent), or None when
         no note waits or the session's tier was re-armed since.
     """
     adapter = state.setdefault("adapter", {})
-    message, tier = adapter.pop(PENDING_NOTE, None), adapter.pop(PENDING_TIER, None)
-    if not isinstance(message, str) or (tier is not None and "tier" not in state):
+    missing = object()
+    message, tier = adapter.pop(PENDING_NOTE, None), adapter.pop(PENDING_TIER, missing)
+    if not isinstance(message, str) or (
+        tier is not missing and tier is not None and (not isinstance(tier, str) or "tier" not in state)
+    ):
         return None
-    return message, tier if isinstance(tier, str) else state.get("tier")
+    return message, state.get("tier") if tier is missing else tier
 
 
 def handoff_written(decision: Decision) -> bool:
@@ -749,7 +752,7 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
         """
         routing = runner.services(home).prompt(prompt)
         routes.append(routing)
-        return routing
+        return routing if routing.blocked else service.Routing()
 
     def compose(decision: Decision, state: dict) -> Decision:
         """Render the composed decision before its state transaction commits.
