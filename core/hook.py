@@ -66,6 +66,7 @@ def evaluate(
     delivered: Callable[[dict], bool],
     session_text: Callable[[], str] = str,
     carry: Callable[[Decision], Decision] | None = None,
+    adjust: Callable[[Decision, dict], Decision] | None = None,
 ) -> dict:
     """Prune on session start, route, evaluate policy, render, and log a note the response delivered.
 
@@ -78,6 +79,7 @@ def evaluate(
         delivered: Tells whether a native response hands the decision's message to the model.
         session_text: Produces the policy text for session and compaction context in main sessions.
         carry: Adjusts the decision before it is rendered; None renders it unchanged.
+        adjust: Adjusts decision and state together before the policy transaction commits.
 
     Returns:
         The native response.
@@ -89,7 +91,7 @@ def evaluate(
     routing = service.route(obs, config, services)
     if routing.blocked:
         return respond(service.combine(Decision(), routing))
-    decision = service.combine(policy.evaluate(obs, config, home, text), routing)
+    decision = service.combine(policy.evaluate(obs, config, home, text, adjust), routing)
     response = respond(carry(decision) if carry else decision)
     if delivered(response):
         policy.log_delivered(obs, decision, config, home)

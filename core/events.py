@@ -71,7 +71,7 @@ def record(
 
 
 def append(path: Path, records: Iterable[dict], max_lines: int, slack: int = TRIM_SLACK) -> None:
-    """Append records and trim to the newest max_lines; I/O failures are dropped (fail open).
+    """Append and trim records without waiting for another writer; contention and I/O failures drop records.
 
     Args:
         path: The JSONL log file.
@@ -83,7 +83,7 @@ def append(path: Path, records: Iterable[dict], max_lines: int, slack: int = TRI
     if not lines:
         return
     try:
-        with file_lock(path.with_name(path.name + ".lock")):
+        with file_lock(path.with_name(path.name + ".lock"), blocking=False):
             with path.open("a") as handle:
                 handle.writelines(lines)
             with path.open() as handle:

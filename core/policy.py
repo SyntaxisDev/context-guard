@@ -6,6 +6,7 @@ evaluate() adds the locked session state and the bounded event log.
 
 import hashlib
 import time
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -518,6 +519,7 @@ def rearmed(obs: Observation, state: dict, ctx: Context) -> bool:
     """Compaction, or live context back under the first tier (e.g. a summarised chat), resets fired tiers.
 
     A zero reading is missing telemetry (no usage recorded yet), not an empty chat.
+    Adapters requiring explicit completion evidence disable usage-based rearming.
 
     Args:
         obs: The observation.
@@ -529,7 +531,12 @@ def rearmed(obs: Observation, state: dict, ctx: Context) -> bool:
     """
     if obs.compacted or obs.event == COMPACT:
         return True
-    return bool(obs.tokens) and "tier" in state and obs.tokens < thresholds(ctx.config, obs.window).note
+    return (
+        obs.rearm_on_usage
+        and bool(obs.tokens)
+        and "tier" in state
+        and obs.tokens < thresholds(ctx.config, obs.window).note
+    )
 
 
 def decide(obs: Observation, state: dict, ctx: Context) -> Decision:
@@ -560,7 +567,13 @@ def decide(obs: Observation, state: dict, ctx: Context) -> Decision:
     return Decision(decision.kind, decision.message, decision.tier, logged + decision.events)
 
 
-def evaluate(obs: Observation, config: dict, home: Path, policy_text: str = "") -> Decision:
+def evaluate(
+    obs: Observation,
+    config: dict,
+    home: Path,
+    policy_text: str = "",
+    adjust: Callable[[Decision, dict], Decision] | None = None,
+) -> Decision:
     """Load locked session state, decide, persist state and append the decision's events.
 
     The save commits the hook deadline, so a saved decision is never replaced by the pass fallback.
@@ -570,6 +583,7 @@ def evaluate(obs: Observation, config: dict, home: Path, policy_text: str = "") 
         config: Loaded configuration.
         home: Home directory the hook acts on.
         policy_text: Policy text for session and compaction context.
+        adjust: Optional decision and state adjustment inside the deadline-bound transaction.
 
     Returns:
         The decision.
@@ -578,6 +592,8 @@ def evaluate(obs: Observation, config: dict, home: Path, policy_text: str = "") 
     ctx = Context(config, config_mod.handoff_dir(config, home), home, policy_text)
     with state_mod.session_state(directory, obs.runtime, obs.session_id, commit=True) as state:
         decision = decide(obs, state, ctx)
+        if adjust is not None:
+            decision = adjust(decision, state)
     log_events(config, directory, decision.events)
     return decision
 

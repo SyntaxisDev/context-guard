@@ -35,18 +35,19 @@ SESSION_FILE = re.compile(rf"[0-9a-f]{{{KEY_LENGTH}}}\.(?:json|lock)")
 
 
 @contextlib.contextmanager
-def file_lock(path: Path) -> Iterator[None]:
+def file_lock(path: Path, *, blocking: bool = True) -> Iterator[None]:
     """Hold an exclusive advisory lock on a lock file, creating it and its parents as needed.
 
     Args:
         path: Lock file; it is kept after release.
+        blocking: Whether to wait for an existing holder; False propagates BlockingIOError on contention.
 
     Yields:
         None, while the lock is held.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a") as handle:
-        fcntl.flock(handle, fcntl.LOCK_EX)
+        fcntl.flock(handle, fcntl.LOCK_EX | (0 if blocking else fcntl.LOCK_NB))
         try:
             yield
         finally:

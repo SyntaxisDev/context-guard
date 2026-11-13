@@ -83,6 +83,14 @@ class ParityTests(unittest.TestCase):
             with self.subTest(path=str(path.relative_to(render.CONTENT_DIR))):
                 tokens = {match[1] for match in render.TOKEN.finditer(path.read_text())}
                 self.assertLessEqual(tokens, render.RUNTIME_SLOTS)
+
+    def test_handoff_authorization_reaches_policy_and_skill_in_every_channel(self) -> None:
+        for mapping in MAPPINGS:
+            with self.subTest(runtime=mapping.runtime):
+                for text in (render.render_policy(mapping), render.render_skills(mapping)["handoff"]):
+                    self.assertIn("Routine task handoff saves have standing user authorization", text)
+                    self.assertIn("Save them without requesting permission again", text)
+                    self.assertIn("Respect enforced filesystem approval decisions", text)
         for mapping in MAPPINGS:
             others = [other.runtime for other in MAPPINGS if other is not mapping]
             for file in render.rendered_files(mapping):

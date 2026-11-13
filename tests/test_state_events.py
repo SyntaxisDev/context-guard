@@ -4,6 +4,7 @@ import concurrent.futures
 import json
 import os
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -70,6 +71,8 @@ class EventLogTests(unittest.TestCase):
         def write(number: int) -> None:
             events.append(self.path, [events.record("prompt", self.obs, detail={"n": number})], 20, slack=0)
 
+        for number in range(-20, 0):
+            write(number)
         with concurrent.futures.ThreadPoolExecutor(max_workers=8) as pool:
             list(pool.map(write, range(100)))
         rows = events.read(self.path)
@@ -88,6 +91,15 @@ class EventLogTests(unittest.TestCase):
         events.append(blocked / events.EVENTS_FILE, [events.record("prompt", self.obs)], 10)
         self.path.write_text("not json\n" + json.dumps({"event": "prompt"}) + "\n")
         self.assertEqual(events.read(self.path), [{"event": "prompt"}])
+
+    def test_contended_logging_drops_diagnostics_without_waiting(self) -> None:
+        with state.file_lock(self.path.with_name(self.path.name + ".lock")):
+            started = time.monotonic()
+            events.append(self.path, [events.record("prompt", self.obs)], 10)
+            self.assertLess(time.monotonic() - started, 0.5)
+            self.assertEqual(events.read(self.path), [])
+        events.append(self.path, [events.record("prompt", self.obs)], 10)
+        self.assertEqual(len(events.read(self.path)), 1)
 
 
 if __name__ == "__main__":
