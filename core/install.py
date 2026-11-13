@@ -44,6 +44,32 @@ STALE_KIT = "stale kit output"
 EMPTY_TEXTS = ("", "{}")
 
 
+def marked_section(begin: str, end: str) -> re.Pattern[str]:
+    """Match a marked text-edit section with LF or CRLF line endings.
+
+    Args:
+        begin: Opening marker line.
+        end: Closing marker line.
+
+    Returns:
+        A pattern that includes the section's final line ending when present.
+    """
+    return re.compile(re.escape(begin) + r"\r?\n.*?" + re.escape(end) + r"(?:\r?\n|$)", re.DOTALL)
+
+
+def same_section(actual: str, expected: str) -> bool:
+    """Compare only an owned section, accepting CRLF in place of LF.
+
+    Args:
+        actual: Section found in a user file.
+        expected: Generated LF section.
+
+    Returns:
+        Whether their lines are otherwise identical.
+    """
+    return actual.replace("\r\n", "\n") == expected
+
+
 @dataclass(frozen=True)
 class Change:
     """One planned file system change.
