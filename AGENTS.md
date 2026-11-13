@@ -81,15 +81,11 @@ findings rather than extending it, and keep any `noqa` targeted to one rule.
 
 ## Validation
 
-Run from the repository root.
+Run from the repository root. The unittest command also discovers every
+`adapters/<runtime>/tests` suite.
 
 ```sh
 uv run --python 3.14 python -m unittest discover -s tests -t .
-uv run --python 3.14 python -m unittest discover -s adapters/cursor/tests -t .
-uv run --python 3.14 python -m unittest discover -s adapters/codex/tests -t .
-uv run --python 3.14 python -m unittest discover -s adapters/genie/tests -t .
-uv run --python 3.14 python -m unittest discover -s adapters/claude/tests -t .
-uv run --python 3.14 python -m unittest discover -s adapters/copilot/tests -t .
 uv run --python 3.14 python scripts/gen_docs.py --check
 uvx ruff check .
 uvx ruff format --check .
