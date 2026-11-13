@@ -117,9 +117,37 @@ five trusted handlers.
   open, so `classifier.enabled`, `runner.enabled` and calibration model calls have no effect. The
   core warning, handoff and delegation policies do not depend on this optional subsystem.
 
+Host report prompts beginning with `[Subagent hand-back]`, `<task-notification>`, or
+`<agent-message from="…">` immediately followed by `[Subagent hand-back]` receive at
+most a firm warning above the context block tier. Quoted or embedded markers and
+markerless `agent-message` wrappers retain ordinary prompt classification. This is
+transport framing recognition; the hook payload supplies no authenticated sender field.
+
+## Subagent silence notes
+
+Child hooks carrying `agent_id` and the parent's `session_id` start or refresh silence
+tracking, retaining the child role and its own rollout path. The adapter also observes child
+rollout modification times, so text generation can rearm activity without a tool call.
+`SubagentStop` retires tracking. The next root `SessionStart`, prompt or tool response adds
+one model-facing note and `subagent_silent` event per inactive period after
+`subagents.silence_minutes` (default 10). Refused prompts retain pending notes; child hooks
+keep their leaf budgets and never receive root policy or silence notes. No role or ancestry
+is inferred from a T3 transport envelope.
+
+Tracking begins at the first observed child hook, rather than guessing an identity from a
+scrubbed spawn result. A child that never emits a hook is not tracked. Idle roots receive
+silence notes only at their next hook opportunity; Genie starts no idle waker. These
+contracts are covered offline with temporary homes; fresh native delivery has not been
+measured.
+
 ## Unverified
 
 - A live plugin install has not yet been exercised by the repository smoke script.
 - The exact `tool_name` of a real `spawn_agent` PostToolUse payload was not present in the recorded
   local rollouts; namespaced and bare forms are accepted and unit-tested.
 - Per-spawn model override precedence when a named role file also pins a model is not observed.
+
+The [current Genie CLI limitations](https://docs.databricks.com/aws/en/genie-code/genie-code-cli#limitations)
+state that model selection is managed by Databricks. Accepting a model-shaped profile field
+does not establish a model-pinned invocation; the runner gap remains until native behavior
+supports that contract. Local Genie 0.3.0 help exposes no demonstrated idle-parent queue.

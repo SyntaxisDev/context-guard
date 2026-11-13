@@ -17,7 +17,7 @@ KIT = Path(__file__).resolve().parents[2]
 if str(KIT) not in sys.path:
     sys.path.insert(0, str(KIT))
 
-from adapters.genie import mapping, rollout, runner, tools
+from adapters.genie import mapping, rollout, runner, subagents, tools
 from core import config as config_mod, hook, install, render
 from core.observation import BLOCK, COMPACT, CONTEXT, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
 from core.package import LAUNCHER
@@ -344,18 +344,24 @@ def load_config(home: Path, environ: Mapping[str, str] | None = None) -> dict:
     return config_mod.load_config(config_mod.sources_for(RUNTIME, home, ADAPTER_CONFIG), environ)
 
 
-def subagent_stop(payload: dict[str, object]) -> dict[str, object]:
+def subagent_stop(payload: dict[str, object], config: dict, home: Path) -> dict[str, object]:
     """Validate a finished subagent payload and pass.
 
     Invalid payload fields raise ValueError from `check_payload`; `run` turns that into a pass.
 
     Args:
         payload: Decoded SubagentStop payload object.
+        config: Loaded runtime configuration.
+        home: Explicit installation home.
 
     Returns:
         `{}`: the stop itself is never held.
     """
     check_payload(mapping.SUBAGENT_STOP, payload)
+    agent = payload.get("agent_id")
+    if agent and AGENT_ID.fullmatch(agent):
+        obs = Observation(RUNTIME, agent, STOP, is_subagent=True)
+        subagents.track(mapping.SUBAGENT_STOP, payload, obs, config_mod.state_dir(config, home, RUNTIME), None)
     return {}
 
 
@@ -378,19 +384,24 @@ def handle(
         continuations already in progress.
     """
     if event_name == mapping.SUBAGENT_STOP and isinstance(payload, dict):
-        return subagent_stop(payload)
+        return subagent_stop(payload, config, home)
     if event_name not in EVENTS or not isinstance(payload, dict):
         return {}
     if event_name == STOP_EVENT and payload.get("stop_hook_active") is True:
         return {}
+    obs = observe(event_name, payload, config, home)
+    directory = config_mod.state_dir(config, home, RUNTIME)
+    transcript = subagent_transcript(payload, payload["agent_id"]) if obs.is_subagent else None
+    subagents.track(event_name, payload, obs, directory, transcript)
     return hook.evaluate(
-        observe(event_name, payload, config, home),
+        obs,
         config,
         home,
         lambda: runner.services(home),
         lambda decision: respond(decision, event_name),
         lambda response: "hookSpecificOutput" in response,
         lambda: session_policy(config, home, environ),
+        adjust=lambda decision, state: subagents.carry(obs, decision, state, config),
     )
 
 

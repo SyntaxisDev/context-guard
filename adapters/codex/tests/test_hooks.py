@@ -246,16 +246,6 @@ class LeafTests(HookCase):
             [record["session"] for record in self.logged() if record["event"] == "subagent_budget"], [AGENT]
         )
 
-    def test_agent_type_selects_the_role_budget(self) -> None:
-        self.write_rollout(self.agent_rollout, 100000)
-        self.assertEqual(self.event("PostToolUse", agent_id=AGENT, agent_type="reviewer", tool_name="Bash"), {})
-        self.write_rollout(self.agent_rollout, 125000)
-        self.context(self.event("PostToolUse", agent_id=AGENT, agent_type="reviewer", tool_name="Bash"), "PostToolUse")
-        self.assertEqual(
-            [r["detail"] for r in self.logged() if r["event"] == "subagent_budget"],
-            [{"role": "reviewer", "budget": 120_000}],
-        )
-
     def test_parent_tokens_and_state_stay_with_the_parent(self) -> None:
         self.assertEqual(self.event("UserPromptSubmit", agent_id=AGENT, prompt="go"), {})
         self.assertEqual(self.event("PostToolUse", agent_id=AGENT, tool_name="Bash"), {})

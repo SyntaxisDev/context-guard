@@ -199,6 +199,29 @@ the model to offer the agents command once. Later sessions, subagents, and a mar
 written get no note. `agents.py install` also creates the marker, and `uninstall` keeps it. Delete
 the marker to be offered the step again.
 
+Host report prompts beginning with `[Subagent hand-back]`, `<task-notification>`, or
+`<agent-message from="…">` immediately followed by `[Subagent hand-back]` receive at
+most a firm warning above the context block tier. Quoted or embedded markers and
+markerless `agent-message` wrappers retain ordinary prompt classification. This is
+transport framing recognition; the hook payload supplies no authenticated sender field.
+
+## Subagent silence notes
+
+Child hooks carrying `agent_id` and the parent's `session_id` start or refresh silence
+tracking, retaining the child role and its own rollout path. The adapter also observes child
+rollout modification times, so text generation can rearm activity without a tool call.
+`SubagentStop` retires tracking. The next root `SessionStart`, prompt or tool response adds
+one model-facing note and `subagent_silent` event per inactive period after
+`subagents.silence_minutes` (default 10). Refused prompts retain pending notes; child hooks
+keep their leaf budgets and never receive root policy or silence notes. No role or ancestry
+is inferred from a T3 transport envelope.
+
+Tracking begins at the first observed child hook, rather than guessing an identity from a
+scrubbed spawn result. A child that never emits a hook is not tracked. Idle roots receive
+silence notes only at their next hook opportunity; Genie starts no idle waker. These
+contracts are covered offline with temporary homes; fresh native delivery has not been
+measured.
+
 ## Unverified
 
 - A role file `model` is documented to win over an explicit spawn `model`; observed calls do not separate the two, so per-spawn override is unproven when the role file also sets a model.
