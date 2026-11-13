@@ -7,6 +7,7 @@ with exactly one JSON line on stdout and nothing on stderr: the hook boundary pr
 only when it swallowed an unexpected exception.
 """
 
+import importlib
 import re
 import subprocess
 import tempfile
@@ -15,20 +16,17 @@ import unittest
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
-from adapters.claude import mapping as claude_mapping
-from adapters.codex import mapping as codex_mapping
-from adapters.cursor import mapping as cursor_mapping
-from adapters.genie import mapping as genie_mapping
+from adapters.registry import discover
 from core import deadline
 from tests import harness
+from tests.driver_support import load_driver
 
-PROMPT_EVENTS = ("beforeSubmitPrompt", "UserPromptSubmit")
-STOP_EVENTS = ("stop", "Stop")
+PROMPT_EVENTS = ("beforeSubmitPrompt", "UserPromptSubmit", "userPromptSubmitted")
+STOP_EVENTS = ("stop", "Stop", "agentStop")
 HUNG_EVENTS = {
-    "cursor": "beforeSubmitPrompt",
-    "codex": "UserPromptSubmit",
-    "genie": "UserPromptSubmit",
-    "claude": "UserPromptSubmit",
+    runtime: driver.event_name("prompt", driver.payload("prompt"))
+    for runtime in harness.RUNTIMES
+    for driver in [load_driver(runtime, Path("/unused"), Path("/unused/project"), "inventory")]
 }
 ROOT_EXPECTED = {
     "sessionStart": "context",
@@ -42,13 +40,18 @@ ROOT_EXPECTED = {
     "Stop": "refresh",
     "PreCompact": "pass",
     "PostCompact": "pass",
+    "userPromptSubmitted": "block",
+    "agentStop": "refresh",
+    "subagentStart": "pass",
+    "subagentStop": "pass",
+    "preCompact": "pass",
 }
 ROOT_TOKENS, LEAF_TOKENS, WINDOW = 195_000, 160_000, 200_000
 CODEX_TOKENS, CODEX_WINDOW = 250_000, 258_400
 EMAIL = re.compile(r"[\w.+-]+@[\w-]+\.[\w.]+")
 
 
-MAPPINGS = {"cursor": cursor_mapping, "codex": codex_mapping, "genie": genie_mapping, "claude": claude_mapping}
+MAPPINGS = {name: importlib.import_module(adapter.mapping) for name, adapter in discover().items()}
 
 
 def registered_events(runtime: str) -> set[str]:
@@ -65,9 +68,18 @@ def expected(rec: harness.Recorded, state: str = "armed") -> str:
         pass, block, note, budget, refresh or context.
     """
     if state != "armed":
-        bare_context = {("codex", "SessionStart"), ("genie", "SessionStart"), ("cursor", "sessionStart")}
+        bare_context = {
+            ("codex", "SessionStart"),
+            ("genie", "SessionStart"),
+            ("cursor", "sessionStart"),
+            ("copilot", "sessionStart"),
+        }
         return "context" if state == "bare" and (rec.runtime, rec.event) in bare_context else "pass"
     if rec.name == "stop-aborted" or rec.event not in registered_events(rec.runtime):
+        return "pass"
+    if rec.runtime == "copilot" and rec.event in {"subagentStart", "subagentStop", "preCompact"}:
+        return "pass"
+    if rec.runtime == "copilot" and rec.subagent and rec.event in {"agentStop", "sessionStart"}:
         return "pass"
     if rec.subagent:
         return "pass" if rec.event in ("preToolUse", "SubagentStop") else "budget"
@@ -82,6 +94,7 @@ def classify(event: str, response: dict) -> str:
     specific = response.get("hookSpecificOutput") or {}
     text = (
         response.get("additional_context")
+        or response.get("additionalContext")
         or specific.get("additionalContext")
         or response.get("followup_message")
         or response.get("reason")
@@ -92,29 +105,6 @@ def classify(event: str, response: dict) -> str:
     if event in STOP_EVENTS and text.startswith("[context-guard]"):
         return "refresh"
     return "note" if text.startswith("Context check") else "context"
-
-
-def arm_cursor(payload: dict, home: Path, *, subagent: bool) -> None:
-    harness.write_cursor_chat(home, payload["conversation_id"], LEAF_TOKENS if subagent else ROOT_TOKENS, WINDOW)
-
-
-def arm_codex(payload: dict, _home: Path, *, subagent: bool) -> None:
-    parent = Path(payload["transcript_path"])
-    harness.write_rollout(parent, CODEX_TOKENS, CODEX_WINDOW)
-    if subagent:
-        child = payload.get("agent_transcript_path") or harness.codex_child_rollout(parent, payload["agent_id"])
-        harness.write_rollout(Path(child), LEAF_TOKENS, CODEX_WINDOW)
-
-
-def arm_claude(payload: dict, _home: Path, *, subagent: bool) -> None:
-    parent = Path(payload["transcript_path"])
-    harness.append_transcript(parent, harness.assistant_usage(ROOT_TOKENS))
-    if subagent:
-        child = payload.get("agent_transcript_path") or harness.claude_child_transcript(parent, payload["agent_id"])
-        harness.append_transcript(Path(child), harness.assistant_usage(LEAF_TOKENS))
-
-
-ARM = {"cursor": arm_cursor, "codex": arm_codex, "genie": arm_codex, "claude": arm_claude}
 
 
 def corrupt(payload: dict) -> dict:
@@ -128,7 +118,7 @@ def run_case(rec: harness.Recorded, state: str) -> tuple[harness.Recorded, str, 
         (project / ".git").mkdir(parents=True)
         data = harness.materialize(rec.payload, home, project)
         if state == "armed":
-            ARM[rec.runtime](data, home, subagent=rec.subagent)
+            load_driver(rec.runtime, home, project, "recorded").arm_recorded(data, subagent=rec.subagent)
             harness.seed_handoff(home, project)
         elif state == "corrupt":
             data = corrupt(data)

@@ -11,6 +11,14 @@
   the hook schemas embedded in the Genie binary.
 - Claude Code: hook stdin is not logged, so payloads are built from real transcript values
   (session, model, tool inputs and results, subagent ids) with the documented hook fields.
+  --cursor-lifecycle-root selects only explicit Cursor CLI capture artifacts; no home or DB reads.
+  --claude-lifecycle-root selects only an explicit sandbox stream capture with original source
+  hashes, ordered native events and redacted experiment framing; it never reads default homes.
+- Copilot: native `hook.start` inputs and `hook.end` outputs from an explicit sandbox home's
+  `session-state/*/events.jsonl` (`--copilot-home`, never defaulted), telemetry templates from the
+  same logs, and an output contract checked against the SDK hook contracts d.ts (`--copilot-contract`).
+  Optional `--copilot-lifecycle-root` records measured native ACP wake with hashed source provenance;
+  ordinary tests only replay the scrubbed fixture and never access those capture roots.
 
 Output: tests/fixtures/<runtime>/<event>-<case>.json = {"source", "event", "payload"} plus
 telemetry templates. Prompts, commands, file contents and tool output are replaced, paths
@@ -35,8 +43,12 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 from adapters.cursor.hooks import CLI_USAGE_FIELD, LENGTH_DELIMITED, cli_root_id, cli_usage, proto_fields
+from adapters.registry import discover
+from scripts.claude_lifecycle import record_claude_lifecycle
+from scripts.cursor_lifecycle import record_cursor_lifecycle
 
 FIXTURES = ROOT / "tests" / "fixtures"
+RECORDER_RUNTIMES = frozenset({"cursor", "codex", "genie", "claude", "copilot"})
 HOME_TOKEN, PROJECT_TOKEN = "{HOME}", "{PROJECT}"
 SCRUBBED, PROMPT_TEXT, EMAIL = "<scrubbed>", "recorded prompt (scrubbed)", "user@example.com"
 KEEP_KEYS = frozenset(
@@ -364,6 +376,58 @@ def cursor_case(payload: dict) -> str:
     if event == "stop":
         return f"stop-{payload.get('status', 'unknown')}"
     return f"{event}-root"
+
+
+def record_cursor_capture(path: Path, scrub: Scrubber) -> dict[str, dict]:
+    """Record the actual compaction recipe from an explicit hook capture only.
+
+    Args:
+        path: Captured native hook JSONL; no runtime home is discovered.
+        scrub: Stable identity and content scrubber.
+
+    Returns:
+        Independently hashed, scrubbed payloads for initiation, completion and next Read.
+
+    Raises:
+        ValueError: The capture lacks a matching completed compaction and subsequent Read.
+    """
+    rows = list(rollout_records(path))
+    for index, row in enumerate(rows):
+        if row.get("event") != "preCompact":
+            continue
+        pre = row["payload"]
+        for following, stop in enumerate(rows[index + 1 :], index + 1):
+            payload = stop.get("payload", {})
+            if (
+                stop.get("event") == "stop"
+                and payload.get("status") == "completed"
+                and all(payload.get(key) == pre.get(key) for key in ("conversation_id", "session_id", "generation_id"))
+            ):
+                tool = next(
+                    (
+                        item["payload"]
+                        for item in rows[following + 1 :]
+                        if item.get("event") == "postToolUse"
+                        and item.get("payload", {}).get("tool_name") == "Read"
+                        and item["payload"].get("session_id") == pre.get("session_id")
+                    ),
+                    None,
+                )
+                if tool:
+                    source = (
+                        "Captured Cursor CLI hook JSONL; original capture sha256 "
+                        + hashlib.sha256(path.read_bytes()).hexdigest()
+                    )
+                    return {
+                        name: entry(source, data["hook_event_name"], scrub.payload(data, projects_of(data)))
+                        for name, data in (
+                            ("preCompact-root", pre),
+                            ("stop-compaction-completed", payload),
+                            ("postToolUse-recovery-read", tool),
+                        )
+                    }
+    msg = "capture lacks a completed compaction/Read recipe"
+    raise ValueError(msg)
 
 
 def record_cursor(home: Path, scrub: Scrubber) -> dict[str, dict]:
@@ -1067,6 +1131,562 @@ def assistant_record(record: dict) -> dict:
     }
 
 
+COPILOT_IDS = frozenset(
+    {"sessionId", "toolCallId", "parentToolCallId", "parentAgentId", "agentId", "compactionAttemptId"}
+)
+COPILOT_PATHS = frozenset({"transcriptPath"})
+COPILOT_KEEP = frozenset(
+    {
+        "toolName",
+        "agentType",
+        "agentName",
+        "stopReason",
+        "notificationType",
+        "resultType",
+        "model",
+        "outcome",
+        "execution",
+        "copilotVersion",
+    }
+)
+COPILOT_STRUCTURAL = frozenset({"session-state", "events.jsonl"})
+COPILOT_USAGE_KEYS = (
+    "interactionType",
+    "model",
+    "inputTokens",
+    "outputTokens",
+    "cacheReadTokens",
+    "cacheWriteTokens",
+    "reasoningTokens",
+    "maxPromptTokens",
+)
+COPILOT_SESSION_KEYS = ("copilotVersion", "selectedModel", "contextTier")
+COPILOT_COMPACTION_KEYS = {
+    "session.compaction_start": (
+        "model",
+        "systemTokens",
+        "conversationTokens",
+        "toolDefinitionsTokens",
+        "currentTokens",
+        "tokenLimit",
+        "trigger",
+        "execution",
+    ),
+    "session.compaction_complete": (
+        "success",
+        "outcome",
+        "preCompactionMessagesLength",
+        "messagesRemoved",
+        "preCompactionTokens",
+        "postCompactionTokens",
+        "tokensRemoved",
+        "tokenAccountingBasis",
+    ),
+}
+COPILOT_CONTRACT_FILE = "sdk-hook-contracts.d.ts"
+# Hand-maintained from the SDK hook contracts d.ts; recorded only after each field is found there.
+COPILOT_OUTPUT_CONTRACT = {
+    "sessionStart": ("SessionStartHookOutput", ("additionalContext", "modifiedConfig")),
+    "userPromptSubmitted": (
+        "UserPromptSubmittedHookOutput",
+        ("modifiedPrompt", "additionalContext", "suppressOutput", "decision", "reason"),
+    ),
+    "userPromptTransformed": ("UserPromptTransformedHookOutput", ("modifiedTransformedPrompt",)),
+    "postToolUse": ("PostToolUseHookOutput", ("modifiedResult", "additionalContext", "suppressOutput")),
+    "postToolUseFailure": ("PostToolUseFailureHookOutput", ("additionalContext",)),
+    "agentStop": ("AgentStopHookOutput", ("decision", "reason")),
+    "subagentStart": ("SubagentStartHookOutput", ("additionalContext",)),
+    "subagentStop": ("SubagentStopHookOutput", ("decision", "reason", "modifiedResponse")),
+    "sessionEnd": ("SessionEndHookOutput", ("suppressOutput", "cleanupActions", "sessionSummary")),
+}
+COPILOT_BLOCK_EVENTS = {
+    "userPromptSubmitted": "refuses the prompt; no model turn",
+    "agentStop": "continues the agent; reason becomes the next user message",
+    "subagentStop": "continues the child; reason becomes its next message",
+}
+
+
+class CopilotScrubber(Scrubber):
+    """Scrubber that also understands Copilot's camelCase ids, paths and structural values."""
+
+    def segment(self, part: str) -> str:
+        """Scrub one path segment, keeping the Copilot session-state layout.
+
+        Args:
+            part: The segment.
+
+        Returns:
+            The segment unchanged when structural, otherwise as `Scrubber.segment`.
+        """
+        return part if part in COPILOT_STRUCTURAL else super().segment(part)
+
+    def text(self, key: str, value: str) -> str:
+        """Scrub a string by the camelCase key that holds it.
+
+        Args:
+            key: The JSON key of the value.
+            value: The string.
+
+        Returns:
+            A fake id, scrubbed path or kept structural token; otherwise as `Scrubber.text`.
+        """
+        if value and key in COPILOT_IDS:
+            return self.fake_id(value)
+        if value and key in COPILOT_PATHS:
+            return self.path(value)
+        if key == "reason" and value in {"complete", "error", "abort", "timeout", "user_exit"}:
+            return value
+        if key == "toolArgs" and value.startswith("*** Begin Patch"):
+            return self.patch(value)
+        if value and key in COPILOT_KEEP and SAFE_TOKEN.fullmatch(value) and self.home not in value:
+            return value
+        return super().text(key, value)
+
+    def patch(self, value: str) -> str:
+        """Preserve native patch headers and operation shape while removing file contents.
+
+        Args:
+            value: Recorded raw patch argument.
+
+        Returns:
+            Patch structure with scrubbed paths, context and file contents.
+        """
+        lines = []
+        for line in value.splitlines():
+            if line in {"*** Begin Patch", "*** End Patch"}:
+                lines.append(line)
+            elif line.startswith(("*** Add File: ", "*** Update File: ")):
+                header, path = line.split(": ", 1)
+                lines.append(f"{header}: {self.path(path)}")
+            elif line.startswith("@@"):
+                lines.append("@@")
+            else:
+                prefix = line[0] if line and line[0] in "+- " else " "
+                lines.append(prefix + SCRUBBED)
+        return "\n".join(lines) + "\n"
+
+    def value(self, key: str, value: object) -> object:
+        """Scrub a JSON value, treating each `toolCalls` entry's `id`, `name` and `args`.
+
+        Args:
+            key: The key of the value.
+            value: The JSON value.
+
+        Returns:
+            The scrubbed value.
+        """
+        if key == "toolCalls" and isinstance(value, list):
+            return [{name: self.tool_call_field(name, item) for name, item in call.items()} for call in value]
+        return super().value(key, value)
+
+    def tool_call_field(self, name: str, item: object) -> object:
+        """Scrub one field of a `toolCalls` entry.
+
+        Args:
+            name: The field name.
+            item: The field value.
+
+        Returns:
+            A fake id, the tool name when a safe token, or the scrubbed value.
+        """
+        if name == "id" and isinstance(item, str):
+            return self.fake_id(item)
+        if name == "name" and isinstance(item, str) and SAFE_TOKEN.fullmatch(item):
+            return item
+        return super().value(name, item)
+
+
+def copilot_events(home: Path) -> Iterator[tuple[str, dict]]:
+    """Yield every record of every session event log under a Copilot home, oldest first.
+
+    Args:
+        home: The Copilot home (`session-state/<id>/events.jsonl` below it), read only.
+
+    Yields:
+        The Copilot version of the log's session start and each record. Unreadable lines are skipped.
+    """
+    records = []
+    for path in sorted((home / "session-state").glob("*/events.jsonl")):
+        version = ""
+        try:
+            lines = path.read_text().splitlines()
+        except OSError:
+            continue
+        for index, line in enumerate(lines):
+            try:
+                record = json.loads(line)
+            except json.JSONDecodeError:
+                continue
+            if isinstance(record, dict) and isinstance(record.get("data"), dict):
+                if record.get("type") == "session.start":
+                    version = str(record["data"].get("copilotVersion", ""))
+                records.append((str(record.get("timestamp", "")), path.name, index, version, record))
+    for _, _, _, version, record in sorted(records, key=lambda item: item[:3]):
+        yield version, record
+
+
+def copilot_case(hook: str, data: dict) -> str:
+    """Name the recording case of a hook.start record from its structural values.
+
+    Args:
+        hook: The native hook event name.
+        data: The hook.start `data`; its `input` is read.
+
+    Returns:
+        The case: the discriminating input value, or `root` or `subagent` by who fired it.
+    """
+    given = data["input"]
+    if hook == "sessionStart":
+        found = given.get("source")
+    elif hook == "sessionEnd":
+        found = given.get("reason")
+    elif hook == "notification":
+        found = given.get("notificationType")
+    elif hook == "preCompact":
+        found = given.get("trigger")
+    elif hook in ("postToolUse", "postToolUseFailure", "permissionRequest"):
+        found = given.get("toolName")
+        if found == "apply_patch" and isinstance(given.get("toolArgs"), str):
+            patch = given["toolArgs"]
+            operation = "add" if "*** Add File: " in patch else "update" if "*** Update File: " in patch else "other"
+            return f"apply_patch-{operation}"
+    elif hook in ("subagentStart", "subagentStop"):
+        found = given.get("agentType")
+    else:
+        found = None
+    scope = "subagent" if given.get("agentId") or data.get("parentToolCallId") else "root"
+    parts = [str(found) if found else "", scope if hook in ("postToolUse", "preToolUse", "permissionRequest") else ""]
+    case = "-".join(part for part in parts if part) or scope
+    return re.sub(r"[^A-Za-z0-9]+", "-", case).strip("-")
+
+
+def copilot_hooks(home: Path, scrub: Scrubber) -> dict[str, dict]:
+    """Record the first observed hook.start input and hook.end output per hook and case.
+
+    Args:
+        home: The Copilot home to read.
+        scrub: The recording's scrubber.
+
+    Returns:
+        Fixture names mapped to their content: `<hook>-<case>` inputs and `output-<hook>-<case>` outputs.
+    """
+    found: dict[str, dict] = {}
+    pending: dict[str, tuple[str, str, str]] = {}
+    for version, record in copilot_events(home):
+        data = record["data"]
+        if record["type"] == "hook.start" and isinstance(data.get("input"), dict):
+            hook, case = str(data["hookType"]), copilot_case(str(data["hookType"]), data)
+            name = f"{hook}-{case}"
+            if name in found:
+                continue
+            source = f"Copilot {version} events.jsonl hook.start input (native, unmodified except scrubbing)"
+            found[name] = entry(source, hook, scrub.payload(data["input"], projects_of(data["input"])))
+            pending[str(data.get("hookInvocationId"))] = (hook, name, version)
+        elif record["type"] == "hook.end" and str(data.get("hookInvocationId")) in pending:
+            hook, name, started = pending.pop(str(data["hookInvocationId"]))
+            if isinstance(data.get("output"), dict):
+                source = f"Copilot {started} events.jsonl hook.end output of the same invocation (observed template)"
+                output = scrub.value("", data["output"])
+                found[f"output-{name}"] = {"source": source, "event": hook, "output": output}
+    return found
+
+
+def pick(data: dict, keys: tuple[str, ...]) -> dict:
+    """Select the present keys of a mapping.
+
+    Args:
+        data: The mapping.
+        keys: The keys to keep.
+
+    Returns:
+        The mapping reduced to those of `keys` it holds.
+    """
+    return {key: data[key] for key in keys if key in data}
+
+
+def copilot_telemetry(home: Path, scrub: Scrubber) -> dict[str, dict]:
+    """Record the observed telemetry templates: usage, compaction and session start events.
+
+    Args:
+        home: The Copilot home to read.
+        scrub: Scrubber that consistently replaces native event and agent identities.
+
+    Returns:
+        Fixture names mapped to records holding only structural and numeric fields.
+    """
+    found: dict[str, dict] = {}
+    for version, record in copilot_events(home):
+        kind, data = record["type"], record["data"]
+        if kind == "session.usage_record" and isinstance(data.get("usage"), dict):
+            name, kept = "events-usage-record", {"usage": pick(data["usage"], COPILOT_USAGE_KEYS)}
+            if record.get("agentId"):
+                name = "events-subagent-usage-record"
+        elif kind in COPILOT_COMPACTION_KEYS:
+            name, kept = "events-" + kind.split(".")[1].replace("_", "-"), pick(data, COPILOT_COMPACTION_KEYS[kind])
+        elif kind == "session.start":
+            name, kept = "events-session-start", pick(data, COPILOT_SESSION_KEYS)
+        else:
+            continue
+        native = {"type": kind, "data": kept}
+        for key in ("id", "agentId"):
+            if isinstance(record.get(key), str):
+                native[key] = scrub.fake_id(record[key])
+        found.setdefault(
+            name,
+            {
+                "source": f"Copilot {version} events.jsonl {kind} record, numeric and structural fields only",
+                "record": native,
+            },
+        )
+    return found
+
+
+def copilot_contract(contract: Path) -> dict[str, dict]:
+    """Record the hand-maintained native output contract after verifying it against the SDK d.ts.
+
+    Args:
+        contract: The SDK hook contracts d.ts.
+
+    Returns:
+        The one `output-contract` fixture with the d.ts digest as provenance.
+
+    Raises:
+        SystemExit: When the d.ts does not declare a maintained output type or field.
+    """
+    text = contract.read_text()
+    outputs = {}
+    for event, (name, fields) in COPILOT_OUTPUT_CONTRACT.items():
+        start = re.search(rf"export (?:interface|type) {name}\b", text)
+        if not start:
+            msg = f"{contract.name} does not declare {name}"
+            raise SystemExit(msg)
+        region = text[start.start() :].split("\nexport ")[0]
+        absent = [field for field in fields if not re.search(rf"\b{field}\??:", region)]
+        if absent:
+            msg = f"{contract.name} {name} lacks maintained fields: {absent}"
+            raise SystemExit(msg)
+        outputs[event] = {"type": name, "fields": list(fields)}
+    source = (
+        f"Maintained from the Copilot SDK hook contracts d.ts ({COPILOT_CONTRACT_FILE}, "
+        f"sha256 {hashlib.sha256(text.encode()).hexdigest()}); independent of adapters/copilot"
+    )
+    return {"output-contract": {"source": source, "outputs": outputs, "block_semantics": COPILOT_BLOCK_EVENTS}}
+
+
+def record_copilot(home: Path, contract: Path | None, scrub: Scrubber) -> dict[str, dict]:
+    """Record Copilot fixtures from an explicitly given Copilot home's native event logs.
+
+    Args:
+        home: The Copilot home to read; never defaulted to a live home.
+        contract: The SDK hook contracts d.ts, or None to omit the output contract fixture.
+        scrub: The recording's scrubber.
+
+    Returns:
+        Fixture names mapped to their content.
+
+    Raises:
+        SystemExit: When the home holds no hook.start input.
+    """
+    found = copilot_hooks(home, scrub)
+    if not found:
+        msg = f"no Copilot hook.start inputs under {home}/session-state"
+        raise SystemExit(msg)
+    found.update(copilot_telemetry(home, scrub))
+    if contract:
+        found.update(copilot_contract(contract))
+    return found
+
+
+LIFECYCLE_MARKERS = ("PARENT_IDLE_ACP", "CHILD_RETURNED_ACP", "S_CHILD_4P6C", "TOOL_READ_OK")
+LIFECYCLE_TYPES = frozenset(
+    {
+        "assistant.message",
+        "assistant.turn_start",
+        "assistant.idle",
+        "subagent.started",
+        "subagent.completed",
+        "user.message",
+    }
+)
+
+
+def lifecycle_text(text: str) -> str:
+    """Keep only the experiment's controlled sentinels from native model text.
+
+    Args:
+        text: Native model output, never user input.
+
+    Returns:
+        Sentinel occurrences in their original order, with all other text removed.
+    """
+    return "".join(match.group() for match in re.finditer("|".join(LIFECYCLE_MARKERS), text))
+
+
+def lifecycle_event(record: dict, scrub: Scrubber) -> dict:
+    """Reduce a native journal or ACP event to independent lifecycle evidence.
+
+    Args:
+        record: Native event object.
+        scrub: Stable identity scrubber shared across all evidence sources.
+
+    Returns:
+        Actual native event fields with identities aliased and content redacted.
+    """
+    result = {key: record[key] for key in ("type", "timestamp")}
+    for key in ("id", "sessionId", "agentId"):
+        if record.get(key):
+            result[key] = scrub.fake_id(record[key])
+    data = record.get("data", {})
+    kept = {
+        key: scrub.fake_id(data[key])
+        for key in ("messageId", "interactionId", "toolCallId", "sessionId")
+        if data.get(key)
+    }
+    for key in ("executionMode", "turnId", "model"):
+        if isinstance(data.get(key), str) and SAFE_TOKEN.fullmatch(data[key]):
+            kept[key] = data[key]
+    if record["type"] == "assistant.message" and isinstance(data.get("content"), str):
+        kept["content"] = lifecycle_text(data["content"])
+    if record["type"] == "user.message":
+        kept["content"] = PROMPT_TEXT
+        if "source" in data:
+            kept["source"] = "system" if data["source"] == "system" else SCRUBBED
+    result["data"] = kept
+    return result
+
+
+def lifecycle_chunk_masks(rows: list[dict]) -> dict[int, str]:
+    """Redact ACP text without losing original marker splits across native chunks.
+
+    Args:
+        rows: Original ACP wire messages in capture order.
+
+    Returns:
+        Native wire indices mapped to their sentinel-only chunk text.
+    """
+    groups: dict[str, list[tuple[int, str]]] = {}
+    for index, row in enumerate(rows):
+        update = row.get("message", {}).get("params", {}).get("update", {})
+        if update.get("sessionUpdate") == "agent_message_chunk":
+            groups.setdefault(update["messageId"], []).append((index, update["content"].get("text", "")))
+    kept = {}
+    for chunks in groups.values():
+        text = "".join(chunk for _, chunk in chunks)
+        offsets = {
+            position
+            for match in re.finditer("|".join(LIFECYCLE_MARKERS), text)
+            for position in range(match.start(), match.end())
+        }
+        offset = 0
+        for index, chunk in chunks:
+            kept[index] = "".join(char for position, char in enumerate(chunk, offset) if position in offsets)
+            offset += len(chunk)
+    return kept
+
+
+def lifecycle_wire(rows: list[dict], scrub: Scrubber) -> list[dict]:
+    """Retain submissions, native lifecycle notifications and model-output chunks.
+
+    Args:
+        rows: Original ACP wire messages.
+        scrub: The capture's shared stable identity scrubber.
+
+    Returns:
+        Scrubbed native messages retaining their original wire sequence indices.
+    """
+    chunks = lifecycle_chunk_masks(rows)
+    kept = []
+    for index, row in enumerate(rows):
+        message, direction = row["message"], row["direction"]
+        method, params = message.get("method"), message.get("params", {})
+        if direction == "send" and method == "session/prompt":
+            value = {"sessionId": scrub.fake_id(params["sessionId"]), "prompt": PROMPT_TEXT}
+        elif direction == "receive" and method == "github.com/copilot/sessionEvent":
+            value = lifecycle_event(params, scrub)
+        elif direction == "receive" and index in chunks:
+            update = params["update"]
+            native = {
+                "sessionUpdate": update["sessionUpdate"],
+                "messageId": scrub.fake_id(update["messageId"]),
+                "content": {"type": "text", "text": chunks[index]},
+            }
+            agent = update.get("_meta", {}).get("github.com/copilot", {}).get("agentId")
+            if agent:
+                native["_meta"] = {"github.com/copilot": {"agentId": scrub.fake_id(agent)}}
+            value = {"sessionId": scrub.fake_id(params["sessionId"]), "update": native}
+        else:
+            continue
+        kept.append({"sequence": index, "direction": direction, "message": {"method": method, "params": value}})
+    return kept
+
+
+def lifecycle_artifact(path: Path, name: str) -> dict:
+    """Describe a read-only capture by logical name and original byte digest.
+
+    Args:
+        path: Explicit capture file to hash.
+        name: Nonpersonal logical artifact identity.
+
+    Returns:
+        Source byte count and SHA-256 provenance, without filesystem paths.
+    """
+    data = path.read_bytes()
+    return {"name": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def record_copilot_lifecycle(root: Path, scrub: Scrubber) -> dict[str, dict]:
+    """Record measured idle-parent wake from explicitly supplied native spike captures.
+
+    Args:
+        root: Explicit capture directory; never inferred from a runtime home.
+        scrub: Shared native identity scrubber.
+
+    Returns:
+        One lifecycle fixture, without inferred or precomputed success flags.
+
+    Raises:
+        SystemExit: The captured session identity or runtime provenance does not match.
+    """
+    session = (root / "acp-lifecycle-session-id").read_text().strip()
+    if not re.fullmatch(r"[a-f0-9-]{36}", session):
+        msg = "invalid captured ACP lifecycle session identity"
+        raise SystemExit(msg)
+    paths = {
+        "journal": root / "home/session-state" / session / "events.jsonl",
+        "lifecycle": root / "acp-lifecycle-events.json",
+        "wire": root / "acp-lifecycle-wire.jsonl",
+        "manifest": root / "source-provenance.json",
+    }
+    journal = list(rollout_records(paths["journal"]))
+    lifecycle = json.loads(paths["lifecycle"].read_text())
+    wire = list(rollout_records(paths["wire"]))
+    manifest = json.loads(paths["manifest"].read_text())
+    starts = [row["data"] for row in journal if row.get("type") == "session.start"]
+    if not any(
+        data.get("sessionId") == session and data.get("copilotVersion") == manifest["version"] for data in starts
+    ):
+        msg = "captured journal identity/version does not match lifecycle provenance"
+        raise SystemExit(msg)
+    provenance = {
+        "version": manifest["version"],
+        "build_commit": manifest["buildCommit"],
+        "artifacts": [lifecycle_artifact(path, name) for name, path in paths.items()],
+        "runtime_sources": [
+            {"name": Path(item["path"]).name, "sha256": item["sha256"], "bytes": item["bytes"]}
+            for item in manifest["files"]
+        ],
+    }
+    fixture = {
+        "source": "Measured Copilot native ACP idle-parent wake; offline captured observation, not fresh execution",
+        "provenance": provenance,
+        "root_session": scrub.fake_id(session),
+        "journal": [lifecycle_event(record, scrub) for record in journal if record.get("type") in LIFECYCLE_TYPES],
+        "lifecycle": [lifecycle_event(record, scrub) for record in lifecycle],
+        "wire": lifecycle_wire(wire, scrub),
+    }
+    return {"lifecycle/idle-parent-wake": fixture}
+
+
 def write(found: dict[str, dict], runtime: str, out: Path, *, dry_run: bool, scrub: Scrubber) -> None:
     """Check and write one runtime's fixtures, printing each path.
 
@@ -1108,6 +1728,39 @@ def default_genie_binary() -> Path | None:
     return Path(os.path.realpath(found)) if found else None
 
 
+def record_copilot_inputs(args: argparse.Namespace, scrub: Scrubber) -> dict[str, dict]:
+    """Record all explicitly supplied Copilot artifact roots.
+
+    Args:
+        args: Parsed explicit native source paths and recording options.
+        scrub: Primary native identity scrubber.
+
+    Returns:
+        Hook, telemetry and optional measured lifecycle fixtures.
+    """
+    found = record_copilot(args.copilot_home, args.copilot_contract, scrub)
+    if args.copilot_lifecycle_root is not None:
+        found.update(record_copilot_lifecycle(args.copilot_lifecycle_root, scrub))
+    for extra_home in args.copilot_extra_home:
+        extra_scrub = CopilotScrubber(extra_home)
+        extra = record_copilot(extra_home, None, extra_scrub)
+        for name, fixture in extra.items():
+            extra_scrub.check(fixture)
+            found.setdefault(name, fixture)
+    return found
+
+
+def validate_cursor_capture_route(args: argparse.Namespace, parser: argparse.ArgumentParser) -> None:
+    """Keep the explicit lifecycle route isolated from runtime-home discovery.
+
+    Args:
+        args: Parsed recorder arguments.
+        parser: Parser reporting invalid combinations before any capture reads.
+    """
+    if args.cursor_lifecycle_root is not None and (args.runtime != "cursor" or args.cursor_capture is not None):
+        parser.error("--cursor-lifecycle-root requires --runtime cursor and excludes --cursor-capture")
+
+
 def main(argv: list[str] | None = None) -> int:
     """Record the selected runtimes' fixtures.
 
@@ -1118,24 +1771,69 @@ def main(argv: list[str] | None = None) -> int:
         0; recording problems exit through SystemExit.
     """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--runtime", choices=("cursor", "codex", "genie", "claude", "all"), default="all")
+    parser.add_argument("--runtime", choices=(*sorted({*discover(), "copilot"}), "all"), default="all")
     parser.add_argument("--home", type=Path, default=Path.home(), help="home to read artifacts from (read only)")
+    parser.add_argument(
+        "--copilot-home",
+        type=Path,
+        default=None,
+        help="explicit Copilot home or sandbox to read (read only); Copilot is never recorded from a default home",
+    )
+    parser.add_argument(
+        "--copilot-lifecycle-root",
+        type=Path,
+        default=None,
+        help="explicit native ACP lifecycle capture directory (read only)",
+    )
+    parser.add_argument(
+        "--claude-lifecycle-root",
+        type=Path,
+        help="explicit native Claude stream capture (read only; records lifecycle only)",
+    )
+    parser.add_argument("--copilot-contract", type=Path, default=None, help="SDK hook contracts d.ts (read only)")
+    parser.add_argument(
+        "--copilot-extra-home", type=Path, action="append", default=[], help="additional explicit native capture root"
+    )
+    parser.add_argument("--cursor-lifecycle-root", type=Path, help="explicit Cursor lifecycle capture only (read only)")
+    parser.add_argument("--cursor-capture", type=Path, help="explicit captured native hook JSONL; capture only")
     parser.add_argument("--codex-binary", type=Path, default=None)
     parser.add_argument("--genie-binary", type=Path, default=None)
     parser.add_argument("--out", type=Path, default=FIXTURES)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args(argv)
-    runtimes = ("cursor", "codex", "genie", "claude") if args.runtime == "all" else (args.runtime,)
+    validate_cursor_capture_route(args, parser)
+    runtimes = tuple(discover()) if args.runtime == "all" else (args.runtime,)
+    if args.runtime == "all" and args.copilot_home is None:
+        runtimes = tuple(runtime for runtime in runtimes if runtime != "copilot")
+    missing = set(runtimes) - RECORDER_RUNTIMES
+    if missing:
+        parser.error(f"no native fixture recorder for: {', '.join(sorted(missing))}")
+    if "copilot" in runtimes and args.copilot_home is None:
+        parser.error("--runtime copilot requires an explicit --copilot-home")
     for runtime in runtimes:
-        scrub = Scrubber(args.home)
-        if runtime == "cursor":
-            found = record_cursor(args.home, scrub)
+        scrub = CopilotScrubber(args.copilot_home) if runtime == "copilot" else Scrubber(args.home)
+        if runtime == "copilot":
+            found = record_copilot_inputs(args, scrub)
+        elif runtime == "cursor":
+            found = (
+                record_cursor_lifecycle(args.cursor_lifecycle_root, scrub.fake_id)
+                if args.cursor_lifecycle_root is not None
+                else (
+                    record_cursor_capture(args.cursor_capture, scrub)
+                    if args.cursor_capture
+                    else record_cursor(args.home, scrub)
+                )
+            )
         elif runtime == "codex":
             found = record_codex(args.home, args.codex_binary or default_codex_binary(), scrub)
         elif runtime == "genie":
             found = record_genie(args.home, args.genie_binary or default_genie_binary(), scrub)
-        else:
-            found = record_claude(args.home, scrub)
+        elif runtime == "claude":
+            found = (
+                record_claude_lifecycle(args.claude_lifecycle_root, scrub.fake_id)
+                if args.claude_lifecycle_root is not None
+                else record_claude(args.home, scrub)
+            )
         write(found, runtime, args.out, dry_run=args.dry_run, scrub=scrub)
     return 0
 
