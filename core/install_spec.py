@@ -15,11 +15,14 @@ class JsonMerge:
         path: The JSON file to change.
         merge: Return the object with the kit's entries in place; must be idempotent.
         unmerge: Return the object with only the kit's entries removed.
+        defaults: Top-level scalar defaults added only when absent; original ownership
+            is restored from the manifest, and intervening value changes are kept.
     """
 
     path: Path
     merge: Callable[[dict], dict]
     unmerge: Callable[[dict], dict]
+    defaults: dict = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

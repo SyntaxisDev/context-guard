@@ -256,7 +256,7 @@ def read_text(path: Path) -> str | None:
         ValueError: The file exists but cannot be read as text.
     """
     try:
-        return path.read_text()
+        return path.read_text(newline="")
     except FileNotFoundError:
         return None
     except (OSError, UnicodeDecodeError) as exc:
@@ -621,6 +621,36 @@ class UninstallPlanner(Planner):
                 self.change(WRITE, path, restored, section)
 
 
+def object_lists(data: dict, keys: tuple[str, ...], fields: tuple[str, ...]) -> dict:
+    """Validate nested native string lists without recreating missing containers.
+
+    Args:
+        data: Parsed native settings object.
+        keys: Object keys leading to the list container.
+        fields: Optional string-list fields within that object.
+
+    Returns:
+        The existing container, or an empty object when a container is absent.
+
+    Raises:
+        ValueError: A present container or string list has an invalid shape.
+    """
+    current = data
+    for key in keys:
+        if key not in current:
+            return {}
+        current = current[key]
+        if not isinstance(current, dict):
+            msg = f"{'.'.join(keys)} must be an object"
+            raise ValueError(msg)  # noqa: TRY004 - malformed native data is an installer conflict
+    for name in fields:
+        entries = current.get(name, [])
+        if not isinstance(entries, list) or any(not isinstance(item, str) for item in entries):
+            msg = f"{'.'.join((*keys, name))} must be a list of strings"
+            raise ValueError(msg)
+    return current
+
+
 def original_object(path: Path, original: object) -> dict | None:
     """Parse a recorded original text.
 
@@ -635,6 +665,32 @@ def original_object(path: Path, original: object) -> dict | None:
         return parse_object(path, original) if isinstance(original, str) else None
     except ValueError:
         return None
+
+
+def restore_empty_containers(original: dict, current: dict, restored: dict) -> dict:
+    """Recover original empty containers still present before unmerging.
+
+    Missing current keys remain deleted; nonempty original content is never reinstated.
+
+    Args:
+        original: The object before installation.
+        current: The object currently on disk.
+        restored: The current object after unmerging; not modified.
+
+    Returns:
+        The reversed object with original structure and user edits preserved.
+    """
+    result = copy.deepcopy(restored)
+    for key, value in original.items():
+        if key not in current:
+            continue
+        if key not in result and value in ({}, []):
+            result[key] = copy.deepcopy(value)
+        elif isinstance(value, dict) and isinstance(current[key], dict):
+            child = restore_empty_containers(value, current[key], result.get(key, {}))
+            if child or key in result:
+                result[key] = child
+    return result
 
 
 def unmerged(item: JsonMerge, path: Path, text: str, entry: dict) -> str:
@@ -652,9 +708,18 @@ def unmerged(item: JsonMerge, path: Path, text: str, entry: dict) -> str:
     """
     current = parse_object(path, text)
     restored = item.unmerge(copy.deepcopy(current))
+    original = original_object(path, entry.get("original"))
+    if original is not None:
+        restored = restore_empty_containers(original, current, restored)
+    if original is not None or entry.get("created"):
+        for key, value in item.defaults.items():
+            if key in current and (key in (original or {}) or current[key] != value):
+                restored[key] = current[key]
+            elif key in restored and restored[key] == value:
+                del restored[key]
     if restored == current:
         return text
-    if original_object(path, entry.get("original")) == restored:
+    if original == restored:
         return entry["original"]
     return dump_object(restored)
 
@@ -760,7 +825,7 @@ def replace_text(path: Path, text: str) -> None:
     target = path.resolve() if path.is_symlink() else path
     temporary = target.with_name(f".{target.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
     try:
-        with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666), "w") as handle:
+        with os.fdopen(os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o666), "w", newline="") as handle:
             handle.write(text)
         if target.exists():
             temporary.chmod(target.stat().st_mode & 0o7777)
