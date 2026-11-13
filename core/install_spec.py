@@ -17,12 +17,18 @@ class JsonMerge:
         unmerge: Return the object with only the kit's entries removed.
         defaults: Top-level scalar defaults added only when absent; original ownership
             is restored from the manifest, and intervening value changes are kept.
+        owned: Optional callback recording per-entry values from the objects before and
+            after the merge; None when the merge does not track individual entries.
+        notes: Optional callback describing edited owned entries in the current object; they
+            are kept as the user's and reported without failing the run.
     """
 
     path: Path
     merge: Callable[[dict], dict]
     unmerge: Callable[[dict], dict]
     defaults: dict = field(default_factory=dict)
+    owned: Callable[[dict, dict], dict] | None = None
+    notes: Callable[[dict], list[str]] | None = None
 
 
 @dataclass(frozen=True)

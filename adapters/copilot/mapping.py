@@ -216,12 +216,15 @@ def subagent_settings(config: Mapping, prefix: str = "") -> dict[str, dict[str, 
     return entries
 
 
-def merge_subagents(data: dict, entries: Mapping[str, dict[str, str]]) -> dict:
+def merge_subagents(
+    data: dict, entries: Mapping[str, dict[str, str]], installed: Mapping[str, dict[str, str]] | None = None
+) -> dict:
     """Add each owned agent entry that the user has not set, creating `subagents.agents` when absent.
 
     Args:
         data: Parsed settings.json; it is changed in place.
         entries: The kit's entries from `subagent_settings`.
+        installed: Last recorded values for entries the kit owns.
 
     Returns:
         `data`; a `subagents` or `agents` that is not an object is left alone.
@@ -230,7 +233,9 @@ def merge_subagents(data: dict, entries: Mapping[str, dict[str, str]]) -> dict:
     agents = subagents.setdefault("agents", {}) if isinstance(subagents, dict) else None
     if isinstance(agents, dict):
         for name, entry in entries.items():
-            agents.setdefault(name, dict(entry))
+            owned = installed is not None and name in installed
+            if (owned and agents.get(name) == installed[name]) or (not owned and name not in agents):
+                agents[name] = dict(entry)
     return data
 
 
@@ -261,6 +266,67 @@ def unmerge_subagents(data: dict, entries: Mapping[str, dict[str, str]], origina
     return data
 
 
+def agent_entries(data: dict) -> dict | None:
+    """Find the agent preferences in a settings object.
+
+    Args:
+        data: Parsed settings.
+
+    Returns:
+        The preferences object, or None when absent or malformed.
+    """
+    subagents = data.get("subagents")
+    agents = subagents.get("agents") if isinstance(subagents, dict) else None
+    return agents if isinstance(agents, dict) else None
+
+
+def recorded_preferences(
+    current: dict, merged: dict, original: dict, entries: Mapping[str, dict[str, str]], installed: dict
+) -> dict:
+    """Update recorded ownership only for preferences written by this merge.
+
+    Args:
+        current: Settings before merging.
+        merged: Settings after merging.
+        original: Settings before the first installation.
+        entries: Current desired kit preferences.
+        installed: Last installed values.
+
+    Returns:
+        The updated installed values.
+    """
+    prior, before, after = agent_entries(original), agent_entries(current), agent_entries(merged)
+    result = dict(installed)
+    if after is not None:
+        for name, entry in entries.items():
+            if prior is not None and name in prior:
+                continue
+            owned = name in installed
+            if (owned and before is not None and before.get(name) == installed[name]) or (
+                not owned and (before is None or name not in before)
+            ):
+                result[name] = dict(entry)
+    return result
+
+
+def edited_preferences(current: dict, installed: Mapping[str, dict[str, str]]) -> list[str]:
+    """Identify edits to preferences previously installed by the kit.
+
+    Args:
+        current: Settings on disk.
+        installed: Last installed values.
+
+    Returns:
+        One note per edited entry.
+    """
+    agents = agent_entries(current)
+    return [
+        f"subagents.agents.{name} edited since install; kept"
+        for name, value in installed.items()
+        if agents is not None and name in agents and agents[name] != value
+    ]
+
+
 def subagent_merge(path: Path, entries: Mapping[str, dict[str, str]], manifest: dict | None = None) -> JsonMerge:
     """Build the reversible settings.json merge for the owned `subagents.agents` entries.
 
@@ -276,6 +342,7 @@ def subagent_merge(path: Path, entries: Mapping[str, dict[str, str]], manifest: 
     original = install.original_object(path, recorded.get("original"))
     if original is None and recorded.get("created"):
         original = {}
+    installed = dict(recorded.get("installed", {}))
 
     def merge(data: dict) -> dict:
         """Capture the first settings object and merge the role preferences.
@@ -289,7 +356,7 @@ def subagent_merge(path: Path, entries: Mapping[str, dict[str, str]], manifest: 
         nonlocal original
         if original is None:
             original = json.loads(json.dumps(data))
-        return merge_subagents(data, entries)
+        return merge_subagents(data, entries, installed)
 
     def unmerge(data: dict) -> dict:
         """Remove only preferences absent before installation.
@@ -301,9 +368,15 @@ def subagent_merge(path: Path, entries: Mapping[str, dict[str, str]], manifest: 
             Settings with unchanged owned preferences removed.
         """
         baseline = original if original is not None else data
-        return unmerge_subagents(data, entries, baseline)
+        return unmerge_subagents(data, installed, baseline)
 
-    return JsonMerge(path, merge, unmerge)
+    return JsonMerge(
+        path,
+        merge,
+        unmerge,
+        owned=lambda current, merged: recorded_preferences(current, merged, original or {}, entries, installed),
+        notes=lambda current: edited_preferences(current, installed),
+    )
 
 
 def install_spec(

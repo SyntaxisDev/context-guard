@@ -9,6 +9,7 @@ every line of the spec's kit signature for its path is stale kit output and is r
 without force. Every replaced or removed path is backed up first.
 A JSON merge that rewrites an existing file records the file's original text, so uninstall can
 put back the user's exact formatting when nothing but our merge changed since.
+Merges that own individual entries also record their last installed values.
 Planning never writes; dry runs only describe the plan.
 
 JsonMerge.merge and TextEdit.apply must be idempotent: doctor treats merge(current) ==
@@ -252,6 +253,15 @@ def read_manifest(path: Path) -> dict:
             for k, v in entries.items()
             if isinstance(v, dict) and isinstance(v.get("created"), bool) and isinstance(v.get("original", ""), str)
         }
+    for entry in manifest["merges"].values():
+        owned = entry.get("installed")
+        if not isinstance(owned, dict) or any(
+            not isinstance(name, str)
+            or not isinstance(value, dict)
+            or any(not isinstance(key, str) or not isinstance(item, str) for key, item in value.items())
+            for name, value in owned.items()
+        ):
+            entry.pop("installed", None)
     dirs = data.get("dirs") if isinstance(data.get("dirs"), list) else []
     manifest["dirs"] = [item for item in dirs if isinstance(item, str)]
     return manifest if data else {}
@@ -530,12 +540,16 @@ class InstallPlanner(Planner):
             except ValueError as exc:
                 self.conflict(item.path, str(exc), "merges")
                 continue
+            if item.notes:
+                self.plan.notes.extend(Conflict(item.path, message) for message in item.notes(current))
             new = text if text is not None and merged == current else dump_object(merged)
             if text is None and not merged:
                 continue
             if new != text:
                 self.change(WRITE, item.path, new, "merge")
             self.record("merges", item.path, new, created=text is None, original=text if new != text else None)
+            if item.owned:
+                self.recorded["merges"][str(item.path)]["installed"] = item.owned(current, merged)
 
     def edits(self) -> None:
         """Plan every text edit; an unreadable file conflicts."""
@@ -640,6 +654,9 @@ class UninstallPlanner(Planner):
                 continue
             if restored is None:
                 continue
+            merge = targets[path]
+            if section == "merges" and isinstance(merge, JsonMerge) and merge.notes:
+                self.plan.notes.extend(Conflict(path, message) for message in merge.notes(parse_object(path, text)))
             emptied = restored.strip() in EMPTY_TEXTS
             if emptied and (entry["created"] or (section == "merges" and restored != entry.get("original"))):
                 self.change(REMOVE, path, reason=section)
