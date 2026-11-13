@@ -6,9 +6,11 @@ import unittest
 from collections.abc import Iterator
 from pathlib import Path
 
+from adapters.registry import discover
+
 ROOT = Path(__file__).resolve().parents[1]
 MAX_FUNCTION_LINES = 80
-RUNTIME_HOMES = re.compile(r"\.(cursor|codex|genie|claude)\b")
+RUNTIME_HOMES = re.compile(r"\.(?:" + "|".join(re.escape(runtime) for runtime in discover()) + r")\b")
 
 
 def production_paths() -> Iterator[Path]:
@@ -37,6 +39,11 @@ def imported_modules(tree: ast.Module) -> Iterator[str]:
 
 class ArchitectureTests(unittest.TestCase):
     """Production functions stay small and core stays independent of adapters and runtime homes."""
+
+    def test_registered_runtime_homes_are_forbidden(self) -> None:
+        for runtime in discover():
+            with self.subTest(runtime=runtime):
+                self.assertIsNotNone(RUNTIME_HOMES.search(f"~/.{runtime}/settings.json"))
 
     def test_function_size(self) -> None:
         for path in production_paths():
