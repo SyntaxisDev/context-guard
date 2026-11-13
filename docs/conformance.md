@@ -6,8 +6,8 @@ construct temporary native drivers and invoke source hooks by default; scenarios
 the driver's install operation instead invoke the registered installed-kit commands.
 The separate `tests/installed/` layer installs a kit and exercises its exact registered
 commands. Native mechanics and retained lifecycle evidence are decoded independently.
-Failures and unfinished capabilities remain visible in measured reports.
-The dispatcher and rollout refactors remain separate work.
+Failures and unfinished capabilities remain visible in command output and optional
+JSON results. The dispatcher and rollout refactors are outside this contract.
 
 ## Run the two gates
 
@@ -36,7 +36,7 @@ uv run --python 3.14 python scripts/conformance.py --json /tmp/conformance.json
 
 Conformance exits nonzero for a failed scenario or a `NOT IMPLEMENTED` declaration. Do not mask
 its exit status when collecting reports. Filters support focused iterations; they do not replace
-the complete baseline. Repeat the relevant structural and conformance checks with Python 3.15
+the complete suite. Repeat the relevant structural and conformance checks with Python 3.15
 when changing shared infrastructure.
 
 ## Interpret results
@@ -46,18 +46,16 @@ when changing shared infrastructure.
 | PASS | The scenario executed and its assertions passed. |
 | FAIL | The executable scenario observed a mismatch, or failed to establish required evidence. Read its assertion and classify the cause before changing anything. |
 | GAP | A validated `runtime_limit` or `not_applicable` declaration links to the runtime documentation. |
-| NOT IMPLEMENTED | Declared adapter behavior is unfinished. This keeps conformance nonzero. Missing driver, fixture or scenario infrastructure instead fails structural validation.
-A supported silence or wake capability cannot inherit the base driver's unimplemented action. |
+| NOT IMPLEMENTED | Declared adapter behavior is unfinished. This keeps conformance nonzero. Missing driver, fixture or scenario infrastructure instead fails structural validation. A supported silence or wake capability cannot inherit the base driver's unimplemented action. |
 
 Guarantees never accept gap declarations. An emulated capability runs the same shared contract.
-Declared support in the generated README matrix is separate from measured results. See the
-[baseline and next actions](conformance-baseline.md) for the current measured state.
+Declared support in the generated README matrix is separate from executable results;
+run `scripts/conformance.py` for the current dispositions.
 
 Offline hooks cannot prove a native host starts an idle parent turn or actually delivers hook
-context to a model. Claude, Copilot and Cursor wake scenarios independently replay measured native lifecycle
-captures. Cursor uses actual post-idle child output, matching Task notification and a new
-parent generation without intervening input; the child's failed sleep-order instruction
-remains a separate recorded control outcome. Documentation alone never produces PASS,
+context to a model. Claude, Copilot and Cursor wake scenarios independently replay recorded
+native lifecycle captures. Cursor requires actual post-idle child output, matching Task notification and a new
+parent generation without intervening input. Documentation alone never produces PASS,
 and CLI evidence does not establish IDE behavior.
 
 ## Extension points
@@ -90,25 +88,10 @@ test copies shipped source into a temporary kit, removes returned note text whil
 response shape and event logging, observes the unchanged shared scenario fail, restores the source,
 and observes it pass. Production adapter files are untouched by these tests.
 
-## Historical Copilot onboarding checklist
-
-The following steps record the original extension plan; Copilot is now registered and
-participates in the shared scenarios. They are not pending implementation tasks.
-
-1. Record and scrub Copilot's actual native payloads and response schemas through an explicitly
-   reviewed recorder source. Resolve the native-behaviour questions; `docs/copilot.md` records
-   the observed answers. Ordinary tests never collect live fixtures.
-2. Add `adapters/copilot/adapter.py` with lazy `ADAPTER` metadata, its hook/mapping/config modules,
-   `docs/copilot.md` and precise documented capability dispositions. Mandatory guarantees cannot
-   be opted out; unfinished behavior uses `not_implemented`, never `runtime_limit` by inference.
-3. Add `adapters/copilot/tests/driver.py` implementing the operations in `DriverProtocol` and
-   `DRIVER_METHODS`, semantic fixture actions, independent response validation/decoding, and native
-   installed-command discovery. Do not import hook/mapping renderers into decoder dependencies.
-4. Run structural validation, then `scripts/conformance.py --runtime copilot`. The registry joins
-   the adapter to existing scenarios automatically. Supply native recorder dispatch explicitly;
-   registry selection cannot invent a recorder. Keep host-specific smoke wiring explicit too.
-5. Regenerate declared support with `uv run --python 3.14 python scripts/gen_docs.py`, review the
-   failure evidence, and iterate on Copilot in a separate implementation task.
+Native recording and smoke wiring require explicit runtime-specific implementations;
+registry discovery does not infer a recorder or a host-specific smoke path. Ordinary
+tests never collect live fixtures. Driver decoders validate native responses independently
+of production hook and mapping renderers; mandatory guarantees cannot be opted out.
 
 Copilot's handoff-access action explicitly configures a workspace grant through the packaged
 helper; other adapters may configure access during ordinary installation. The shared scenario

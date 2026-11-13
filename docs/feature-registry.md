@@ -8,8 +8,7 @@ hooks. The CLI, documentation generator, recording selection and shared tests co
 registry. Test drivers are loaded separately by tests. Source documentation and anchors are
 validated by structural checks and documentation generation, separately from installed metadata.
 
-Discovery is deterministic in alphabetical runtime order. This is intentional; it differs from
-the former hand-written CLI lists. CLI `all` selection follows this same order.
+Discovery is deterministic in alphabetical runtime order. CLI `all` selection follows this order.
 A runtime directory containing `hooks.py` must also contain an adapter declaration.
 
 ## Capabilities

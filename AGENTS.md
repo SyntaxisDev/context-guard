@@ -105,7 +105,7 @@ uv run --python 3.14 python scripts/conformance.py --json /tmp/conformance.json
 Structure must pass. Conformance returns nonzero for behavior failures and
 `NOT IMPLEMENTED` declarations; never mask that exit status or weaken assertions to make it
 green. Classify infrastructure defects, adapter gaps and documented runtime limitations
-separately. See `docs/conformance.md` and `docs/conformance-baseline.md`.
+separately. See `docs/conformance.md` for the current verification contract.
 
 Also spot-check with `--python 3.15`. Tests assert observable contracts or distinct failure
 modes, not helper structure. The `tests` run covers three layers beyond unit tests:

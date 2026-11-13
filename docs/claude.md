@@ -35,8 +35,8 @@ For isolated checks, unset `CLAUDE_CONFIG_DIR` or set it to a temporary director
 
 Claude Code wakes the parent natively. When a background subagent stops, it queues a `<task-notification>` (status, summary, result) and a subagent hand-back message; if the parent's turn has ended, Claude Code starts a new parent turn with them, without a user message, and mid-turn it delivers them at the next tool result. In recorded transcripts a parent turn ended (`stop_hook_summary`), a hand-back or `<task-notification>` arrived seconds to minutes later, and the next record was the parent's own reply. So the shared policy holds as written: spawn in the background, end the turn, pick up each result as a new turn.
 
-The measured stream-json capture from Claude Code 2.1.311 proves native idle-parent wake:
-a background `task_started` precedes the first root `result`; actual child assistant output
+The native wake fixture requires a background `task_started` before the first root `result`;
+actual child assistant output
 then precedes a matching completed `task_notification`, a new root assistant reply and a
 second root `result` in the same session, without an intervening human submission. The first
 root reply may mention the known experiment token. Token presence alone therefore cannot
@@ -57,13 +57,12 @@ uv run --python 3.14 python scripts/record_payloads.py --runtime claude \
 ```
 
 This route writes only the lifecycle fixture. The directory contains `wire.jsonl`,
-`request.json` and the original `verdict.txt`; its parent contains the original
+`request.json` and `verdict.txt`; its parent contains the
 `claude-existing-auth.py` probe and `verify-claude.py` independent verifier. Sources are
 read only and never executed. The fixture preserves native event order, stable scrubbed
 identities, sentinel framing and runtime version, with byte counts and SHA-256 hashes of
-all five original files. It contains no precomputed success flags. The original smoke
-FAIL remains evidence: its token heuristic misclassified the first reply; the independent
-validator retains the idle assertion and checks the later delivery chronologically.
+all five source files. It contains no precomputed success flags; the independent validator
+checks the idle boundary and subsequent delivery chronologically.
 
 context-guard adds the silent-subagent note above, the closest equivalent of Cursor's notes: a hung or killed subagent never notifies, and the note reaches the parent on its next tool result, prompt or session start. Cursor's unreturned and orphaned notes have no Claude Code counterpart: a foreground `Agent` call holds the parent's tool call until the result is its tool result, and no recorded transcript shows a parent moving on while a foreground subagent still runs.
 

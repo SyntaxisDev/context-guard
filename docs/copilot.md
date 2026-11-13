@@ -1,10 +1,10 @@
 # GitHub Copilot CLI
 
 The Copilot adapter participates in registry discovery, shared conformance, recorded-payload
-contracts and exact installed-command checks. Declared support is separate from measured
+contracts and exact installed-command checks. Declared support is separate from executable
 conformance. Handoff directory access requires explicit setup for each workspace; normal
-installation does not infer a global grant. The [measured inventory](conformance-results.md)
-lists every runtime, contract and scenario. Offline validation needs no live installation or trust change.
+installation does not infer a global grant. The [conformance guide](conformance.md)
+defines the shared runtime contracts. Offline validation needs no live installation or trust change.
 
 ## Native mechanisms and evidence
 
@@ -20,18 +20,18 @@ owns that one file and preserves other hook files; hook trust remains entirely w
 `sessionStart` returns `additionalContext`, containing policy and ranked handoffs. Native
 resume payloads are recorded. Payload event names come from the registered command argument.
 
-Contrary to the original proposal, command-hook `userPromptSubmitted` accepts
+Command-hook `userPromptSubmitted` accepts
 `additionalContext` and `decision: "block"` with a user-facing `reason`. Native headless
 sentinel and refusal probes established this on `gpt-6-luna`: a refusal ran no model turn.
 The adapter uses this single prompt hook; it does not also inject through
 `userPromptTransformed`. A refusal reason is user-visible text, not model-facing delivery.
 `agentStop` uses the same decision spelling to continue the agent with `reason` as the next
-message. Its observed loop guard is `stop_hook_active`; the SDK also documents `stopHookActive`.
+message. The observed loop guard is `stop_hook_active`; the SDK also documents `stopHookActive`.
 
 Telemetry uses a bounded tail of the native session event log. A root
 `session.usage_record.data.usage.inputTokens` already includes cache reads and writes;
-`maxPromptTokens` is the measured model window, not a fixed runtime constant. The native
-`gpt-6-luna` observation was 272,000 tokens. Missing or malformed telemetry fails open.
+`maxPromptTokens` is the model window from telemetry, not a fixed runtime constant.
+Missing or malformed telemetry fails open.
 Usage-output files use different cache accounting and are not this telemetry source.
 
 ## Tiers
@@ -81,7 +81,7 @@ user submission, and model-visible child content. No adapter waker or polling is
 The recorder's explicit `--copilot-lifecycle-root` route captures scrubbed journal and ACP
 chunks with source hashes. The independent driver computes wake from chronology, identities
 and actual model output; removing idle/start/completion/model evidence or inserting a human
-prompt fails validation. This is replay of a measured native observation, not a fresh host run
+prompt fails validation. This replays a recorded native lifecycle, not a fresh host run
 during ordinary offline conformance. Notification context also reached the model, asynchronously.
 
 ## Handoff access
@@ -180,16 +180,12 @@ uv run --python 3.14 python scripts/copilot_smoke.py --run --output /tmp/copilot
 ```
 
 The native command is opt-in, authenticated and spends credits. It installs only into its
-temporary sandbox, uses existing authentication and never writes trust. The completed installed
-smoke selected launcher **1.0.105** (the pinned spike package was **1.0.107**), made five
-`gpt-6-luna` requests and consumed 0.3147175 AI credits. A blind handoff title appeared in the
-model response, the model quoted a telemetry warning, refusal made no extra usage record, and
-an identical resend proceeded. A denied handoff write did not alter permissions. Interactive
-delivery remains unverified because its folder-trust gate was left untouched.
+temporary sandbox, uses existing authentication and never writes trust. The smoke checks
+handoff context, warning delivery, refusal and resend behavior, and whether a denied handoff
+write leaves permissions unchanged. Interactive delivery remains unverified.
 
 The smoke counts unique native request event IDs. Usage exports across resumed turns are
-cumulative and must not be summed. Including failed/inconclusive probes, all observed native
-verification used 4.280587 AI credits; delegated development/review costs are not exposed.
+cumulative and must not be summed.
 
 ## Validation
 
@@ -205,6 +201,4 @@ uv run --python 3.14 python scripts/conformance.py --json /tmp/conformance.json
 uv run --python 3.15 python scripts/conformance.py --structure
 ```
 
-Conformance must remain nonzero when FAIL or NOT IMPLEMENTED results remain. The four-runtime
-baseline before Copilot integration is 131 PASS, 6 FAIL, 5 GAP and 2 NOT IMPLEMENTED, exit 1.
-Existing adapter preservation and native-wake evidence gaps are outside this adapter's scope.
+Conformance must remain nonzero when FAIL or NOT IMPLEMENTED results remain.
