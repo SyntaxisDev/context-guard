@@ -19,7 +19,7 @@ KIT_ROOT = Path(__file__).resolve().parents[2]
 if str(KIT_ROOT) not in sys.path:
     sys.path.insert(0, str(KIT_ROOT))
 
-from adapters.cursor import mapping, runner, subagents
+from adapters.cursor import mapping, recovery, runner, subagents
 from core import config as config_mod, events, handoffs, hook, policy, spawn, state as state_mod
 from core.config import valid_text
 from core.observation import (
@@ -54,6 +54,7 @@ TEXT_FIELDS = (
     "prompt",
     "model",
     "status",
+    "trigger",
     "tool_name",
     "cwd",
 )
@@ -603,6 +604,7 @@ def observe(native: str, payload: object, config: dict, home: Path) -> Observati
         session_id(payload),
         event,
         tokens=chat.tokens,
+        rearm_on_usage=False,
         window=chat.window or fallback,
         model=payload.get("model") or None,
         is_subagent=bool(parent),
@@ -642,32 +644,25 @@ def handoff_written(decision: Decision) -> bool:
     return any(record.get("event") == "handoff_written" for record in decision.events)
 
 
-def carry_prompt_note(obs: Observation, decision: Decision, directory: Path, config: dict) -> Decision:
-    """Defer a prompt note to the next response that can reach the model.
-
-    beforeSubmitPrompt cannot add model context, so a prompt note waits for the next tool result
-    or session start (stop cannot carry it either); its delivery is logged as `note_delivered`.
-    A credited handoff write, a stop follow-up or a note of the same or a higher tier supersedes
-    the waiting note, which is then dropped. Subagents and spawns pass decisions through.
+def carry_note(obs: Observation, decision: Decision, state: dict) -> Decision:
+    """Compose a deferred warning inside the policy transaction.
 
     Args:
-        obs: The observation being answered.
-        decision: The evaluated decision.
-        directory: Cursor state directory.
-        config: Loaded Cursor adapter configuration.
+        obs: Current observation.
+        decision: Policy decision.
+        state: Locked session state.
 
     Returns:
-        The decision to render, with a delivered waiting note prepended to its message.
+        Decision with any deliverable warning attached.
     """
     if obs.is_subagent or (obs.tool and obs.tool.action == SPAWN):
         return decision
     if (obs.event == PROMPT and decision.kind != NOTE) or (obs.event == STOP and decision.kind != CONTEXT):
         return decision
-    with state_mod.session_state(directory, obs.runtime, obs.session_id, commit=True) as state:
-        if obs.event == PROMPT:
-            state.setdefault("adapter", {}).update({PENDING_NOTE: decision.message, PENDING_TIER: decision.tier})
-            return decision
-        pending = take_pending(state)
+    if obs.event == PROMPT:
+        state.setdefault("adapter", {}).update({PENDING_NOTE: decision.message, PENDING_TIER: decision.tier})
+        return decision
+    pending = take_pending(state)
     if (
         obs.event == STOP
         or handoff_written(decision)
@@ -675,9 +670,13 @@ def carry_prompt_note(obs: Observation, decision: Decision, directory: Path, con
         or policy.RANK.get(decision.tier, 0) >= policy.RANK.get(pending[1], 0) > 0
     ):
         return decision
-    policy.log_events(config, directory, [events.record("note_delivered", obs, pending[1])])
     message = "\n\n".join(part for part in (pending[0], decision.message) if part)
-    return replace(decision, kind=NOTE if obs.event == TOOL else CONTEXT, message=message)
+    return replace(
+        decision,
+        kind=NOTE if obs.event == TOOL else CONTEXT,
+        message=message,
+        events=[*decision.events, events.record("note_delivered", obs, pending[1])],
+    )
 
 
 def respond(decision: Decision, event: str) -> dict[str, object]:
@@ -722,22 +721,51 @@ def handle(native: str, payload: object, config: dict, home: Path) -> dict[str, 
     Returns:
         The native hook response.
     """
-    obs = observe(native, payload, config, home)
+    payload = validate_payload(payload)
+    event_spec(native)
     directory = config_mod.state_dir(config, home, RUNTIME)
     remember_parent(directory, payload)
     subagents.track(config, directory, native, payload)
+    if recovery.lifecycle(native, payload, config, home):
+        return {}
+    obs = observe(native, payload, config, home)
     if obs is None:
         return respond(Decision(), event_spec(native).event)
     if obs.tool is not None and obs.tool.action == SPAWN:
         subagents.remember_spawn(directory, payload, obs.tool.detail.get("role"))
+    responses: list[tuple[Decision, dict]] = []
+
+    def compose(decision: Decision, state: dict) -> Decision:
+        """Render the composed decision before its state transaction commits.
+
+        Args:
+            decision: Shared policy decision.
+            state: Locked session state.
+
+        Returns:
+            The composed decision whose native response is retained for delivery.
+
+        Raises:
+            ValueError: Model context could not be rendered for delivery.
+        """
+        decision = subagents.deliver_state(
+            obs, recovery.deliver(obs, carry_note(obs, decision, state), state, config, home), state
+        )
+        response = respond(decision, obs.event)
+        if decision.message and obs.event in (TOOL, SESSION) and not response.get("additional_context"):
+            msg = "Cursor model context response was not rendered"
+            raise ValueError(msg)
+        responses.append((decision, response))
+        return decision
+
     return hook.evaluate(
         obs,
         config,
         home,
         lambda: runner.services(home),
-        lambda decision: respond(decision, obs.event),
+        lambda decision: responses[0][1] if responses and decision == responses[0][0] else respond(decision, obs.event),
         lambda response: obs.event == TOOL and "additional_context" in response,
-        carry=lambda decision: subagents.deliver(obs, carry_prompt_note(obs, decision, directory, config), directory),
+        adjust=compose,
     )
 
 

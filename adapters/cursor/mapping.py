@@ -37,6 +37,7 @@ SESSION_MARKER = "context-guard hooks: active."
 PLUGIN_HOOKS = "cursor-hooks"
 HOOK_EVENTS = {
     "sessionStart": HookEvent(SESSION),
+    "preCompact": HookEvent(STOP),
     "beforeSubmitPrompt": HookEvent(PROMPT),
     "preToolUse": HookEvent(TOOL, (("matcher", "Task"),), spawn_only=True),
     "postToolUse": HookEvent(TOOL),
@@ -162,11 +163,14 @@ def unmerge_hooks(doc: dict, script: str) -> dict:
     """
     result = json.loads(json.dumps(doc))
     hooks = hookfile.event_lists(result, HOOKS_LABEL)
+    emptied = False
     for event in list(hooks):
-        hooks[event] = [entry for entry in hooks[event] if not hookfile.runs_script(entry, script)]
-        if not hooks[event]:
+        entries = hooks[event]
+        hooks[event] = [entry for entry in entries if not hookfile.runs_script(entry, script)]
+        if entries and not hooks[event]:
             del hooks[event]
-    if "hooks" in result and not hooks:
+            emptied = True
+    if emptied and not hooks:
         del result["hooks"]
     return {} if set(result) == {"version"} else result
 
@@ -194,7 +198,7 @@ def merge_hooks(doc: dict, registrations: dict[str, dict], script: str) -> dict:
     if "version" in doc and {event: found for event, found in owned.items() if found} == expected:
         return doc
     result = unmerge_hooks(doc, script)
-    result.setdefault("version", 1)
+    result["version"] = doc.get("version", 1)
     hooks = result.setdefault("hooks", {})
     for native, entry in registrations.items():
         hooks.setdefault(native, []).append(entry)
@@ -243,6 +247,7 @@ def install_spec(home: Path, kit: Path, python: Path, config: dict) -> InstallSp
             script=script,
         ),
         partial(unmerge_hooks, script=script),
+        defaults={"version": 1},
     )
     return InstallSpec(
         RUNTIME,

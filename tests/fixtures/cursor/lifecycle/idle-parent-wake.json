@@ -1,0 +1,949 @@
+{
+  "hooks": [
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "sessionStart",
+      "generation_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "ns": 1794569702360210000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "beforeSubmitPrompt",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "ns": 1794569740197570000,
+      "prompt": "<scrubbed>",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "preToolUse",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "ns": 1794569744413719000,
+      "run_in_background": true,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": "Task",
+      "tool_use_id": "toolu_efbc69132ca14f591e0f7754"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "postToolUse",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "ns": 1794569745128427000,
+      "output": {
+        "agentId": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+        "isBackground": true,
+        "status": "success"
+      },
+      "run_in_background": true,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": "Task",
+      "tool_use_id": "toolu_efbc69132ca14f591e0f7754"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "stop",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "loop_count": 0,
+      "ns": 1794569746774592000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "status": "completed"
+    },
+    {
+      "command": "cat",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "preToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "ns": 1794569748077897000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "1d47eba5-4e39-73c8-b563-9ff7eb1faca6"
+    },
+    {
+      "command": "sleep",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "preToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "ns": 1794569748081919000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "5710362e-36f4-4e69-ce97-d84ec965732b"
+    },
+    {
+      "command": "cat",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "postToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "ns": 1794569749782532000,
+      "output": {
+        "exitCode": 0,
+        "text": "CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>"
+      },
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "1d47eba5-4e39-73c8-b563-9ff7eb1faca6"
+    },
+    {
+      "command": "sleep",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "postToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "ns": 1794569779549994000,
+      "output": {
+        "exitCode": 0,
+        "text": ""
+      },
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "5710362e-36f4-4e69-ce97-d84ec965732b"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "stop",
+      "generation_id": "227fdeb9-52aa-4bb9-83bf-247dc7537d90",
+      "loop_count": 0,
+      "ns": 1794569782474652000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "status": "completed"
+    },
+    {
+      "command": "",
+      "cursor_version": "2026.11.11-043ef28",
+      "event": "stop",
+      "generation_id": "d08d79c0-f962-4668-aece-0502ed4c24a3",
+      "loop_count": 0,
+      "ns": 1794569785939178000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "status": "completed"
+    }
+  ],
+  "native": [
+    {
+      "content": [
+        {
+          "command": "sleep",
+          "operation": "Shell",
+          "toolCallId": "toolu_0ae21065f6229a54b23fa902",
+          "toolName": "Shell",
+          "type": "tool-call"
+        },
+        {
+          "command": "cat",
+          "operation": "Shell",
+          "toolCallId": "toolu_18379ec6d342fb885eff7dd7",
+          "toolName": "Shell",
+          "type": "tool-call"
+        }
+      ],
+      "message_id": "51c36370f238093400887fe26ff097af79ba23da7c76eae8737779b660d2464f",
+      "role": "assistant",
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
+    },
+    {
+      "content": [
+        {
+          "result": "<scrubbed>",
+          "toolCallId": "toolu_0ae21065f6229a54b23fa902",
+          "toolName": "Shell",
+          "type": "tool-result"
+        }
+      ],
+      "message_id": "aa6b8fb5e759114c6612d254b75185ffda8de3d8fd5686df7b6001f7bc5e53dd",
+      "role": "tool",
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
+    },
+    {
+      "content": [
+        {
+          "result": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "toolCallId": "toolu_18379ec6d342fb885eff7dd7",
+          "toolName": "Shell",
+          "type": "tool-result"
+        }
+      ],
+      "message_id": "f514568e3a9395232d4438a4a8e22f1c1846be2f4f34a2657f438e68b9a05543",
+      "role": "tool",
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
+    },
+    {
+      "content": [
+        {
+          "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "type": "text"
+        }
+      ],
+      "message_id": "e2847c7c2d88ef1484587d2f5df2f55d4f0593c9cb4ccbcec017e19bc3c097f3",
+      "role": "assistant",
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
+    },
+    {
+      "content": [
+        {
+          "command": "",
+          "operation": "Task",
+          "run_in_background": true,
+          "toolCallId": "toolu_efbc69132ca14f591e0f7754",
+          "toolName": "CallDynamicTool",
+          "type": "tool-call"
+        }
+      ],
+      "message_id": "1d7cc1190dbe841a61b914860b2b6c24c721c431d40047eec9fb5c0af332c423",
+      "role": "assistant",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "content": [
+        {
+          "agent_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+          "result": "<scrubbed>",
+          "toolCallId": "toolu_efbc69132ca14f591e0f7754",
+          "toolName": "CallDynamicTool",
+          "type": "tool-result"
+        }
+      ],
+      "message_id": "2828dfa35d59ea75d323015dbf857bc3194f0b0f1e57a258633d70bd08bd9d0a",
+      "role": "tool",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "content": [
+        {
+          "text": "<scrubbed>",
+          "type": "text"
+        }
+      ],
+      "message_id": "28a11d8197c2dbd8383926a9e20fd99d6720f1a6500ab7d6c1ecd6174a8878c7",
+      "role": "assistant",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "message_id": "ce036772e8cf1b09543070240e50b41b7ca7a6afc8a4e084d8a8b7aed900b10f",
+      "notification": {
+        "detail": "",
+        "kind": "shell",
+        "status": "success",
+        "task_id": "51519c"
+      },
+      "role": "user",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "text": "<scrubbed>"
+    },
+    {
+      "content": [
+        {
+          "text": "<scrubbed>",
+          "type": "text"
+        }
+      ],
+      "message_id": "c650cd68fdcf3e3ca7706551f24846be85d28fb1396d8060d6e5d7c275e79c42",
+      "role": "assistant",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    },
+    {
+      "message_id": "840d72fb66d1a94061435d7b44591b56c0f235273c0871f5a2a3a416e0867b93",
+      "notification": {
+        "detail": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "kind": "subagent",
+        "status": "success",
+        "task_id": "1afa874b-de25-7090-ff7e-dfade6f7912a"
+      },
+      "role": "user",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>"
+    },
+    {
+      "content": [
+        {
+          "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+          "type": "text"
+        }
+      ],
+      "message_id": "c13afd8ea225ce4190a8448f7c8a57e576086292040ae3212bae3d81dcceeacc",
+      "role": "assistant",
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+    }
+  ],
+  "ordered": [
+    {
+      "event": "sessionStart",
+      "generation_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "kind": "hook",
+      "ns": 1794569702360210000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": null,
+      "tool_use_id": null
+    },
+    {
+      "kind": "input",
+      "ns": 1794569722741099000
+    },
+    {
+      "kind": "input",
+      "ns": 1794569739740772000
+    },
+    {
+      "event": "beforeSubmitPrompt",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "kind": "hook",
+      "ns": 1794569740197570000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": null,
+      "tool_use_id": null
+    },
+    {
+      "event": "preToolUse",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "kind": "hook",
+      "ns": 1794569744413719000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": "Task",
+      "tool_use_id": "toolu_efbc69132ca14f591e0f7754"
+    },
+    {
+      "event": "postToolUse",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "kind": "hook",
+      "ns": 1794569745128427000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": "Task",
+      "tool_use_id": "toolu_efbc69132ca14f591e0f7754"
+    },
+    {
+      "event": "stop",
+      "generation_id": "a42c2992-e466-e558-39b8-e54a5feefb40",
+      "kind": "hook",
+      "ns": 1794569746774592000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": null,
+      "tool_use_id": null
+    },
+    {
+      "event": "preToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "kind": "hook",
+      "ns": 1794569748077897000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "1d47eba5-4e39-73c8-b563-9ff7eb1faca6"
+    },
+    {
+      "event": "preToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "kind": "hook",
+      "ns": 1794569748081919000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "5710362e-36f4-4e69-ce97-d84ec965732b"
+    },
+    {
+      "event": "postToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "kind": "hook",
+      "ns": 1794569749782532000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "1d47eba5-4e39-73c8-b563-9ff7eb1faca6"
+    },
+    {
+      "event": "postToolUse",
+      "generation_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "kind": "hook",
+      "ns": 1794569779549994000,
+      "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+      "tool_name": "Shell",
+      "tool_use_id": "5710362e-36f4-4e69-ce97-d84ec965732b"
+    },
+    {
+      "event": "stop",
+      "generation_id": "227fdeb9-52aa-4bb9-83bf-247dc7537d90",
+      "kind": "hook",
+      "ns": 1794569782474652000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": null,
+      "tool_use_id": null
+    },
+    {
+      "event": "stop",
+      "generation_id": "d08d79c0-f962-4668-aece-0502ed4c24a3",
+      "kind": "hook",
+      "ns": 1794569785939178000,
+      "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+      "tool_name": null,
+      "tool_use_id": null
+    }
+  ],
+  "provenance": {
+    "artifacts": [
+      {
+        "bytes": 9885,
+        "name": "hooks.jsonl",
+        "sha256": "d47590873eb10e6d3b21eede8283142bf6248d9b714127393436758fb5965a1d"
+      },
+      {
+        "bytes": 19470,
+        "name": "native-allowlisted-events.json",
+        "sha256": "fbfa79134f782a22299c944a23b428239881a363326d57837c710dc4b0399b41"
+      },
+      {
+        "bytes": 47083,
+        "name": "terminal-chronology.jsonl",
+        "sha256": "d1bcedca1e4ba6cfc73dbd9fe33a7e3fb86a83cecf3fd7177f451c6e0001fe88"
+      },
+      {
+        "bytes": 3715,
+        "name": "ordered-events.json",
+        "sha256": "774147f5c6dcdebeceb4bd95d032bbf46d5c20c66b6f6475177e4651a2996d4f"
+      },
+      {
+        "bytes": 750,
+        "name": "native-source-hashes.json",
+        "sha256": "c91f7514d69c9174dcb60090704795a0f184959925620c22bc22052e0b06fa17"
+      },
+      {
+        "bytes": 574,
+        "name": "transcript-source-hashes.json",
+        "sha256": "d2782c4af7037883d421e8398ae459a379e757a0952eea423b0025d49c9c0555"
+      },
+      {
+        "bytes": 377,
+        "name": "source-hashes.json",
+        "sha256": "8fb324d559bf79c313ea2c8277e780ac9edfd5c4bd81edc903a6cf71186fd514"
+      },
+      {
+        "bytes": 7273,
+        "name": "report.md",
+        "sha256": "bde99059eb4c4af5d3d0073399b7176451bcaa305c1335597a32351784d6ccfb"
+      },
+      {
+        "bytes": 2091,
+        "name": "transcript-0",
+        "sha256": "b664886359ee2ece32e15736b61d998c9de5ab6dc17e417892fe45994f8c66db"
+      },
+      {
+        "bytes": 3821,
+        "name": "transcript-1",
+        "sha256": "e565216933467006d9fc2c22fdee4fcf44a4e6b0744b5c3336954c1c8c4afea4"
+      }
+    ],
+    "database_hash_scope": "Reported original DB/WAL bytes; projected events are separate artifacts, not a snapshot",
+    "original_database_hashes": [
+      {
+        "kind": "database",
+        "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+        "sha256": "4ecb364c1e98be49d3e0f468ec541e4b6ef0cd560095929d98adb0e9ba10597c",
+        "source_id": "/49822/fe59c.7503e/.94fb36/9c997/a9fc6abf07337009dbfbf4faa43551f6/7fb78d49-822f-e59c-7503-e94fb369c997/a9fc6.ab"
+      },
+      {
+        "kind": "wal",
+        "session_id": "1afa874b-de25-7090-ff7e-dfade6f7912a",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_id": "/be35b/0a261.7905e/.902381/0412a/b0efda6cda314b1cdf2043ebee024813/fb708abe-35b0-a261-7905-e9023810412a/b0efd.a6-cda"
+      },
+      {
+        "kind": "database",
+        "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+        "sha256": "2bf525e87a559ccf11048666feabb79e0d1cc60bb58a919eca9cd547403487e6",
+        "source_id": "/20a8f/a0b2f.c2172/.84cbd0/a2a73/2b1ec2f1d021e863c5ff62ab80a6e134/021cb620-a8fa-0b2f-c217-284cbd0a2a73/2b1ec.2f"
+      },
+      {
+        "kind": "wal",
+        "session_id": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "source_id": "/27944/0eca8.b0655/.d439ea/d65b8/9c12f69ae1fdf7290db39e1dc6c2bc56/95278127-9440-eca8-b065-5d439ead65b8/9c12f.69-ae1"
+      }
+    ]
+  },
+  "root_session": "0af38204-f5e2-0a61-a10d-e9ac64c3cec3",
+  "source": "Measured Cursor CLI capture; offline replay, not fresh host execution or IDE proof",
+  "terminal": [
+    {
+      "kind": "output",
+      "ns": 1794569700671321000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700671433000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700804811000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700804975000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700805106000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700807108000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700807352000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569700807456000
+    },
+    {
+      "kind": "input",
+      "ns": 1794569722741099000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569722826376000
+    },
+    {
+      "kind": "input",
+      "ns": 1794569739740772000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569739747353000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569739747454000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569739749387000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740018369000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740252269000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740501713000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740524850000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740534568000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569740752881000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569741002723000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569741257817000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569741508508000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569741767758000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742014882000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742266902000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742521760000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742685358000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742690882000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742771033000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569742886087000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743029390000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743032355000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743180906000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743270704000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743334273000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743525343000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569743783739000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744035590000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744113162000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744257696000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744319567000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744376888000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744383842000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744534890000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744777573000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744820638000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744871048000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569744880255000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745036240000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745286904000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745474794000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745513818000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745537532000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745788959000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569745882127000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746038803000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746266985000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746268214000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746272096000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746324778000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746541742000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569746542053000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569779444100000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569779947279000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569780348800000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569780350672000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569780604163000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569780853878000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781104898000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781356090000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781606552000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781854817000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781865425000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781968509000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781970110000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569781972354000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782013903000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782106312000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782152711000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782250025000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782250085000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569782449412000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569783538200000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569783538338000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569783539734000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569783790470000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569784043847000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569784293705000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569784543384000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569784796695000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785046581000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785299904000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785349699000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785355222000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785365472000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785504390000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785549754000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785663101000
+    },
+    {
+      "kind": "output",
+      "ns": 1794569785663429000
+    }
+  ],
+  "token": "CLEAN_BLIND_535a827bd5af8c806315440e",
+  "transcript_sessions": [
+    "1afa874b-de25-7090-ff7e-dfade6f7912a",
+    "0af38204-f5e2-0a61-a10d-e9ac64c3cec3"
+  ],
+  "transcripts": [
+    [
+      {
+        "role": "user",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "type": null
+      },
+      {
+        "role": null,
+        "status": "success",
+        "text": "",
+        "type": "turn_ended"
+      }
+    ],
+    [
+      {
+        "role": "user",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "user",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "user",
+        "status": null,
+        "text": "<scrubbed>",
+        "type": null
+      },
+      {
+        "role": "assistant",
+        "status": null,
+        "text": "<scrubbed>CLEAN_BLIND_535a827bd5af8c806315440e<scrubbed>",
+        "type": null
+      },
+      {
+        "role": null,
+        "status": "success",
+        "text": "",
+        "type": "turn_ended"
+      }
+    ]
+  ]
+}

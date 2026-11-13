@@ -14,9 +14,9 @@ contract before an override can safely relocate the installed files.
 | item | Cursor |
 | --- | --- |
 | Telemetry | Chat record `composerData:<conversation_id>` in Cursor's `state.vscdb` (read-only, 1 s timeout): `contextTokensUsed`, `contextTokenLimit`. Path from `telemetry.state_db` or the per-platform default. Cursor CLI (`cursor-agent`) chats are not in that database; when it has no record, the CLI's own store `<telemetry.cli_chats>/<workspace hash>/<conversation_id>/store.db` (default `~/.cursor/chats`, found by conversation id, read-only) is used: `meta` row `0` holds hex-encoded JSON whose `latestRootBlobId` names a protobuf blob in `blobs`; its field 5 is the context usage message with tokens used (field 1) and context window (field 2). `telemetry.window_fallback` applies when no window is known. Any changed shape, invalid count or undecodable protobuf means no telemetry (fail open). |
-| Events | `sessionStart`, `beforeSubmitPrompt`, `preToolUse` (matcher `Task`, spawns only), `postToolUse`, `stop` (`loop_limit` 1) in `~/.cursor/hooks.json`, each with the shared hook timeout (5 s), registered by `mapping.py` and merged without touching other hooks; a file that already holds exactly these entries is left as is. `subagentStart`/`subagentStop` are not registered: they can only pass. |
+| Events | `sessionStart`, `preCompact`, `beforeSubmitPrompt`, `preToolUse` (matcher `Task`, spawns only), `postToolUse`, `stop` (`loop_limit` 1) in `~/.cursor/hooks.json`, each with the shared hook timeout (5 s), registered by `mapping.py` and merged without touching other hooks; a file that already holds exactly these entries is left as is. `subagentStart`/`subagentStop` are not registered: they can only pass. |
 | Subagent detection | `parent_tool_call_id` on tool hooks. `sessionStart`, `beforeSubmitPrompt` and `stop` do not fire inside subagents, so leaf observations come from tool hooks only. `is_background_agent` is a cloud agent, not a subagent. Leaf state and telemetry are keyed by `conversation_id`, which assumes each subagent has its own conversation id (as in every recorded subagent payload). A subagent carrying its parent's id would read the parent's tokens and share its state: the budget note would follow the parent's size, and a leaf observation under the note threshold would re-arm the parent's fired tiers. |
-| Compaction | No compaction hook is registered and no hook payload marks a summarised chat. Re-arming relies on the shared token rule: the next observation whose `contextTokensUsed` is back under the note threshold resets fired tiers. A summary that stays above it re-arms nothing, so notes resume only at a higher tier. The policy needs no re-injection because the rules file persists; the handoff list is not re-sent until the next `sessionStart`. |
+| Compaction | `preCompact` records a pending session/generation; only its matching explicitly completed, non-loop stop confirms it. The next model-context opportunity (`postToolUse` or `sessionStart`) delivers recovery policy and handoff facts and rearms warning tiers once. Low usage alone never confirms recovery or rearms tiers. |
 | Channel | Policy in `~/.cursor/rules/context-guard.mdc` (`alwaysApply`, reaches subagents); handoff list through `sessionStart` `additional_context` (fire-and-forget, best effort), which always starts with the marker line `context-guard hooks: active.` so the plugin rule can tell running hooks from missing ones. |
 | Notes | `beforeSubmitPrompt` cannot add model context, so a prompt note is held (also across a `stop` that sends no follow-up) and delivered as `additional_context` after the next tool result or at the next `sessionStart`; a tool-result note goes out as `additional_context` at once. Each delivered note is logged as `note_delivered`; a held note is dropped when its tier re-arms, when a tool result writes the handoff, or when `stop` sends its refresh follow-up, which supersedes it. Block: `{"continue": false, "user_message"}`. Stop refresh: `followup_message`. |
 | Unreturned subagents | A foreground Task result is lost when the parent turn is aborted or Cursor retries the parent request after a dropped connection; the subagent may keep running. `adapters/cursor/subagents.py` records each spawn under the parent's Task `tool_use_id` (role, parent conversation, spawn time, transcript directory `<parent transcript dir>/subagents`, and from the subagent's tool hooks its agent id and last activity, kept to the minute). A foreground spawn closes when the parent's Task `postToolUse` reports `status` `success` (output without a status counts as returned). A background spawn (`"isBackground": true` in that result, which also names its `agentId`) is detached instead: it is tracked until the subagent's own `stop` reports `completed` (mapped through the parent call its tool hooks recorded) or, because Cursor does not send that hook for background subagents (none fired in 3.26), until its transcript `<transcript dir>/<agent id>.jsonl` ends with a `{"type": "turn_ended", ...}` record. Cursor 3.26 sends `"transcript_path": null` on the Task `preToolUse` and `postToolUse` and on subagent tool hooks, so a spawn recorded without a transcript directory takes it from the parent's later hooks that carry one (only the last 4 KiB are read, only for detached spawns idle for a minute or spawns past the silence threshold). At any parent `stop` with `loop_count` 0 (completed, aborted or error), each foreground spawn still open is logged as `subagent_unreturned` (role, agent, status) and a note naming the role, agent id, last activity and transcript is queued. A parent `postToolUse` of a non-Task tool that started more than 30 s after a still-open foreground spawn (start = now − `duration` ms) means the parent moved on without its result: the spawn is detached, logged as `subagent_orphaned` (role, agent) and an orphan note queued; tools started within 30 s of the spawn may run beside it in the same step and are ignored, as are Task results. On each parent `postToolUse` and `sessionStart`, every open or detached spawn whose last activity (else its spawn time) is older than `subagents.silence_minutes` (10) and whose transcript does not show a finished turn gets one note per silence period (role, agent id, minutes, transcript, what to check) and a `subagent_silent` event (role, agent, minutes). Queued notes are appended once to the parent's next tool-result or `sessionStart` `additional_context`; subagents never get them. |
@@ -30,6 +30,23 @@ contract before an override can safely relocate the installed files.
 ## How the orchestrator is woken
 
 Cursor wakes the parent natively: when a background Task subagent finishes, Cursor starts a new parent turn with its result, without a user message, so the shared policy's "end your turn and pick up each result as a new turn" holds as written. context-guard adds only fallback notes for the cases the runtime cannot report: a background subagent silent past `subagents.silence_minutes` (its transcript shows no finished turn), a foreground subagent whose result never arrived, and one the parent moved on from (see Unreturned subagents above). The notes reach the parent on its next tool result or `sessionStart`; an idle parent fires no hook, so it sees them at its first tool result after the user next writes (`beforeSubmitPrompt` cannot add context).
+
+The independent shared wake driver replays a measured Cursor CLI capture using
+`adapters/cursor/tests/native_lifecycle.py`. It requires a correlated background
+Task and agent identity, a completed root generation before the actual child token
+read, actual native child output, a matching **subagent** completion notification
+(the earlier shell notification is insufficient), and distinct root assistant text
+in a new completed generation with no further terminal input. Native messages have
+per-session order and blob identities; root text messages are correlated in order
+with completed hook generations, rather than inventing native message timestamps.
+The recorded child launched `sleep` and `cat` in parallel: **the strict delay control
+FAILED**, although the measured token read occurred after root idle. This supports
+the wake contract and does not establish compliance with the requested delay.
+Fixtures are generated only by `scripts/record_payloads.py --runtime cursor
+--cursor-lifecycle-root <capture>`; this explicit route reads capture artifacts only.
+It hashes projected artifacts separately from reported original DB/WAL hashes;
+projected events are not a database snapshot. Replay is neither fresh host execution
+nor IDE wake verification, and absent subagent lifecycle hooks remain a native gap.
 
 `scripts/plugin_live.sh check --run` checks the wake with `cursor-agent -p --output-format stream-json --force` (`--force` lets the subagent run `sleep`): print mode waits for background subagents after the parent's turn and runs the parent's follow-up turn itself, then prints one `result`. The case passes when a Task call reports `isBackground: true` and that final reply quotes the subagent's token. The IDE's wake is not covered headlessly; `scripts/plugin_live.sh checklist` lists it as a manual step.
 
@@ -59,7 +76,7 @@ The Cursor app (3.25) loads plugin hooks only when Settings → Agents → Third
    `<plugin root>` is the directory holding `.cursor-plugin/` and `rules/context-guard.mdc`: `~/.cursor/plugins/local/context-guard` for a local install, `~/.cursor/plugins/cache/<marketplace>/context-guard/<version or commit>/` for a marketplace install (`ls -d ~/.cursor/plugins/cache/*/context-guard/*/` lists it).
 3. Reload the window (Developer: Reload Window).
 4. Turn Settings → Agents → Third-Party Imports off unless you use it for something else: context-guard does not need it, and it imports duplicate Claude Code and Codex configuration.
-5. Verify: `~/.cursor/hooks.json` has `sessionStart`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse` and `stop` entries running `~/.context-guard/cursor-hooks/hooks/context-guard-hook`; after the next prompt in a new chat, the Hooks output channel shows them running and `~/.context-guard/state/cursor/events.jsonl` ends with a `prompt` record.
+5. Verify: `~/.cursor/hooks.json` has `sessionStart`, `preCompact`, `beforeSubmitPrompt`, `preToolUse`, `postToolUse` and `stop` entries running `~/.context-guard/cursor-hooks/hooks/context-guard-hook`; after the next prompt in a new chat, the Hooks output channel shows them running and `~/.context-guard/state/cursor/events.jsonl` ends with a `prompt` record.
 
 While the hooks are not registered, the rule's `Hooks` section has the main agent offer this step once, ever. The signal is the `sessionStart` context: the hooks always send one, starting with `context-guard hooks: active.`, so a main chat without it has no running hooks (or none that reached the model). In such a chat the agent checks for the marker file `~/.context-guard/state/offers/cursor-hooks` (under `$CONTEXT_GUARD_HOME` instead of `~` when that is set): if it exists the agent says nothing; otherwise it offers the step in its reply and creates the marker with a file-writing tool. `hooks_install.py install` also creates the marker, and `uninstall` keeps it, so a user who installed and later removed the hooks is not offered them again. Delete the marker to be offered the step again. Subagents ignore the section.
 
@@ -75,9 +92,78 @@ An installed context-guard Claude plugin registers its hooks in Cursor when Thir
 
 Use one path per machine: the script install and `hooks_install.py` both register hooks in `~/.cursor/hooks.json`, so both would fire on every event and double notes, state and logs. `hooks_install.py install` warns when the script install is present; uninstall one before enabling the other.
 
+## Compaction recovery
+
+The adapter registers [`preCompact`](https://cursor.com/docs/hooks#precompact) as observation only.
+It records a pending generation under the native session identity. Only a `stop` with the same
+session and generation, explicit `status: completed` and zero loop count confirms completion.
+Cancelled, failed, missing-status and mismatched stops cannot confirm it. Duplicate initiations
+and stops cannot rearm warnings or redeliver recovery for a consumed generation. Only one
+pending/ready recovery is tracked at a time; overlapping initiations are ignored and their
+identities retired so duplicate callbacks cannot later become new recoveries. A lower token
+reading alone never rearms warnings.
+
+Confirmed recovery waits for the next main-session `postToolUse` or `sessionStart` response.
+Task pre-hooks and prompts cannot carry it. Recovery context contains the shipped policy,
+open handoff listing and pending reports, composed with warnings and child notes in the same
+state transaction. Successful rendering commits consumption and clears fired tiers once;
+render failure or deadline fallback before commit preserves retry. Persisted response state
+is the hook's delivery boundary; host receipt and model compliance cannot be acknowledged by hooks.
+
+Native CLI evidence from Cursor `2026.11.11-043ef28` records manual `/summarize`, a matching
+completed stop and an independently rendered Summary. A subsequent Read hook's
+`additional_context` was stored in the native tool result and recalled exactly on a later
+model turn. The first reply ignored the instruction: delivery and recall are proven, reliable
+instruction compliance and handoff writes are not. The CLI internally chose a different
+summarization model despite the explicit conversation model. No IDE compaction replay has
+been measured; the same adapter uses the nearest equivalent lifecycle and context channel
+there, conditional on those hooks being emitted. Automatic compaction has not been measured.
+
+The source-backed recipe fixtures are generated only with
+`scripts/record_payloads.py --runtime cursor --cursor-capture <captured-hooks.jsonl>`.
+Their hashes identify the original hook JSONL capture, not original native database bytes;
+sanitized database snapshots are separate evidence and are not read by this recorder.
+
 ## Handoff writes outside the workspace
 
-Handoffs live in `~/.context-guard/handoffs` (`paths.handoff_dir`), outside the workspace, and the agent writes them with its file tool. If Settings → Agents → External-File Protection is on, Cursor asks before that write. The setting lives only in the IDE (no file-based configuration, and its default is undocumented), so context-guard never changes it: `handoff_access.enabled` has no effect in Cursor. Approve the write when asked, or turn the protection off. Cursor CLI (`cursor-agent`) users can allow the directory without a prompt by adding `Write(/<absolute handoff dir>/**)` to `permissions.allow` in `~/.cursor/cli-config.json`; context-guard does not write that file either. This is the documented gap for the handoff access that Codex, Genie and Claude Code get from the installer.
+Handoffs live in `~/.context-guard/handoffs` (`paths.handoff_dir`), outside the workspace.
+Cursor CLI users can explicitly install a project permission with:
+
+```sh
+uv run --python 3.14 python adapters/cursor/access.py install --workspace /absolute/project --home /explicit/home
+```
+
+From a packaged plugin, use `sh "<plugin root>/hooks/context-guard-hook" adapters/cursor/access.py`
+with the same arguments. Both `--workspace` and `--home` are required existing directories;
+workspace aliases and the configured existing handoff directory resolve canonically. Directory
+names containing permission pattern syntax are rejected rather than broadening the grant.
+Configuration uses defaults, adapter config, the explicit home's user config (including `runtimes.cursor`),
+then `CONTEXT_GUARD_PATHS_HANDOFF_DIR`. The helper adds only
+`Write(<canonical handoff directory>/**)` to `permissions.allow` in the project's
+`.cursor/cli.json`. `CURSOR_CONFIG_DIR` does not relocate this project file. It grants no Shell
+permission and changes neither global CLI settings nor hook trust. Ordinary installation and
+`handoff_access.enabled` do not install this optional project grant.
+
+Use `--dry-run` to inspect without writing, and `uninstall` with the same home and workspace
+to retire the recorded grant, even if configuration has since changed. A changed configured
+handoff directory requires uninstalling the previous grant first. Ownership manifests are scoped
+to the canonical project under the explicit home's `.context-guard/state/`; backups use that
+home's `.context-guard/backups/`. Other entries, denies and user edits are preserved. Preexisting
+grants remain user-owned; an unchanged file returns to its original bytes on uninstall, including
+empty containers. Malformed native JSON or permission containers are reported without replacement.
+Readonly filesystem errors are reported. Potential overlapping project Write denies are diagnosed
+and retained; runtime readonly, protected paths, ignore rules and higher-level native restrictions
+remain overrides, so an installed grant alone is not proof of effective access.
+
+Native Cursor CLI `2026.11.11-043ef28` demonstrated an external Write with this grant without
+approval, an ungranted external Write prompting for approval, and explicit denies blocking writes.
+OS temporary directory exemptions can independently permit ungranted writes: this grant is
+an auto-approval mechanism, not an exclusive filesystem boundary. See the
+[CLI permission contract](https://cursor.com/docs/cli/reference/permissions).
+
+The IDE uses Settings → Agents → External-File Protection, which the helper does not change.
+IDE file-tool approval remains unverified. IDE sandbox `additionalReadwritePaths` applies to
+terminal access and does not establish approval for native file-tool writes.
 
 ## Tiers
 

@@ -531,23 +531,20 @@ def track(config: dict, directory: Path, native: str, payload: dict[str, object]
         check_silence(config, directory, payload, now)
 
 
-def deliver(obs: Observation, decision: Decision, directory: Path) -> Decision:
-    """Append waiting subagent notes to a main chat's tool result or session start, once.
+def deliver_state(obs: Observation, decision: Decision, state: dict) -> Decision:
+    """Compose waiting child notes within an existing policy transaction.
 
     Args:
-        obs: The observation being answered.
-        decision: The decision to render.
-        directory: Cursor state directory.
+        obs: Current observation.
+        decision: Policy decision.
+        state: Locked parent state.
 
     Returns:
-        The decision with the notes appended to its message, or unchanged when none wait.
+        Decision with deliverable child notes appended.
     """
     if obs.is_subagent or obs.event not in (TOOL, SESSION) or (obs.tool and obs.tool.action == SPAWN):
         return decision
-    if not read_adapter(state_path(directory, obs.session_id)).get(NOTES):
-        return decision
-    with state_mod.session_state(directory, RUNTIME, obs.session_id, commit=True) as state:
-        notes = state.setdefault("adapter", {}).pop(NOTES, [])
+    notes = state.setdefault("adapter", {}).pop(NOTES, [])
     texts = [note for note in notes if valid_text(note)] if isinstance(notes, list) else []
     if not texts:
         return decision

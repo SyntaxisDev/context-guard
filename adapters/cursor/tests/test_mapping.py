@@ -9,7 +9,7 @@ from pathlib import Path
 from adapters.cursor import hooks, mapping
 from core import deadline, install, render
 
-NATIVE_EVENTS = ("sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop")
+NATIVE_EVENTS = ("preCompact", "sessionStart", "beforeSubmitPrompt", "preToolUse", "postToolUse", "stop")
 
 
 def frontmatter(text: str) -> tuple[dict[str, str], str]:
