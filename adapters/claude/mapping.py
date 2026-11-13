@@ -248,7 +248,9 @@ def grant_access(data: dict, rule: str) -> dict:
 
 
 def withdraw_access(data: dict, rule: str) -> dict:
-    """Remove the rule from `permissions.allow`, and `allow` and `permissions` when that empties them.
+    """Remove the owned rule, validating present native containers before retirement.
+
+    Malformed containers propagate ValueError from object_lists to retain ownership for retry.
 
     Args:
         data: Parsed settings.json; it is changed in place.
@@ -257,8 +259,8 @@ def withdraw_access(data: dict, rule: str) -> dict:
     Returns:
         `data`.
     """
-    permissions = data.get("permissions")
-    allow = permissions.get("allow") if isinstance(permissions, dict) else None
+    permissions = install.object_lists(data, ("permissions",), ("allow", "deny"))
+    allow = permissions.get("allow")
     if not isinstance(allow, list) or rule not in allow:
         return data
     allow.remove(rule)

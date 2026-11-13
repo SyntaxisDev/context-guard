@@ -35,7 +35,35 @@ For isolated checks, unset `CLAUDE_CONFIG_DIR` or set it to a temporary director
 
 Claude Code wakes the parent natively. When a background subagent stops, it queues a `<task-notification>` (status, summary, result) and a subagent hand-back message; if the parent's turn has ended, Claude Code starts a new parent turn with them, without a user message, and mid-turn it delivers them at the next tool result. In recorded transcripts a parent turn ended (`stop_hook_summary`), a hand-back or `<task-notification>` arrived seconds to minutes later, and the next record was the parent's own reply. So the shared policy holds as written: spawn in the background, end the turn, pick up each result as a new turn.
 
-`scripts/plugin_live.sh check --run` checks this headlessly with one `claude -p --input-format stream-json --output-format stream-json` session, the streaming-input mode the Agent SDK uses: stdin stays open, so the session outlives the first turn. The parent spawns a background subagent that sleeps 20 s and answers a token, and ends its turn; the case passes when a later turn's `result` quotes the token (subagent messages print no `result`). The interactive terminal session takes the same path but is not driven by the check.
+The measured stream-json capture from Claude Code 2.1.311 proves native idle-parent wake:
+a background `task_started` precedes the first root `result`; actual child assistant output
+then precedes a matching completed `task_notification`, a new root assistant reply and a
+second root `result` in the same session, without an intervening human submission. The first
+root reply may mention the known experiment token. Token presence alone therefore cannot
+establish either waiting or delivery; ordering against actual child output is required.
+
+Offline conformance replays `tests/fixtures/claude/lifecycle/idle-parent-wake.json` through
+an independent validator in `adapters/claude/tests/native_lifecycle.py`. It checks native
+session, task, agent, tool and run identities and actual child/notification/root token text.
+Negative controls remove each boundary or output, move child output before idle, insert
+human submissions and corrupt identities. This proves the captured lifecycle contract;
+it does not execute a fresh host or prove interactive-terminal behavior.
+
+Record only an explicit sandbox capture, without reading default runtime homes:
+
+```sh
+uv run --python 3.14 python scripts/record_payloads.py --runtime claude \
+  --claude-lifecycle-root <capture-directory> [--out <fixture-root>] [--dry-run]
+```
+
+This route writes only the lifecycle fixture. The directory contains `wire.jsonl`,
+`request.json` and the original `verdict.txt`; its parent contains the original
+`claude-existing-auth.py` probe and `verify-claude.py` independent verifier. Sources are
+read only and never executed. The fixture preserves native event order, stable scrubbed
+identities, sentinel framing and runtime version, with byte counts and SHA-256 hashes of
+all five original files. It contains no precomputed success flags. The original smoke
+FAIL remains evidence: its token heuristic misclassified the first reply; the independent
+validator retains the idle assertion and checks the later delivery chronologically.
 
 context-guard adds the silent-subagent note above, the closest equivalent of Cursor's notes: a hung or killed subagent never notifies, and the note reaches the parent on its next tool result, prompt or session start. Cursor's unreturned and orphaned notes have no Claude Code counterpart: a foreground `Agent` call holds the parent's tool call until the result is its tool result, and no recorded transcript shows a parent moving on while a foreground subagent still runs.
 
@@ -111,4 +139,4 @@ installed kit and the plugin, both sets of hooks fire.
 - Transcript usage records are not a hook contract; a changed shape disables warnings (fail open).
 - `agent_id` as the subagent marker on tool and prompt events is documented, not observed in local payloads.
 - Whether the model follows the policy's `model` authorisation despite the tool description is untested.
-- The `async_launched` Agent result and the automatic parent turn come from transcripts; that `SubagentStop` fires for background subagents is documented, not observed in a live hook run.
+- The automatic parent turn is measured in a native streaming session; that `SubagentStop` fires for background subagents is documented, not observed in a live hook run.

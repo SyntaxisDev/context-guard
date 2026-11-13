@@ -1,0 +1,201 @@
+{
+  "experiment": {
+    "prompt_template": "<scrubbed>",
+    "token": "NATIVE_CLAUDE_WAKE_Q8J2"
+  },
+  "provenance": {
+    "artifacts": [
+      {
+        "bytes": 22949,
+        "name": "wire",
+        "sha256": "d90f1b0b531e451ce37b432573d2ac2a36df3e17b48026aa0b429711db71e228"
+      },
+      {
+        "bytes": 994,
+        "name": "request",
+        "sha256": "34b5a493588de10cb9b5fc3ed60611f0670383beb5b01b2582bbb8a372750caf"
+      },
+      {
+        "bytes": 2575,
+        "name": "probe",
+        "sha256": "041d75ae63ea12711d3300ccf79a7858fd34313eecf2fe5efc22f4e315816980"
+      },
+      {
+        "bytes": 2275,
+        "name": "verifier",
+        "sha256": "05879e6eb8778b45caf67e597d929f07c560cf55b3ba012682187d2280eed752"
+      },
+      {
+        "bytes": 55,
+        "name": "original_smoke_verdict",
+        "sha256": "ab35a8f8e50d0c5c362ab6f8e48973b5f6513ce1661acaaac6aaa545ea586f06"
+      }
+    ],
+    "version": "2.1.311"
+  },
+  "root_session": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+  "source": "Measured Claude native stream; offline replay, not fresh host execution",
+  "wire": [
+    {
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "init",
+      "type": "system"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "type": "tool_use"
+          }
+        ],
+        "id": "msg_e97a977ed6d7d4835e8eb74e",
+        "model": "claude-haiku-5-5",
+        "role": "assistant"
+      },
+      "parent_tool_use_id": null,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "assistant"
+    },
+    {
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "background_tasks_changed",
+      "type": "system"
+    },
+    {
+      "is_backgrounded": true,
+      "run_id": "17b89c118-00b064d3",
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "task_started",
+      "task_id": "97e6e2ee0f37fb4c4",
+      "tool_use_id": "toolu_e50fa10afbb066d0f8527208",
+      "type": "system"
+    },
+    {
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "rate_limit_event"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "type": "tool_result"
+          }
+        ],
+        "role": "user"
+      },
+      "parent_tool_use_id": null,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "user"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "<scrubbed>NATIVE_CLAUDE_WAKE_Q8J2<scrubbed>",
+            "type": "text"
+          }
+        ],
+        "id": "msg_dff190723fcd346c4731ee66",
+        "model": "claude-haiku-5-5",
+        "role": "assistant"
+      },
+      "parent_tool_use_id": null,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "assistant"
+    },
+    {
+      "is_error": false,
+      "result": "<scrubbed>NATIVE_CLAUDE_WAKE_Q8J2<scrubbed>",
+      "result_index": 0,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "stop_reason": "end_turn",
+      "subtype": "success",
+      "type": "result"
+    },
+    {
+      "agent_id": "97e6e2ee0f37fb4c4",
+      "message": {
+        "content": [
+          {
+            "type": "thinking"
+          }
+        ],
+        "id": "msg_833dc15380cdc7c8aad90b55",
+        "model": "claude-haiku-5-5",
+        "role": "assistant"
+      },
+      "parent_tool_use_id": "toolu_e50fa10afbb066d0f8527208",
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "assistant"
+    },
+    {
+      "agent_id": "97e6e2ee0f37fb4c4",
+      "message": {
+        "content": [
+          {
+            "text": "<scrubbed>NATIVE_CLAUDE_WAKE_Q8J2",
+            "type": "text"
+          }
+        ],
+        "id": "msg_833dc15380cdc7c8aad90b55",
+        "model": "claude-haiku-5-5",
+        "role": "assistant"
+      },
+      "parent_tool_use_id": "toolu_e50fa10afbb066d0f8527208",
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "assistant"
+    },
+    {
+      "run_id": "17b89c118-00b064d3",
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "task_updated",
+      "task_id": "97e6e2ee0f37fb4c4",
+      "type": "system"
+    },
+    {
+      "run_id": "17b89c118-00b064d3",
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "status": "completed",
+      "subtype": "task_notification",
+      "summary": "<scrubbed>NATIVE_CLAUDE_WAKE_Q8J2",
+      "task_id": "97e6e2ee0f37fb4c4",
+      "tool_use_id": "toolu_e50fa10afbb066d0f8527208",
+      "type": "system"
+    },
+    {
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "background_tasks_changed",
+      "type": "system"
+    },
+    {
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "subtype": "init",
+      "type": "system"
+    },
+    {
+      "message": {
+        "content": [
+          {
+            "text": "NATIVE_CLAUDE_WAKE_Q8J2",
+            "type": "text"
+          }
+        ],
+        "id": "msg_d4c13b6e6dfc568251ac01ac",
+        "model": "claude-haiku-5-5",
+        "role": "assistant"
+      },
+      "parent_tool_use_id": null,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "type": "assistant"
+    },
+    {
+      "is_error": false,
+      "result": "NATIVE_CLAUDE_WAKE_Q8J2",
+      "result_index": 1,
+      "session_id": "eaeb42fa-7f0d-2295-8a71-b909d6b3a6be",
+      "stop_reason": "end_turn",
+      "subtype": "success",
+      "type": "result"
+    }
+  ]
+}

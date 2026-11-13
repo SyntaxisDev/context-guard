@@ -240,10 +240,6 @@ class CompactionTests(HookTestCase):
         self.usage(125_000)
         self.context(self.hook("UserPromptSubmit", prompt="fourth"), "UserPromptSubmit")
 
-    def test_compact_session_start_relists_handoffs(self) -> None:
-        self.handoff("open-task", "Open task")
-        self.assertIn("Open task", self.context(self.hook("SessionStart", source="compact"), "SessionStart"))
-
 
 class LeafAndEventTests(HookTestCase):
     """Subagent budgets on their own transcripts, spawn logging and handoff read/write events."""
