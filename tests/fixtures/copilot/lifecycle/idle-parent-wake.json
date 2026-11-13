@@ -1,0 +1,4333 @@
+{
+  "journal": [
+    {
+      "data": {
+        "content": "recorded prompt (scrubbed)",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "fff54162-8174-fc80-ab82-8063d94ba300",
+        "turnId": "0"
+      },
+      "id": "13896917-f466-b826-7e44-53c923bf6949",
+      "timestamp": "2026-11-08T11:27:55.813Z",
+      "type": "user.message"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "id": "c9fa1a70-330a-f745-f180-7147a6d3f8d5",
+      "timestamp": "2026-11-08T11:27:55.814Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "content": "",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "bbe784a6-38a7-9476-b9be-ee24caeb3401",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "f3ddd5d5-0768-d361-d31e-9571681c1153",
+      "timestamp": "2026-11-08T11:27:58.676Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "1"
+      },
+      "id": "1f5c0c4f-6001-a69f-7ccb-4a55a2b5a35b",
+      "timestamp": "2026-11-08T11:27:58.777Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "content": "",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "73727e01-9ecd-9f27-cf3c-1b19d4eeb83a",
+        "model": "gpt-6-luna",
+        "turnId": "1"
+      },
+      "id": "b5a4b28f-fa39-a66e-6d86-9f15d51fd4cc",
+      "timestamp": "2026-11-08T11:28:04.040Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "executionMode": "background",
+        "model": "gpt-6-luna",
+        "toolCallId": "call_858077d00f5b2ed06ec595f9"
+      },
+      "id": "084b401d-3d72-c250-cda1-3c70436bb38f",
+      "timestamp": "2026-11-08T11:28:04.119Z",
+      "type": "subagent.started"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "executionMode": "background",
+        "model": "gpt-6-luna",
+        "toolCallId": "call_c5e911256a3d5e2f342904fb"
+      },
+      "id": "2d6702f1-b42f-3e38-ff4b-0d00f93d7664",
+      "timestamp": "2026-11-08T11:28:04.119Z",
+      "type": "subagent.started"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "2"
+      },
+      "id": "9f25b685-86c1-0e3c-9079-60478cf85941",
+      "timestamp": "2026-11-08T11:28:04.204Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "content": "recorded prompt (scrubbed)",
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "messageId": "3affd529-90d0-b9aa-867c-33ca53ce5937",
+        "source": "<scrubbed>",
+        "turnId": "0"
+      },
+      "id": "ae861770-6bda-6746-4ae7-86ffaaf596ff",
+      "timestamp": "2026-11-08T11:28:04.260Z",
+      "type": "user.message"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "0"
+      },
+      "id": "c7df710a-43c1-7e4d-5415-42b4c838f339",
+      "timestamp": "2026-11-08T11:28:04.260Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "content": "recorded prompt (scrubbed)",
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "messageId": "92c1f022-5805-f7c1-f065-0fff4c2337f5",
+        "source": "<scrubbed>",
+        "turnId": "0"
+      },
+      "id": "cb3a5a25-e255-a746-9a2c-bd4567063603",
+      "timestamp": "2026-11-08T11:28:04.262Z",
+      "type": "user.message"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "0"
+      },
+      "id": "3d4a9666-016f-c4f2-2f6f-5bc00b3d39fb",
+      "timestamp": "2026-11-08T11:28:04.263Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "content": "",
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "messageId": "6998a46f-027d-7a16-119d-8f0d1ec9e3b9",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "4c18b77f-780b-bb1d-3cb1-3363098db380",
+      "timestamp": "2026-11-08T11:28:06.211Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "content": "",
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "messageId": "bb0c3205-a27b-c508-b95b-0422794fbabc",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "f228bd14-b690-0ef5-bcc3-bca73801efa0",
+      "timestamp": "2026-11-08T11:28:06.229Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "1"
+      },
+      "id": "34b661b7-ac64-c93b-b469-b980d165a0c1",
+      "timestamp": "2026-11-08T11:28:06.331Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "content": "",
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "messageId": "f6459e93-6b27-747d-dc7d-efbff8a15508",
+        "model": "gpt-6-luna",
+        "turnId": "1"
+      },
+      "id": "8262e511-f261-5a31-4d2b-fed44fedb91d",
+      "timestamp": "2026-11-08T11:28:07.483Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "content": "",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "b800196d-12fb-ef87-1611-71e8cbedc00f",
+        "model": "gpt-6-luna",
+        "turnId": "2"
+      },
+      "id": "d366e466-5a20-2506-3c5b-134687107cfb",
+      "timestamp": "2026-11-08T11:28:14.425Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "content": "PARENT_IDLE_ACP",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+        "model": "gpt-6-luna",
+        "turnId": "2"
+      },
+      "id": "c5797de0-4407-03f7-d37c-3091ab8b9023",
+      "timestamp": "2026-11-08T11:28:14.425Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "1"
+      },
+      "id": "e4256699-3bbd-3fd0-80a2-603d2f775215",
+      "timestamp": "2026-11-08T11:28:14.475Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "content": "",
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "messageId": "254dd0a2-b456-fd1b-9b43-2859ec40edf2",
+        "model": "gpt-6-luna",
+        "turnId": "1"
+      },
+      "id": "6ad2c6bb-5eff-2207-d2ee-84615b74797f",
+      "timestamp": "2026-11-08T11:28:15.379Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "2"
+      },
+      "id": "8b804f51-0aff-c94e-8971-12bcaa7ac8e7",
+      "timestamp": "2026-11-08T11:28:15.514Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "2"
+      },
+      "id": "394cbca5-b8b9-8aee-2797-7940f0993082",
+      "timestamp": "2026-11-08T11:28:15.737Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "content": "TOOL_READ_OKS_CHILD_4P6C",
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+        "model": "gpt-6-luna",
+        "turnId": "2"
+      },
+      "id": "6e930c4f-21ce-6b7c-1938-c9fca02a3e6d",
+      "timestamp": "2026-11-08T11:28:16.797Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "content": "",
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "messageId": "190e6e1b-a562-40f3-eb7b-3d43070803e9",
+        "model": "gpt-6-luna",
+        "turnId": "2"
+      },
+      "id": "ed16ecef-66d7-7916-f0ad-a3d6294cc37d",
+      "timestamp": "2026-11-08T11:28:16.865Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "model": "gpt-6-luna",
+        "toolCallId": "call_c5e911256a3d5e2f342904fb"
+      },
+      "id": "12fd5a1d-6cbb-dd24-aef4-06c346883a1e",
+      "timestamp": "2026-11-08T11:28:16.896Z",
+      "type": "subagent.completed"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "3"
+      },
+      "id": "c48cfe69-b9ae-d632-265c-cf267deedc00",
+      "timestamp": "2026-11-08T11:28:16.948Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "content": "TOOL_READ_OKS_CHILD_4P6C",
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+        "model": "gpt-6-luna",
+        "turnId": "3"
+      },
+      "id": "16f098b3-8b77-20d1-d894-a6463a4d6ccb",
+      "timestamp": "2026-11-08T11:28:18.120Z",
+      "type": "assistant.message"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "model": "gpt-6-luna",
+        "toolCallId": "call_858077d00f5b2ed06ec595f9"
+      },
+      "id": "d3cfbd1b-e519-23c5-45f6-f2431ec5e23b",
+      "timestamp": "2026-11-08T11:28:18.264Z",
+      "type": "subagent.completed"
+    },
+    {
+      "data": {
+        "content": "",
+        "messageId": "a93948ee-759c-5cfe-f47f-3e2edc27fb54"
+      },
+      "id": "10777604-efd1-ecf4-c126-8233471c5fc5",
+      "timestamp": "2026-11-08T11:28:18.312Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "id": "6099b630-6a2c-3242-d5f4-72c85069eb8b",
+      "timestamp": "2026-11-08T11:28:18.313Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "content": "",
+        "messageId": "15599f3c-2479-0bbb-7703-917de43500c1"
+      },
+      "id": "071b70e4-c256-7807-2987-05113f668050",
+      "timestamp": "2026-11-08T11:28:18.314Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "content": "CHILD_RETURNED_ACPTOOL_READ_OKS_CHILD_4P6C",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "d68a599e-baee-49a6-c1ac-b0c87a881338",
+      "timestamp": "2026-11-08T11:28:21.688Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "content": "recorded prompt (scrubbed)",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "328ffff8-87fb-630f-75cd-fe45c3a53797",
+        "source": "system",
+        "turnId": "0"
+      },
+      "id": "bb0497c4-a495-2d89-df32-28fd216d640c",
+      "timestamp": "2026-11-08T11:28:21.933Z",
+      "type": "user.message"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "id": "45cd2501-3961-14c4-6888-1458b0579e7f",
+      "timestamp": "2026-11-08T11:28:21.934Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "content": "",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "642acdb0-fa6e-159b-6d15-f8841c5c9ea9",
+      "timestamp": "2026-11-08T11:28:24.316Z",
+      "type": "assistant.message"
+    },
+    {
+      "data": {
+        "content": "recorded prompt (scrubbed)",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "51f73503-78fb-9651-13ac-95ac09fe997e",
+        "source": "system",
+        "turnId": "0"
+      },
+      "id": "889dde0c-99e2-24ec-621e-e823731f6926",
+      "timestamp": "2026-11-08T11:28:24.540Z",
+      "type": "user.message"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "id": "686e6999-b66a-0155-320f-a3ba9cbb6985",
+      "timestamp": "2026-11-08T11:28:24.541Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "content": "",
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+        "model": "gpt-6-luna",
+        "turnId": "0"
+      },
+      "id": "1cad9dae-db1b-5a31-bad9-f67339c34f19",
+      "timestamp": "2026-11-08T11:28:27.895Z",
+      "type": "assistant.message"
+    }
+  ],
+  "lifecycle": [
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:27:55.814Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "1"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:27:58.777Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "2"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:04.204Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:04.260Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:04.263Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "1"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:06.331Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "1"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:14.475Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {},
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:14.510Z",
+      "type": "assistant.idle"
+    },
+    {
+      "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+      "data": {
+        "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+        "turnId": "2"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:15.514Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "2"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:15.737Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+      "data": {
+        "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+        "turnId": "3"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:16.948Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:18.313Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:21.934Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {
+        "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+        "turnId": "0"
+      },
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:24.541Z",
+      "type": "assistant.turn_start"
+    },
+    {
+      "data": {},
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:28.029Z",
+      "type": "assistant.idle"
+    },
+    {
+      "data": {},
+      "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+      "timestamp": "2026-11-08T11:28:28.030Z",
+      "type": "session.idle"
+    }
+  ],
+  "provenance": {
+    "artifacts": [
+      {
+        "bytes": 414618,
+        "name": "journal",
+        "sha256": "5e0c3f29bb12647626a8ab637eb44be66ff66b17d307ff08251c7d1eae25505a"
+      },
+      {
+        "bytes": 4991,
+        "name": "lifecycle",
+        "sha256": "a87f17cc6906088e01169f34fdfb5204c883f84f89114b104f11638efc4be4c7"
+      },
+      {
+        "bytes": 189272,
+        "name": "wire",
+        "sha256": "0256ae829ba64f891e2e9fabc2671352ac9eb79b9cb3c10fd0438b7fa50e20d1"
+      },
+      {
+        "bytes": 2395,
+        "name": "manifest",
+        "sha256": "cdc69c1ef01f99fe5d5bc504ed1410f7a8cddb0bfb522718c27f99240a431495"
+      }
+    ],
+    "build_commit": "2bfb456b",
+    "runtime_sources": [
+      {
+        "bytes": 2410,
+        "name": "package.json",
+        "sha256": "2fec16c0c1049c1352617d425a615f599264d561cb0cdf7be5949f38d3ce9eb2"
+      },
+      {
+        "bytes": 8998057,
+        "name": "cli-main.js",
+        "sha256": "3270429bd380550f6e250a49400f68f0e087a377904e78783bf5fdf644769ee4"
+      },
+      {
+        "bytes": 118059120,
+        "name": "runtime.node",
+        "sha256": "0eae290b7e80529f44935ddce0e87919a49c017353269fad5e239579bc3ade3a"
+      },
+      {
+        "bytes": 7622688,
+        "name": "cli-native.node",
+        "sha256": "598ac36779b197d6faa42e07afbfc7c49bf924b294f517e7e66ace60cc9a78f2"
+      },
+      {
+        "bytes": 145581,
+        "name": "types.d.ts",
+        "sha256": "7c39457661228e79e429fd09fce1e5ef5a4771802d6bd2c7fc3599e53ec5edaa"
+      },
+      {
+        "bytes": 1516377,
+        "name": "rpc.d.ts",
+        "sha256": "140b68ae6b492451cb31660baf4c85b3836635efca8b80d96aa1905f1aba500a"
+      },
+      {
+        "bytes": 562812,
+        "name": "session-events.d.ts",
+        "sha256": "027ed7b7c5eb96f19ef454f98feda915d268e5715d26893880f77b27b12b6232"
+      },
+      {
+        "bytes": 1117349,
+        "name": "session-events.schema.json",
+        "sha256": "84b7518af2e12318585ff0420f837ed2babfdd1e7aedbb1960ad8d25191332ac"
+      },
+      {
+        "bytes": 2988473,
+        "name": "api.schema.json",
+        "sha256": "76e5d0871680e1625932757c7678b12e0288a5cfa82291b36b758aff4a003ec5"
+      },
+      {
+        "bytes": 14605,
+        "name": "agent-author.md",
+        "sha256": "10c5719a0c79b98c3820ccb8e43ec0f56be00f772d1ca9b60fbbc6b12f0d284c"
+      }
+    ],
+    "version": "1.0.107"
+  },
+  "root_session": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+  "source": "Measured Copilot native ACP idle-parent wake; offline captured observation, not fresh execution",
+  "wire": [
+    {
+      "direction": "send",
+      "message": {
+        "method": "session/prompt",
+        "params": {
+          "prompt": "recorded prompt (scrubbed)",
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7"
+        }
+      },
+      "sequence": 8
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:27:55.814Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 11
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "1"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:27:58.777Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 15
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "2"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:04.204Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 23
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+          "data": {
+            "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:04.260Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 25
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+          "data": {
+            "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:04.263Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 27
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+          "data": {
+            "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+            "turnId": "1"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:06.331Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 32
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 119
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "ARENT",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 120
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_IDLE",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 121
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_AC",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 122
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 123
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 124
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 125
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 126
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 127
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 128
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 129
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 130
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 131
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 132
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 133
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 134
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 135
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 136
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 137
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 138
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 139
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 140
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 141
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 142
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 143
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 144
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 145
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 146
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 147
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "bb55b61b-a78b-0737-f8e6-be8eef0ec972",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 148
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+          "data": {
+            "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+            "turnId": "1"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:14.475Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 150
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {},
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:14.510Z",
+          "type": "assistant.idle"
+        }
+      },
+      "sequence": 152
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91",
+          "data": {
+            "interactionId": "0e9c0a6d-926d-7207-7592-c52cd238b72d",
+            "turnId": "2"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:15.514Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 155
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+          "data": {
+            "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+            "turnId": "2"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:15.737Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 158
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "TO",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 160
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "OL",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 161
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "_READ",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 162
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "_OK",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 163
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 164
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 165
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 166
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 167
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 168
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "S",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 169
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "_CHILD",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 170
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "_",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 171
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "4",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 172
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 173
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "6",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 174
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "C",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 175
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 176
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 177
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 178
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 179
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 180
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 181
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 182
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 183
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 184
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 185
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 186
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ae3eeff4-4603-1483-d417-a58bb0854e91"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "306873c0-d0f4-0c53-8cbd-44b08c791e60",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 187
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5",
+          "data": {
+            "interactionId": "2670585d-a39d-3abe-d02a-336d098fd560",
+            "turnId": "3"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:16.948Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 190
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "TO",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 192
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "OL",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 193
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "_READ",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 194
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "_OK",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 195
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 196
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 197
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 198
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 199
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 200
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "S",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 201
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "_CHILD",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 202
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "_",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 203
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "4",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 204
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 205
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "6",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 206
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "C",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 207
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 208
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 209
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 210
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 211
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 212
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 213
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 214
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 215
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 216
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 217
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 218
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 219
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 220
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 221
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 222
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 223
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 224
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 225
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 226
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 227
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 228
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 229
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 230
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "_meta": {
+              "github.com/copilot": {
+                "agentId": "ac52b563-12d2-00cc-7d8f-be479fd684a5"
+              }
+            },
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "75aeb7d5-4342-1a55-62cd-ed0f366954d7",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 231
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:18.313Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 234
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "CH",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 238
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "ILD",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 239
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_RETURN",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 240
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "ED",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 241
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_AC",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 242
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 243
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 244
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 245
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 246
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 247
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 248
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "TO",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 249
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "OL",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 250
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_READ",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 251
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_OK",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 252
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 253
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 254
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 255
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 256
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 257
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 258
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 259
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 260
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "S",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 261
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_CHILD",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 262
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "_",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 263
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "4",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 264
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "P",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 265
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "6",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 266
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "C",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 267
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 268
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 269
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 270
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 271
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 272
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 273
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 274
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 275
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 276
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 277
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 278
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 279
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 280
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 281
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 282
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 283
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 284
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 285
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 286
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 287
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 288
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 289
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 290
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 291
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 292
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 293
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 294
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 295
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "525b84a6-14cd-01a9-aed0-c5b59071ccff",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 296
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:21.934Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 297
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 299
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 300
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 301
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 302
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 303
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 304
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "280b92e2-94fb-33ee-eda5-c9b16180ffa8",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 305
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {
+            "interactionId": "3595ea78-c49d-8b8e-bd33-c80898283175",
+            "turnId": "0"
+          },
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:24.541Z",
+          "type": "assistant.turn_start"
+        }
+      },
+      "sequence": 306
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 395
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 396
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 397
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 398
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 399
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 400
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "session/update",
+        "params": {
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "update": {
+            "content": {
+              "text": "",
+              "type": "text"
+            },
+            "messageId": "130b081b-1a41-39c8-ffd7-e2b000fd4a42",
+            "sessionUpdate": "agent_message_chunk"
+          }
+        }
+      },
+      "sequence": 401
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {},
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:28.029Z",
+          "type": "assistant.idle"
+        }
+      },
+      "sequence": 402
+    },
+    {
+      "direction": "receive",
+      "message": {
+        "method": "github.com/copilot/sessionEvent",
+        "params": {
+          "data": {},
+          "sessionId": "f7f6a0a3-7e99-29c7-607e-d531b0e832a7",
+          "timestamp": "2026-11-08T11:28:28.030Z",
+          "type": "session.idle"
+        }
+      },
+      "sequence": 403
+    }
+  ]
+}

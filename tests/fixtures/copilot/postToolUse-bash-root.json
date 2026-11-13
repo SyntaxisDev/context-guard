@@ -1,0 +1,38 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "c57d12b9-8b03-aa56-0a1d-de9703ab5c64",
+    "timestamp": 1794138171729,
+    "toolArgs": {
+      "command": "<scrubbed>",
+      "description": "<scrubbed>"
+    },
+    "toolCallId": "call_8bbbc612837583da8062d2aa",
+    "toolName": "bash",
+    "toolResult": {
+      "resultType": "success",
+      "sessionLog": "<scrubbed>",
+      "structuredContent": {
+        "shellId": "<scrubbed>"
+      },
+      "textResultForLlm": "<scrubbed>",
+      "toolTelemetry": {
+        "metrics": {
+          "commandTimeout": 30000.0,
+          "context_current_tokens": 4870.0,
+          "context_token_limit": 272000.0,
+          "large_output_threshold_bytes": 20480.0
+        },
+        "properties": {
+          "customTimeout": "<scrubbed>",
+          "detached": "<scrubbed>",
+          "executionMode": "<scrubbed>",
+          "sandboxApplied": "<scrubbed>",
+          "sandboxOptOutRequested": "<scrubbed>"
+        }
+      }
+    }
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

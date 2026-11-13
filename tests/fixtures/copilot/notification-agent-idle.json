@@ -1,0 +1,12 @@
+{
+  "event": "notification",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "message": "<scrubbed>",
+    "notificationType": "agent_idle",
+    "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "timestamp": 1794137220133,
+    "title": "<scrubbed>"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

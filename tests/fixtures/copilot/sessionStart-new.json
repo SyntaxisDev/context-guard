@@ -1,0 +1,11 @@
+{
+  "event": "sessionStart",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "initialPrompt": "<scrubbed>",
+    "sessionId": "fee6c0b4-15e3-e34a-230b-f82b980e83ef",
+    "source": "new",
+    "timestamp": 1794136670157
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

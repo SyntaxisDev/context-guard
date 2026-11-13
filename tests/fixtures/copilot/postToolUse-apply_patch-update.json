@@ -1,0 +1,37 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "006635b3-8528-c8ec-b7b6-5c118c4f1e9f",
+    "timestamp": 1794138320011,
+    "toolArgs": "*** Begin Patch\n*** Update File: <scrubbed>\n@@\n-<scrubbed>\n+<scrubbed>\n*** End Patch\n",
+    "toolCallId": "custom_call_e7a5b2f19eabd57a098767f0",
+    "toolName": "apply_patch",
+    "toolResult": {
+      "resultType": "success",
+      "sessionLog": "<scrubbed>",
+      "textResultForLlm": "<scrubbed>",
+      "toolTelemetry": {
+        "metrics": {
+          "context_current_tokens": 3643.0,
+          "context_token_limit": 272000.0,
+          "large_output_threshold_bytes": 20480.0,
+          "linesAdded": 1,
+          "linesRemoved": 1
+        },
+        "properties": {
+          "codeBlocks": "<scrubbed>",
+          "fileExtension": "<scrubbed>",
+          "languageId": "<scrubbed>"
+        },
+        "restrictedProperties": {
+          "addedPaths": "<scrubbed>",
+          "deletedPaths": "<scrubbed>",
+          "filePaths": "<scrubbed>",
+          "movedFromPaths": "<scrubbed>"
+        }
+      }
+    }
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

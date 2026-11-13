@@ -1,0 +1,12 @@
+{
+  "event": "agentStop",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "fee6c0b4-15e3-e34a-230b-f82b980e83ef",
+    "stopReason": "end_turn",
+    "stop_hook_active": false,
+    "timestamp": 1794136672765,
+    "transcriptPath": "{HOME}/session-state/fee6c0b4-15e3-e34a-230b-f82b980e83ef/events.jsonl"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

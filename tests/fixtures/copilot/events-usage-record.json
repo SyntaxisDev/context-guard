@@ -1,0 +1,19 @@
+{
+  "record": {
+    "data": {
+      "usage": {
+        "cacheReadTokens": 0,
+        "cacheWriteTokens": 13748,
+        "inputTokens": 13751,
+        "interactionType": "conversation-agent",
+        "maxPromptTokens": 272000,
+        "model": "gpt-6-luna",
+        "outputTokens": 91,
+        "reasoningTokens": 52
+      }
+    },
+    "id": "aec4160e-488f-e8d6-69f3-ce01ddb01836",
+    "type": "session.usage_record"
+  },
+  "source": "Copilot 1.0.107 events.jsonl session.usage_record record, numeric and structural fields only"
+}

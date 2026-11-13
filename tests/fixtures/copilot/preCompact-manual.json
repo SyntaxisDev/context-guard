@@ -1,0 +1,12 @@
+{
+  "event": "preCompact",
+  "payload": {
+    "customInstructions": "",
+    "cwd": "{PROJECT}",
+    "sessionId": "9955f79c-60cb-1f61-b0af-58588c986aa6",
+    "timestamp": 1794137177630,
+    "transcriptPath": "{HOME}/session-state/9955f79c-60cb-1f61-b0af-58588c986aa6/events.jsonl",
+    "trigger": "manual"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

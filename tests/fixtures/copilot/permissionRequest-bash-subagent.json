@@ -1,0 +1,18 @@
+{
+  "event": "permissionRequest",
+  "payload": {
+    "agentId": "82634c5e-6f56-17e2-4fa5-3a4905560d39",
+    "agentType": "spike-plugin:plugin-child",
+    "cwd": "{PROJECT}",
+    "hookName": "<scrubbed>",
+    "parentAgentId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "permissionSuggestions": [],
+    "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "timestamp": 1794137207336,
+    "toolInput": {
+      "command": "<scrubbed>"
+    },
+    "toolName": "bash"
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}

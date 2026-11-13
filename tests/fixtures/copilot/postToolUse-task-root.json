@@ -1,0 +1,43 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "cwd": "{PROJECT}",
+    "sessionId": "ae073065-a7fd-dab3-0977-dec37aca573c",
+    "timestamp": 1794137204134,
+    "toolArgs": {
+      "agent_type": "spike-plugin:plugin-child",
+      "description": "<scrubbed>",
+      "mode": "<scrubbed>",
+      "model": "gpt-6-luna",
+      "name": "<scrubbed>",
+      "prompt": "recorded prompt (scrubbed)"
+    },
+    "toolCallId": "call_7197d7cdcf974be01914480e",
+    "toolName": "task",
+    "toolResult": {
+      "causalDependencies": [],
+      "resultType": "success",
+      "sessionLog": "<scrubbed>",
+      "textResultForLlm": "<scrubbed>",
+      "toolTelemetry": {
+        "metrics": {
+          "context_current_tokens": 15267.0,
+          "context_token_limit": 272000.0,
+          "large_output_threshold_bytes": 20480.0
+        },
+        "properties": {
+          "agent_name_hash": "<scrubbed>",
+          "agent_type": "custom-agent",
+          "execution_mode": "<scrubbed>",
+          "model": "<scrubbed>"
+        },
+        "restrictedProperties": {
+          "agent_id": "82634c5e-6f56-17e2-4fa5-3a4905560d39",
+          "agent_name": "<scrubbed>",
+          "model": "gpt-6-luna"
+        }
+      }
+    }
+  },
+  "source": "Copilot 1.0.107 events.jsonl hook.start input (native, unmodified except scrubbing)"
+}
