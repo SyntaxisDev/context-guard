@@ -2,11 +2,12 @@
 
 import math
 import time
+from dataclasses import replace
 from pathlib import Path
 
 from adapters.copilot.tools import text
-from core import events, policy, state as state_mod, subagent_notes
-from core.observation import PROMPT, TOOL, Observation
+from core import events, state as state_mod, subagent_notes
+from core.observation import BLOCK, NOTE, PASS, PROMPT, TOOL, Decision, Observation
 
 RUNTIME = "copilot"
 TRACKED = "children"
@@ -81,46 +82,41 @@ def track(event: str, payload: dict, directory: Path) -> None:
         adapter[TRACKED] = children
 
 
-def deliver(obs: Observation, response: dict, config: dict, directory: Path) -> dict:
-    """Append due silence notes to a model-facing parent prompt or tool response.
-
-    Blocked prompts retain their pending notices. State and logs are updated only after
-    the returned response contains the shared note text.
+def adjust(obs: Observation, decision: Decision, state: dict, config: dict) -> Decision:
+    """Append due silence notices within the policy state transaction.
 
     Args:
         obs: Root or child observation.
-        response: Native response already produced by policy and compaction recovery.
+        decision: Policy decision including pending compaction context.
+        state: Locked parent session state.
         config: Loaded configuration with subagents.silence_minutes.
-        directory: Adapter state directory.
 
     Returns:
-        Native response with each newly silent child's note appended, otherwise unchanged.
+        Decision with each newly silent child's note appended, otherwise unchanged.
     """
-    if obs.is_subagent or obs.event not in (PROMPT, TOOL) or "decision" in response:
-        return response
+    if obs.is_subagent or obs.event not in (PROMPT, TOOL) or decision.kind == BLOCK:
+        return decision
     threshold = config["subagents"]["silence_minutes"] * 60
     now, logged, notes = clock(), [], []
-    with state_mod.session_state(directory, RUNTIME, obs.session_id, commit=True) as state:
-        adapter = state.setdefault("adapter", {})
-        children = tracked(adapter)
-        for agent, record in children.items():
-            mark = record["active"]
-            if now - mark < threshold or record.get("warned") == mark:
-                continue
-            minutes = int(now - mark) // 60
-            notes.append(
-                subagent_notes.silent_note(text(record.get("role")), agent, text(record.get("transcript")), minutes)
-            )
-            detail = {"role": text(record.get("role")), "agent": agent, "minutes": minutes}
-            logged.append(events.record("subagent_silent", obs, detail=detail))
-            record["warned"] = mark
-        if notes:
-            response = {
-                **response,
-                "additionalContext": "\n\n".join(
-                    value for value in (response.get("additionalContext", ""), *notes) if value
-                ),
-            }
-        adapter[TRACKED] = children
-    policy.log_events(config, directory, logged)
-    return response
+    adapter = state.setdefault("adapter", {})
+    children = tracked(adapter)
+    for agent, record in children.items():
+        mark = record["active"]
+        if now - mark < threshold or record.get("warned") == mark:
+            continue
+        minutes = int(now - mark) // 60
+        notes.append(
+            subagent_notes.silent_note(text(record.get("role")), agent, text(record.get("transcript")), minutes)
+        )
+        detail = {"role": text(record.get("role")), "agent": agent, "minutes": minutes}
+        logged.append(events.record("subagent_silent", obs, detail=detail))
+        record["warned"] = mark
+    adapter[TRACKED] = children
+    if not notes:
+        return decision
+    return replace(
+        decision,
+        kind=NOTE if decision.kind == PASS else decision.kind,
+        message="\n\n".join(value for value in (decision.message, *notes) if value),
+        events=[*decision.events, *logged],
+    )

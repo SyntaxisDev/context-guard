@@ -1,8 +1,9 @@
 import copy
 from pathlib import Path
+from unittest import mock
 
 from adapters.copilot import hooks, mapping
-from core import config as config_mod
+from core import config as config_mod, deadline, state as state_mod
 from tests import harness
 
 
@@ -184,3 +185,33 @@ class HookTests(harness.RuntimeHookCase):
     def test_relative_runtime_home_is_explicitly_invalid(self) -> None:
         with self.assertRaisesRegex(ValueError, "absolute"):
             mapping.copilot_home(Path("/temporary"), {"COPILOT_HOME": "relative"})
+
+    def test_compaction_and_silence_complete_before_the_policy_commit(self) -> None:
+        start = self.payload("subagentStart-general-purpose", agentId="child", parentAgentId="root")
+        with mock.patch("adapters.copilot.subagents.clock", return_value=100):
+            self.fire("subagentStart", start)
+        complete = copy.deepcopy(harness.read_fixture("copilot", "events-compaction-complete")["record"])
+        complete["id"] = "compaction-1"
+        harness.append_transcript(self.transcript, complete)
+        committed = False
+        original_lock, original_commit = state_mod.session_state, deadline.commit
+
+        def lock(*args: object, **kwargs: object) -> object:
+            if committed:
+                self.fail("session lock reacquired after policy commit")
+            return original_lock(*args, **kwargs)
+
+        def commit() -> None:
+            nonlocal committed
+            committed = True
+            original_commit()
+
+        with (
+            mock.patch.object(state_mod, "session_state", side_effect=lock),
+            mock.patch.object(deadline, "commit", side_effect=commit),
+            mock.patch("adapters.copilot.subagents.clock", return_value=700),
+        ):
+            response = self.fire("userPromptSubmitted", self.payload("userPromptSubmitted-root"))
+        self.assertIn("silent", response["additionalContext"])
+        self.assertIn("context-guard", response["additionalContext"])
+        self.assertTrue(committed)

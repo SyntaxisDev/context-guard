@@ -15,8 +15,9 @@ if str(KIT) not in sys.path:
     sys.path.insert(0, str(KIT))
 
 from adapters.copilot import events, mapping, runner, subagents, tools
-from core import config as config_mod, hook, state as state_mod
-from core.observation import BLOCK, COMPACT, CONTEXT, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
+from core import config as config_mod, hook, policy, state as state_mod
+from core.observation import BLOCK, COMPACT, CONTEXT, NOTE, PASS, PROMPT, SESSION, STOP, TOOL, Decision, Observation
+from core.runner import service
 
 RUNTIME = mapping.RUNTIME
 ADAPTER_CONFIG = Path(__file__).resolve().parent / "config.json"
@@ -269,49 +270,51 @@ def handle(
     path = events.events_path(copilot_home, payload.get("sessionId"), payload.get("transcriptPath"))
     found = recovery(obs, path, config, home)
     identity, compact = found or (None, None)
-    context = evaluate(compact, event_name, config, home) if compact else {}
-    response = {} if compact and obs.event == SESSION else evaluate(obs, event_name, config, home)
-    response = carry_recovery(obs, context, response, config, home, identity)
-    return subagents.deliver(obs, response, config, config_mod.state_dir(config, home, RUNTIME))
+    return evaluate(obs, event_name, config, home, compact=compact, identity=identity)
 
 
-def carry_recovery(
-    obs: Observation, context: dict, response: dict, config: dict, home: Path, identity: str | None
-) -> dict:
-    """Commit compaction consumption and its pending context together after evaluation.
+def carry_recovery(obs: Observation, decision: Decision, state: dict, identity: str | None) -> Decision:
+    """Include pending compaction context in the policy transaction.
 
     Args:
         obs: Current root or child observation.
-        context: Context generated for a newly completed compaction.
-        response: Current native response.
-        config: Loaded configuration.
-        home: User home for adapter state.
+        decision: Current policy decision, or the compaction decision for a new compaction.
+        state: Locked session state.
         identity: Newly evaluated compaction identity, or None for existing pending context.
 
     Returns:
-        Native response with pending compaction context when delivery is possible.
+        Decision with pending context when delivery is possible.
     """
     if obs.is_subagent or obs.event not in (SESSION, PROMPT, TOOL):
-        return response
-    directory = config_mod.state_dir(config, home, RUNTIME)
-    with state_mod.session_state(directory, RUNTIME, obs.session_id, commit=True) as state:
-        adapter = state.setdefault("adapter", {})
-        pending = adapter.pop("recovery_context", "")
-        message = context.get("additionalContext") if identity else pending
-        if identity:
-            adapter["compaction"] = identity
-        if not isinstance(message, str) or not message:
-            return response
-        if "decision" in response:
-            adapter["recovery_context"] = message
-        else:
-            response["additionalContext"] = "\n\n".join(
-                value for value in (message, response.get("additionalContext", "")) if value
-            )
-    return response
+        return decision
+    adapter = state.setdefault("adapter", {})
+    pending = adapter.pop("recovery_context", "")
+    message = decision.message if identity else pending
+    if identity:
+        adapter["compaction"] = identity
+    if not isinstance(message, str) or not message:
+        return decision
+    if decision.kind == BLOCK:
+        adapter["recovery_context"] = message
+        return decision
+    if identity:
+        return decision
+    return replace(
+        decision,
+        kind=NOTE if decision.kind == PASS else decision.kind,
+        message="\n\n".join(value for value in (message, decision.message) if value),
+    )
 
 
-def evaluate(obs: Observation, event_name: str, config: dict, home: Path) -> dict:
+def evaluate(
+    obs: Observation,
+    event_name: str,
+    config: dict,
+    home: Path,
+    *,
+    compact: Observation | None = None,
+    identity: str | None = None,
+) -> dict:
     """Evaluate one observation with the shared policy and native response renderer.
 
     Args:
@@ -319,18 +322,59 @@ def evaluate(obs: Observation, event_name: str, config: dict, home: Path) -> dic
         event_name: Native response event.
         config: Loaded configuration.
         home: User home for state.
+        compact: Newly completed root compaction, when present.
+        identity: Native compaction identity, when present.
 
     Returns:
         Native response for the decision.
     """
+    routing = service.route(obs, config, lambda: runner.services(home)) if compact else service.Routing()
+    if routing.blocked:
+        return respond(service.combine(Decision(), routing), event_name)
+    text = session_policy(config) if compact else ""
+
+    def adjust(decision: Decision, state: dict) -> Decision:
+        """Complete native recovery and silence state before the policy commit.
+
+        Args:
+            decision: First policy decision.
+            state: Locked root or child session state.
+
+        Returns:
+            Final policy decision and its events.
+        """
+        recovery_text = decision.message if compact else ""
+        if compact and obs.event != SESSION:
+            ctx = policy.Context(config, config_mod.handoff_dir(config, home), home, text)
+            current = policy.decide(obs, state, ctx)
+            decision = replace(current, events=[*decision.events, *current.events])
+            decision = service.combine(decision, routing)
+        if compact:
+            adapter = state.setdefault("adapter", {})
+            adapter["compaction"] = identity
+            if obs.event != SESSION:
+                adapter.pop("recovery_context", None)
+                if decision.kind == BLOCK:
+                    adapter["recovery_context"] = recovery_text
+                elif recovery_text:
+                    decision = replace(
+                        decision,
+                        kind=NOTE if decision.kind == PASS else decision.kind,
+                        message="\n\n".join(value for value in (recovery_text, decision.message) if value),
+                    )
+        else:
+            decision = carry_recovery(obs, decision, state, None)
+        return subagents.adjust(obs, decision, state, config)
+
     return hook.evaluate(
-        obs,
+        compact or obs,
         config,
         home,
         lambda: runner.services(home),
         lambda decision: respond(decision, event_name),
         delivered,
-        lambda: session_policy(config),
+        (lambda: text) if compact else (lambda: session_policy(config)),
+        adjust=adjust,
     )
 
 
