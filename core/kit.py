@@ -7,7 +7,6 @@ and user edits are reported. Interpreter discovery and venv creation are injecta
 through Toolchain so tests can pin the current interpreter without uv.
 """
 
-import os
 import re
 import shlex
 import shutil
@@ -309,20 +308,16 @@ def spawn_update(argv: list[str], log: Path) -> bool:
     Returns:
         Whether the process started.
     """
-    actions = [
-        (os.POSIX_SPAWN_OPEN, 0, os.devnull, os.O_RDONLY, 0),
-        (
-            os.POSIX_SPAWN_OPEN,
-            1,
-            str(log),
-            os.O_WRONLY | os.O_CREAT | os.O_TRUNC,
-            0o644,
-        ),
-        (os.POSIX_SPAWN_DUP2, 1, 2),
-    ]
     try:
         log.parent.mkdir(parents=True, exist_ok=True)
-        os.posix_spawn(argv[0], argv, os.environ, file_actions=actions, setsid=True)
+        with log.open("wb") as output:
+            subprocess.Popen(  # noqa: S603
+                argv,
+                stdin=subprocess.DEVNULL,
+                stdout=output,
+                stderr=subprocess.STDOUT,
+                start_new_session=True,
+            )
     except OSError:
         return False
     return True
