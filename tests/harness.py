@@ -24,11 +24,12 @@ from pathlib import Path
 from types import ModuleType
 from unittest import mock
 
+from adapters.registry import discover
 from core import deadline
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).resolve().parent / "fixtures"
-RUNTIMES = ("cursor", "codex", "genie", "claude")
+RUNTIMES = tuple(discover())
 HOOK_SECONDS = 30
 WAKE_PARENT_ENV = "CONTEXT_GUARD_SUBAGENTS_WAKE_PARENT"
 VARINT_PAYLOAD = 0x7F
@@ -73,6 +74,7 @@ def claude_specific(event: str, **extra: object) -> dict:
 
 
 CURSOR_RESPONSES = {
+    "preCompact": obj({}),
     "sessionStart": obj({"env": {"type": "object"}, "additional_context": STRING}),
     "beforeSubmitPrompt": obj({"continue": {"type": "boolean"}, "user_message": STRING}, ("continue",)),
     "preToolUse": obj(
@@ -118,7 +120,9 @@ class Recorded:
     @property
     def subagent(self) -> bool:
         """Whether the payload was sent from inside a subagent."""
-        return bool(self.payload.get("agent_id") or self.payload.get("parent_tool_call_id"))
+        return bool(
+            self.payload.get("agent_id") or self.payload.get("parent_tool_call_id") or self.payload.get("agentId")
+        )
 
 
 def read_fixture(runtime: str, name: str) -> dict:
@@ -341,6 +345,10 @@ def response_problems(runtime: str, event: str, response: object) -> list[str]:
     Returns:
         One message per violation; empty when the response conforms.
     """
+    if runtime == "copilot":
+        from adapters.copilot.tests.responses import problems  # noqa: PLC0415
+
+        return problems(event, response)
     schema = response_schema(runtime, event)
     return schema_problems(response, schema, schema)
 
@@ -360,7 +368,7 @@ def hook_env(home: Path, extra: dict | None = None) -> dict:
         key: value
         for key, value in os.environ.items()
         if not key.startswith("CONTEXT_GUARD_")
-        and key not in ("PYTHONPATH", "CODEX_HOME", "GENIE_HOME", "CLAUDE_CONFIG_DIR")
+        and key not in ("PYTHONPATH", "CODEX_HOME", "GENIE_HOME", "CLAUDE_CONFIG_DIR", "COPILOT_HOME")
     }
     env.update({"HOME": str(home), WAKE_PARENT_ENV: "0", **(extra or {})})
     return env
@@ -390,7 +398,13 @@ class HookRun:
 
 
 def run_hook(
-    command: list[str] | str, data: object, home: Path, cwd: Path | None = None, env: dict | None = None
+    command: list[str] | str,
+    data: object,
+    home: Path,
+    cwd: Path | None = None,
+    env: dict | None = None,
+    *,
+    timeout: float = HOOK_SECONDS,
 ) -> HookRun:
     """Run one hook process the way a runtime does: payload on stdin, JSON on stdout.
 
@@ -400,6 +414,7 @@ def run_hook(
         home: The temporary home the hook sees.
         cwd: The working directory; defaults to `home`.
         env: Extra environment variables.
+        timeout: Maximum process lifetime in seconds.
 
     Returns:
         The exit status and captured output.
@@ -413,7 +428,7 @@ def run_hook(
         shell=isinstance(command, str),
         cwd=cwd or home,
         env=hook_env(home, env),
-        timeout=HOOK_SECONDS,
+        timeout=timeout,
         check=False,
     )
     return HookRun(result.returncode, result.stdout, result.stderr)
