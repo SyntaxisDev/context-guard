@@ -1,0 +1,24 @@
+{
+  "event": "postToolUse",
+  "payload": {
+    "conversation_id": "00a15f5b-2aed-dd19-c9f3-1d86c84e0a34",
+    "cursor_version": "2026.11.11-043ef28",
+    "duration": 4.055,
+    "generation_id": "fddebe55-280c-f87b-cd32-aa1497d5871d",
+    "hook_event_name": "postToolUse",
+    "model": "claude-haiku-5-5",
+    "session_id": "00a15f5b-2aed-dd19-c9f3-1d86c84e0a34",
+    "tool_input": {
+      "file_path": "{PROJECT}/file.txt"
+    },
+    "tool_name": "Read",
+    "tool_output": "<scrubbed>",
+    "tool_use_id": "toolu_6bba75fc50cb1aa9b6baf185",
+    "transcript_path": "{HOME}/.cursor/projects/dir/agent-transcripts/00a15f5b-2aed-dd19-c9f3-1d86c84e0a34/00a15f5b-2aed-dd19-c9f3-1d86c84e0a34.jsonl",
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Captured Cursor CLI hook JSONL; original capture sha256 cc7772f9a3351fe130ddc45fbf5f567b9f8c695d339682c284b98efb0f006eb9"
+}

@@ -1,0 +1,24 @@
+{
+  "event": "preCompact",
+  "payload": {
+    "context_tokens": 27747,
+    "context_usage_percent": 9.249,
+    "context_window_size": 300000,
+    "conversation_id": "00a15f5b-2aed-dd19-c9f3-1d86c84e0a34",
+    "cursor_version": "2026.11.11-043ef28",
+    "generation_id": "ab48b590-b334-255d-0498-9ebf62cfcda4",
+    "hook_event_name": "preCompact",
+    "is_first_compaction": true,
+    "message_count": 10,
+    "messages_to_compact": 8,
+    "model": "gemini-3.7-flash-low",
+    "session_id": "00a15f5b-2aed-dd19-c9f3-1d86c84e0a34",
+    "transcript_path": "{HOME}/.cursor/projects/dir/agent-transcripts/00a15f5b-2aed-dd19-c9f3-1d86c84e0a34/00a15f5b-2aed-dd19-c9f3-1d86c84e0a34.jsonl",
+    "trigger": "manual",
+    "user_email": "user@example.com",
+    "workspace_roots": [
+      "{PROJECT}"
+    ]
+  },
+  "source": "Captured Cursor CLI hook JSONL; original capture sha256 cc7772f9a3351fe130ddc45fbf5f567b9f8c695d339682c284b98efb0f006eb9"
+}
