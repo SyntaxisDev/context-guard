@@ -150,6 +150,17 @@ class CompactionTests(CursorHookCase):
         self.assertIn("Context check", driver.fire("tool").text)
         self.assertEqual(driver.fire("tool").text, "")
 
+    def test_driver_compaction_uses_overridden_generation(self) -> None:
+        driver = Driver(self.home, self.project, "overridden-generation")
+        self.assertIn("Recovery context", driver.fire("compact", generation_id="new-generation").text)
+
+    def test_driver_keeps_user_only_refusal_out_of_model_text(self) -> None:
+        driver = Driver(self.home, self.project, "refusal")
+        result = driver.decode({"continue": False, "user_message": "reason"})
+        self.assertEqual((result.text, result.user_text, result.blocked), ("", "reason", True))
+        combined = driver.decode({"additional_context": "model", "user_message": "reason"})
+        self.assertEqual((combined.text, combined.user_text), ("model", "reason"))
+
     def test_empty_rendered_response_does_not_consume_recovery(self) -> None:
         self.complete()
         with patch.object(hooks, "respond", return_value={}):

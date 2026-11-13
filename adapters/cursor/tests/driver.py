@@ -97,10 +97,11 @@ class Driver(AccessOperations, Operations):
         Returns:
             The observed native result.
         """
-        for channel in ("additional_context", "agent_message", "followup_message", "user_message"):
+        for channel in ("additional_context", "agent_message", "followup_message"):
             if raw.get(channel):
-                return Outcome(raw, raw[channel], raw.get("continue") is False, channel)
-        return Outcome(raw, "", raw.get("continue") is False, "none")
+                return Outcome(raw, raw[channel], raw.get("continue") is False, channel, raw.get("user_message", ""))
+        user_text = raw.get("user_message", "")
+        return Outcome(raw, "", raw.get("continue") is False, "user_message" if user_text else "none", user_text)
 
     def fire(self, action: str, **overrides: object) -> Outcome:
         """Apply Cursor's native role association recipe before leaf activity.
@@ -114,7 +115,7 @@ class Driver(AccessOperations, Operations):
         """
         if action == "compact":
             super().fire("compact", **overrides)
-            generation = self.payload("compact")["generation_id"]
+            generation = self.payload("compact", **overrides)["generation_id"]
             super().fire("compact_stop", generation_id=generation)
             return super().fire("compact_read")
         role = overrides.get("role")

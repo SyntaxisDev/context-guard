@@ -2,10 +2,12 @@ import json
 import sqlite3
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
 from unittest import mock
 
 from adapters.cursor import hooks, mapping, subagents
 from core import policy
+from core.runner import service
 from tests import harness
 
 START = 1_800_000_000
@@ -92,6 +94,32 @@ class SessionTests(CursorHookCase):
 
 class PromptTests(CursorHookCase):
     """Prompt notes and blocks, and delivery of held notes on the next tool result or session."""
+
+    def test_classifier_and_runner_notes_reach_model_on_next_tool(self) -> None:
+        self.user_config({"classifier": {"enabled": True}})
+        self.tokens("c1", 120000)
+        for message in (service.NEW_TASK_NOTE, "A pending runner report is available."):
+            with self.subTest(message=message):
+                with mock.patch.object(
+                    hooks.runner,
+                    "services",
+                    return_value=SimpleNamespace(prompt=lambda _, message=message: service.Routing(message=message)),
+                ):
+                    self.assertEqual(self.hook("beforeSubmitPrompt", prompt="new request"), {"continue": True})
+                note = self.hook("postToolUse", tool_name="Shell", tool_input={"command": "ls"})
+                self.assertIn(message, note["additional_context"])
+                self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
+
+    def test_runner_report_without_usage_is_delivered_once(self) -> None:
+        self.user_config({"runner": {"enabled": True}})
+        message = "A pending runner report is available."
+        with mock.patch.object(
+            hooks.runner, "services", return_value=SimpleNamespace(prompt=lambda _: service.Routing(message=message))
+        ):
+            self.assertEqual(self.hook("beforeSubmitPrompt", prompt="new request"), {"continue": True})
+        note = self.hook("postToolUse", tool_name="Shell", tool_input={"command": "ls"})
+        self.assertIn(message, note["additional_context"])
+        self.assertEqual(self.hook("postToolUse", tool_name="Shell", tool_input={}), {})
 
     def test_block_reports_chat_tokens_and_the_chat_limit(self) -> None:
         self.tokens("c1", 190000)
