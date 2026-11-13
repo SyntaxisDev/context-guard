@@ -4,6 +4,7 @@
     "standard": {"model": "gpt-5.6-sol", "effort": "medium"},
     "deep": {"model": "gpt-5.6-sol", "effort": "high"}
   },
+  "subagents": {"silence_minutes": 10},
   "rollout": {"tail_bytes": 2097152},
   "hook_output": {"session_context_limit": 6000}
 }
