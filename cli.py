@@ -20,12 +20,13 @@ from pathlib import Path
 from types import ModuleType
 from typing import TextIO
 
+from adapters.registry import discover
 from core import config, events, install, kit, package
 from core.install_spec import InstallSpec
 from core.state import read_json
 
 ROOT = Path(__file__).resolve().parent
-RUNTIMES = ("cursor", "codex", "genie", "claude")
+RUNTIMES = tuple(discover())
 COMMANDS = ("install", "uninstall", "doctor", "status", "package")
 EXIT_OK, EXIT_ISSUES, EXIT_ERROR = 0, 1, 2
 
@@ -43,7 +44,7 @@ def import_mapping(runtime: str) -> ModuleType:
     Returns:
         The `adapters.<runtime>.mapping` module.
     """
-    return importlib.import_module(f"adapters.{runtime}.mapping")
+    return importlib.import_module(discover()[runtime].mapping)
 
 
 def import_plugin(runtime: str) -> ModuleType:
