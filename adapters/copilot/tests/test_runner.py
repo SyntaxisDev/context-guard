@@ -1,6 +1,7 @@
 """Copilot runner provider: isolated prompt-mode argv, scratch home, answer gating and fail-closed validation."""
 
 import json
+import os
 import stat
 import subprocess
 import tempfile
@@ -23,6 +24,9 @@ class RunnerTestCase(unittest.TestCase):
         self.base = Path(temporary.name).resolve()
         self.source = self.base / "source-home"
         self.source.mkdir()
+        home_patch = mock.patch.dict(os.environ, {"COPILOT_HOME": str(self.source)})
+        home_patch.start()
+        self.addCleanup(home_patch.stop)
         config = {
             "loggedInUsers": [{**ACCOUNT, "token": "SECRET-TOKEN"}],
             "lastLoggedInUser": {**ACCOUNT, "token": "SECRET-TOKEN"},
@@ -128,6 +132,13 @@ class AnswerTests(RunnerTestCase):
 
 class ProviderTests(RunnerTestCase):
     """The provider runs through the shared completion helper with a stubbed subprocess."""
+
+    def test_provider_sources_account_from_the_temporary_profile(self) -> None:
+        self.assertEqual(os.environ["COPILOT_HOME"], str(self.source))
+        provider = runner.provider(self.config, self.base)
+        provider.command("/bin/copilot", self.model, "classify", self.scratch, None)
+        stored = json.loads((self.scratch / "copilot-home/config.json").read_text())
+        self.assertEqual(stored["lastLoggedInUser"], ACCOUNT)
 
     def test_complete_runs_the_stubbed_copilot_and_returns_its_answer(self) -> None:
         provider = runner.provider(self.config, self.base)

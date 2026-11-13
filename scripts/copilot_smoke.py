@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import shutil
+import stat
 import subprocess
 import sys
 import tempfile
@@ -85,22 +86,52 @@ def evidence(runtime: Path, home: Path, session: str, event: str) -> tuple[Path,
     return native, hooks, context
 
 
-def installed_hook(runtime: Path, event: str, payload: dict, home: Path, cwd: Path) -> dict:
+def output_directory(output: Path | None) -> Path:
+    """Choose a private evidence directory and reject unsafe existing paths.
+
+    Args:
+        output: Explicit output directory, or None for a new private directory.
+
+    Returns:
+        Absolute output directory.
+
+    Raises:
+        RuntimeError: An existing path is not a private directory or contains an unsafe result file.
+    """
+    if output is None:
+        return Path(tempfile.mkdtemp(prefix="copilot-installed-smoke-")).resolve()
+    if output.is_symlink():
+        msg = "smoke output must not be a symlink"
+        raise RuntimeError(msg)
+    target = output.resolve()
+    if target.exists():
+        mode = target.stat()
+        if not target.is_dir() or mode.st_uid != os.getuid() or mode.st_mode & (stat.S_IWGRP | stat.S_IWOTH):
+            msg = "smoke output must be an owned, non-writable-by-others directory"
+            raise RuntimeError(msg)
+        if (target / "result.json").exists() or (target / "result.json").is_symlink():
+            msg = "smoke result already exists"
+            raise RuntimeError(msg)
+    else:
+        target.mkdir(parents=True, mode=0o700)
+    return target
+
+
+def installed_hook(runtime: Path, event: str, payload: dict, cwd: Path, env: dict[str, str]) -> dict:
     """Invoke the exact command rendered in the installed hook file.
 
     Args:
         runtime: Temporary Copilot root.
         event: Native event key.
         payload: Native event input.
-        home: Temporary context-guard home.
         cwd: Temporary project directory.
+        env: Sanitised sandbox environment.
 
     Returns:
         Decoded response from the installed command.
     """
     config = json.loads((runtime / "hooks/context-guard.json").read_text())
     spec = config["hooks"][event][0]
-    env = {**os.environ, "COPILOT_HOME": str(runtime), "CONTEXT_GUARD_HOME": str(home)}
     shell = shutil.which("bash")
     require(shell is not None, "bash is required to invoke installed hooks")
     result = subprocess.run(  # noqa: S603
@@ -222,29 +253,32 @@ def main() -> int:
     mode = parser.add_mutually_exclusive_group(required=True)
     mode.add_argument("--dry-run", action="store_true", help="offline temporary-home check")
     mode.add_argument("--run", action="store_true", help="authorized authenticated native check")
-    parser.add_argument("--output", type=Path, default=Path(tempfile.gettempdir()) / "copilot-installed-smoke")
+    parser.add_argument("--output", type=Path, help="private output directory (default: new temporary directory)")
     parser.add_argument("--copilot-cli", default=shutil.which("copilot"), help="CLI executable or measured cli-main.js")
     args = parser.parse_args()
-    args.output.mkdir(parents=True, exist_ok=True)
+    args.output = output_directory(args.output)
     record = {"mode": "native" if args.run else "dry-run", "started": time.time(), "output": str(args.output)}
     base = args.output / "sandbox"
     home, runtime, work = base / "home", base / "runtime", base / "work"
+    env = {
+        **{key: value for key, value in os.environ.items() if not key.startswith("CONTEXT_GUARD_")},
+        "COPILOT_HOME": str(runtime),
+        "CONTEXT_GUARD_HOME": str(home),
+        "COPILOT_AUTO_UPDATE": "false",
+        "COPILOT_TELEMETRY_DISABLED": "true",
+        "COPILOT_CACHE_HOME": str(base / "cache"),
+        "XDG_CACHE_HOME": str(base / "xdg"),
+        "UV_CACHE_DIR": str(base / "uv-cache"),
+    }
     try:
-        require(not base.exists(), "smoke sandbox already exists; choose a fresh --output directory")
+        require(
+            not base.exists() and not base.is_symlink(),
+            "smoke sandbox already exists; choose a fresh --output directory",
+        )
         for path in (home, runtime, work / ".git", base / "cache", base / "xdg", base / "uv-cache"):
             path.mkdir(parents=True, exist_ok=True)
-        git_init = invoke(["git", "init", "-q"], env=dict(os.environ), cwd=work, timeout=15)
+        git_init = invoke(["git", "init", "-q"], env=env, cwd=work, timeout=15)
         require(git_init.returncode == 0, "unable to initialize isolated smoke project")
-        env = {
-            **os.environ,
-            "COPILOT_HOME": str(runtime),
-            "CONTEXT_GUARD_HOME": str(home),
-            "COPILOT_AUTO_UPDATE": "false",
-            "COPILOT_TELEMETRY_DISABLED": "true",
-            "COPILOT_CACHE_HOME": str(base / "cache"),
-            "XDG_CACHE_HOME": str(base / "xdg"),
-            "UV_CACHE_DIR": str(base / "uv-cache"),
-        }
         title = f"blind-handoff-{uuid.uuid4().hex[:8]}"
         handoffs = home / ".context-guard" / "handoffs"
         handoffs.mkdir(parents=True, exist_ok=True)
@@ -260,7 +294,7 @@ def main() -> int:
         require(install.returncode == 0, f"temporary install failed: {install.stderr[-500:]}")
         record["install_exit"] = install.returncode
         if args.dry_run:
-            record["offline"] = offline_check(home, runtime, work, handoffs)
+            record["offline"] = offline_check(home, runtime, work, handoffs, env)
         else:
             record.update(native_check(args, env, runtime, home, work, handoffs, title))
         record["status"] = "pass"
@@ -278,7 +312,7 @@ def main() -> int:
     return 0 if record["status"] == "pass" else 1
 
 
-def offline_check(home: Path, runtime: Path, work: Path, handoffs: Path) -> dict:
+def offline_check(home: Path, runtime: Path, work: Path, handoffs: Path, env: dict[str, str]) -> dict:
     """Verify exact installed commands against temporary native telemetry.
 
     Args:
@@ -286,6 +320,7 @@ def offline_check(home: Path, runtime: Path, work: Path, handoffs: Path) -> dict
         runtime: Copilot configuration root.
         work: Isolated project directory.
         handoffs: Isolated handoff store.
+        env: Sanitised sandbox environment.
 
     Returns:
         Successful session-context and prompt-refusal observations.
@@ -309,15 +344,15 @@ def offline_check(home: Path, runtime: Path, work: Path, handoffs: Path) -> dict
         + "\n"
     )
     start = installed_hook(
-        runtime, "sessionStart", {"sessionId": "offline", "cwd": str(work), "source": "new"}, home, work
+        runtime, "sessionStart", {"sessionId": "offline", "cwd": str(work), "source": "new"}, work, env
     )
     configure(home, handoffs, block=True)
     block = installed_hook(
         runtime,
         "userPromptSubmitted",
         {"sessionId": "offline", "cwd": str(work), "prompt": "continue"},
-        home,
         work,
+        env,
     )
     require(bool(start.get("additionalContext")), "installed sessionStart did not return context")
     require(block.get("decision") == "block", "installed prompt hook did not block at configured threshold")

@@ -56,17 +56,17 @@ class CompactionTransactionTests(harness.RuntimeHookCase):
 
     def test_interrupted_response_evaluation_keeps_compaction_retryable(self) -> None:
         self.complete("compaction-1")
-        original = hooks.evaluate
+        original = hooks.policy.decide
         calls = 0
 
-        def interrupted(*args: object) -> dict:
-            """Interrupt after the compaction context is evaluated.
+        def interrupted(*args: object) -> object:
+            """Interrupt after compaction policy is evaluated, before response policy.
 
             Args:
-                *args: Arguments forwarded to the actual evaluator on its first call.
+                *args: Arguments forwarded to the policy decision.
 
             Returns:
-                Native compaction response from the actual evaluator.
+                The compaction policy decision.
 
             Raises:
                 DeadlineExceeded: At the second evaluation before compaction consumption.
@@ -77,7 +77,7 @@ class CompactionTransactionTests(harness.RuntimeHookCase):
                 raise deadline.DeadlineExceeded
             return original(*args)
 
-        with patch.object(hooks, "evaluate", side_effect=interrupted):
+        with patch.object(hooks.policy, "decide", side_effect=interrupted):
             self.assertEqual(self.fire(), {})
         with patch.object(hooks, "session_policy", return_value="retry-policy"):
             self.assertIn("retry-policy", self.fire()["additionalContext"])
@@ -86,7 +86,7 @@ class CompactionTransactionTests(harness.RuntimeHookCase):
     def test_failed_deadline_reserve_does_not_consume_compaction_or_pending_context(self) -> None:
         self.complete("compaction-1")
         with (
-            patch.object(hooks, "evaluate", side_effect=[{"additionalContext": "new-policy"}, {}]),
+            patch.object(hooks, "session_policy", return_value="new-policy"),
             patch.object(deadline, "commit", side_effect=deadline.DeadlineExceeded),
         ):
             self.assertEqual(self.fire(), {})
