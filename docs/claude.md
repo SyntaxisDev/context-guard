@@ -75,8 +75,11 @@ allow rule to `permissions.allow` in `~/.claude/settings.json` (creating `permis
 when absent): `Edit(//<absolute handoff dir>/**)`, where `//` marks an absolute path and an `Edit`
 rule covers Edit, Write and MultiEdit. It covers only the handoff directory, not `~/.context-guard`,
 which also holds the kit and hook code. A `permissions` that is not an object or an `allow` that is
-not a list is left alone. Uninstall removes only the rule, plus `allow` and `permissions` when that
-empties them; the byte-identical restore of the original settings file still applies.
+not a list is left alone during install. Uninstall removes only the rule, plus `allow` and
+`permissions` when that empties them; the byte-identical restore of the original settings file
+still applies. If `permissions` is not an object or `allow`/`deny` is not a list, uninstall reports
+a conflict (or `access.py` exits 2 on error) and leaves the settings bytes and install manifest
+unchanged so the user can correct the file and retry.
 
 The script install includes the rule in its `settings.json` merge. A plugin user runs, once:
 

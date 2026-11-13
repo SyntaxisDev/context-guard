@@ -2,6 +2,7 @@
 
 import ast
 import importlib.util
+import os
 import tempfile
 import unittest
 from pathlib import Path
@@ -134,6 +135,29 @@ class DriverBoundaryTests(unittest.TestCase):
                 self.assertFalse(outcome.text)
                 self.assertFalse(outcome.blocked)
                 self.assertEqual(outcome.channel, "none")
+
+    def test_in_process_runner_ignores_inherited_configuration(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            home = Path(temporary)
+            driver = load_driver("codex", home, home / "project", "runner-env")
+            observed = []
+
+            def roundtrip(*_args: object) -> tuple:
+                observed.append(dict(os.environ))
+                return ("staged", "scheduled", 0, {"status": "done"})
+
+            with (
+                patch.dict(os.environ, {"CONTEXT_GUARD_PATHS_STATE_DIR": "/unsafe", "CODEX_HOME": "/unsafe"}),
+                patch.object(driver, "runner_roundtrip", side_effect=roundtrip),
+            ):
+                driver.runner_contract()
+                self.assertEqual(os.environ["CONTEXT_GUARD_PATHS_STATE_DIR"], "/unsafe")
+            self.assertEqual(len(observed), 2)
+            for environment in observed:
+                self.assertNotIn("CONTEXT_GUARD_PATHS_STATE_DIR", environment)
+                self.assertNotIn("CODEX_HOME", environment)
+                self.assertEqual(environment["HOME"], str(home))
+                self.assertEqual(environment["CONTEXT_GUARD_HOME"], str(home))
 
     def test_user_visible_system_message_is_not_model_context_delivery(self) -> None:
         for runtime in ("codex", "genie", "claude"):

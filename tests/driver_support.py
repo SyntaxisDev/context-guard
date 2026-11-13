@@ -694,19 +694,21 @@ class Operations:
         def spawn(argv: list[str], **_kwargs: object) -> None:
             staged.append(Path(argv[-1]))
 
-        environment = {
-            "HOME": str(self.home),
-            "CONTEXT_GUARD_HOME": str(self.home),
-            "COPILOT_HOME": str(self.home / ".copilot"),
-            "CONTEXT_GUARD_INTERNAL": "0",
-            "CONTEXT_GUARD_RUNNER_ENABLED": "true",
-            "CONTEXT_GUARD_RUNNER_COOLDOWN_SECONDS": "0",
-        }
+        environment = harness.hook_env(
+            self.home,
+            {
+                "CONTEXT_GUARD_HOME": str(self.home),
+                "COPILOT_HOME": str(self.home / ".copilot"),
+                "CONTEXT_GUARD_INTERNAL": "0",
+                "CONTEXT_GUARD_RUNNER_ENABLED": "true",
+                "CONTEXT_GUARD_RUNNER_COOLDOWN_SECONDS": "0",
+            },
+        )
         self.tokens(int(self.window * 0.7))
         observations = []
         try:
             with (
-                mock.patch.dict(os.environ, environment),
+                mock.patch.dict(os.environ, environment, clear=True),
                 mock.patch("core.runner.provider.shutil.which", side_effect=lambda name: f"/usr/bin/{name}"),
                 mock.patch("core.runner.provider.processes.run", side_effect=transport),
                 mock.patch("core.runner.mechanical.subprocess.Popen", side_effect=spawn),
