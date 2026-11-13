@@ -374,9 +374,9 @@ State lives in `paths.state_dir/<runtime>/`: `decisions.jsonl`, `classifier_cach
 
 ## Verification
 
-Run `uv run --python 3.14 python -m unittest discover -s tests -t .` plus each adapter
-suite (see `AGENTS.md`). Installer checks use `--home` with a temporary directory, never a
-live home. Fixture tests prove contracts; hook execution inside a real runtime needs a live
+Run `uv run --python 3.14 python -m unittest discover -s tests -t .`; it discovers the shared
+tests and every `adapters/<runtime>/tests` suite. Installer checks use `--home` with a
+temporary directory, never a live home. Fixture tests prove contracts; hook execution inside a real runtime needs a live
 smoke run, `scripts/sandbox_smoke.sh`, which uses the real logins and sandboxes only the hook
 and config wiring. Each runtime doc ends with an Unverified list of facts not yet observed.
 
