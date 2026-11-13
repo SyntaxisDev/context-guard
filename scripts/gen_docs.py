@@ -11,10 +11,55 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-RUNTIMES = ("cursor", "codex", "genie", "claude")
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from adapters.registry import discover, validate_adapter_documentation  # noqa: E402
+from core.features import Feature  # noqa: E402
+
+RUNTIMES = tuple(discover())
 BEGIN = "<!-- BEGIN generated: tiers -->"
 END = "<!-- END generated: tiers -->"
 BLOCK = re.compile(re.escape(BEGIN) + r".*?" + re.escape(END), re.DOTALL)
+SUPPORT_BEGIN = "<!-- BEGIN generated: declared-support -->"
+SUPPORT_END = "<!-- END generated: declared-support -->"
+SUPPORT_BLOCK = re.compile(re.escape(SUPPORT_BEGIN) + r".*?" + re.escape(SUPPORT_END), re.DOTALL)
+
+
+def declared_support(text: str) -> str:
+    """Replace the README's declared-support matrix using validated metadata.
+
+    Args:
+        text: The current README text, containing generated support markers.
+
+    Returns:
+        The README with current support declarations, independently of test results.
+
+    Raises:
+        ValueError: The README has no generated support markers.
+    """
+    if not SUPPORT_BLOCK.search(text):
+        msg = "README.md has no generated declared-support markers"
+        raise ValueError(msg)
+    adapters = discover()
+    for adapter in adapters.values():
+        validate_adapter_documentation(adapter)
+    rows = [
+        SUPPORT_BEGIN,
+        "Declared support (capability declarations, not test results).",
+        "",
+        "Gap links explain the reason and kind; universal guarantees cannot be opted out.",
+        "",
+        "| Capability | " + " | ".join(adapters) + " |",
+        "| --- |" + " --- |" * len(adapters),
+    ]
+    for feature in Feature:
+        cells = []
+        for adapter in adapters.values():
+            gap = adapter.gaps.get(feature)
+            cells.append(f"[{gap.kind.value}]({gap.documentation})" if gap else "supported")
+        rows.append(f"| `{feature.value}` | " + " | ".join(cells) + " |")
+    return SUPPORT_BLOCK.sub(lambda _: "\n".join([*rows, SUPPORT_END]), text)
 
 
 def tier_table(runtime: str) -> str:
@@ -79,6 +124,15 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--check", action="store_true")
     args = parser.parse_args(argv)
     status = 0
+    readme = ROOT / "README.md"
+    current = readme.read_text()
+    rendered = declared_support(current)
+    if current != rendered:
+        if args.check:
+            print("README.md is stale; run scripts/gen_docs.py", file=sys.stderr)
+            status = 1
+        else:
+            readme.write_text(rendered)
     for runtime in RUNTIMES:
         path = ROOT / "docs" / f"{runtime}.md"
         if not stale(runtime):
