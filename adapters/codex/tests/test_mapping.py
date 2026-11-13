@@ -165,6 +165,15 @@ class ConfigTomlTests(SpecCase):
         self.assertNotIn("context-guard", reverted)
         self.assertEqual(tomllib.loads(reverted), tomllib.loads(USER_CONFIG + trust))
 
+    def test_crlf_foreign_table_inside_agents_section_survives_uninstall(self) -> None:
+        installed = self.registrations.apply(USER_CONFIG).replace("\n", "\r\n")
+        foreign = '\r\n[profiles.extra]\r\nmodel = "x"\r\n'
+        rewritten = installed.replace(mapping.SECTION_END, foreign + mapping.SECTION_END)
+        reverted = self.registrations.revert(rewritten)
+        self.assertNotIn(mapping.SECTION_BEGIN, reverted)
+        self.assertIn('[profiles.extra]\r\nmodel = "x"', reverted)
+        self.assertEqual(tomllib.loads(reverted)["profiles"]["extra"]["model"], "x")
+
 
 class HandoffAccessTests(SpecCase):
     """The config.toml edit adds the handoff directory to the sandbox writable roots and reverses exactly."""
@@ -197,6 +206,15 @@ class HandoffAccessTests(SpecCase):
         self.assertIn(f"[sandbox_workspace_write]\n{mapping.owned_line(Path(self.root))}\n", applied)
         self.assertEqual(tomllib.loads(applied)[mapping.SANDBOX_TABLE]["network_access"], True)
         self.assertNotIn(mapping.ACCESS_BEGIN, applied)
+
+    def test_crlf_sandbox_header_without_roots_gets_access(self) -> None:
+        access = mapping.access_edit(self.codex / "config.toml", Path(self.root), enabled=True)
+        for header in ("[sandbox_workspace_write]", "[sandbox_workspace_write] # user comment"):
+            with self.subTest(header=header):
+                original = header + "\r\nnetwork_access = true\r\n"
+                installed = access.apply(original)
+                self.assertIn(self.root, tomllib.loads(installed)[mapping.SANDBOX_TABLE][mapping.ROOTS_KEY])
+                self.assertEqual(access.revert(installed), original)
 
     def test_a_directory_already_present_is_left_alone(self) -> None:
         original = f'[sandbox_workspace_write]\nwritable_roots = [{json.dumps(self.root)}, "/srv"]\n'
@@ -241,6 +259,17 @@ class HandoffAccessTests(SpecCase):
         self.assertTrue(reapplied.startswith(installed))
         self.assertEqual(tomllib.loads(reapplied), tomllib.loads(rewritten))
         self.assertEqual(tomllib.loads(access.revert(rewritten)), tomllib.loads(USER_CONFIG + "\n" + trust))
+
+    def test_crlf_foreign_table_after_blank_line_inside_access_block_survives_uninstall(self) -> None:
+        access = mapping.access_edit(self.codex / "config.toml", Path(self.root), enabled=True)
+        installed = access.apply(USER_CONFIG).replace("\n", "\r\n")
+        foreign = '\r\n[profiles.extra]\r\nmodel = "x"\r\n'
+        rewritten = installed.replace(mapping.ACCESS_END, foreign + mapping.ACCESS_END)
+        reverted = access.revert(rewritten)
+        self.assertNotIn(mapping.ACCESS_BEGIN, reverted)
+        self.assertNotIn(self.root, reverted)
+        self.assertIn('[profiles.extra]\r\nmodel = "x"', reverted)
+        self.assertEqual(tomllib.loads(reverted)["profiles"]["extra"]["model"], "x")
 
     def test_disabled_setting_adds_nothing_and_withdraws_an_unedited_edit(self) -> None:
         installed = self.edit.apply(USER_CONFIG)
