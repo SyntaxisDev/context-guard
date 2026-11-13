@@ -432,7 +432,8 @@ def find_python() -> Path:
     """
     candidates = []
     uv = shutil.which("uv")
-    found = run_tool([uv, "python", "find", "--system", "--no-project", REQUIREMENT]) if uv else None
+    # --no-cache: discovery must not create uv's cache in the home, so dry runs write nothing.
+    found = run_tool([uv, "python", "find", "--system", "--no-project", "--no-cache", REQUIREMENT]) if uv else None
     if found and found.returncode == 0 and found.stdout.strip():
         candidates.append(Path(found.stdout.strip()))
     system = shutil.which("python3")
